@@ -1,0 +1,74 @@
+QWidget {
+    background-color: #111827;
+    color: #E5E7EB;
+    font-family: "Segoe UI";
+    font-size: 13px;
+}
+
+#Sidebar {
+    background-color: #020617;
+    border-right: 1px solid #1F2937;
+}
+
+#SidebarTitle {
+    font-size: 24px;
+    font-weight: 800;
+    color: #FFFFFF;
+}
+
+#SidebarSubtitle {
+    font-size: 12px;
+    font-weight: 700;
+    color: #60A5FA;
+    letter-spacing: 2px;
+}
+
+#Content {
+    background-color: #111827;
+}
+
+#PageTitle {
+    font-size: 24px;
+    font-weight: 800;
+    color: #F9FAFB;
+}
+
+QPushButton {
+    background-color: #1F2937;
+    color: #E5E7EB;
+    border: 1px solid #374151;
+    border-radius: 10px;
+    padding: 11px;
+    text-align: left;
+    font-weight: 600;
+}
+
+QPushButton:hover {
+    background-color: #2563EB;
+    border: 1px solid #3B82F6;
+}
+
+#BaseCard {
+    background-color: #1F2937;
+    border: 1px solid #374151;
+    border-radius: 14px;
+    padding: 12px;
+}
+
+#CardTitle {
+    font-size: 15px;
+    font-weight: 800;
+    color: #FFFFFF;
+}
+
+#CardContent {
+    color: #D1D5DB;
+    font-family: "Segoe UI";
+    font-size: 13px;
+    line-height: 1.4;
+}
+#ClockLabel {
+    color: #93C5FD;
+    font-size: 13px;
+    font-weight: 600;
+}

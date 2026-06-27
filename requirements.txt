@@ -1,0 +1,5 @@
+PySide6==6.7.2
+Pillow
+PyMuPDF
+pytest
+ruff

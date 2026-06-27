@@ -1,0 +1,32 @@
+# Virtual Environment
+.venv/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# VS Code
+.vscode/
+
+# Build
+build/
+dist/
+*.spec
+
+# Logs
+*.log
+
+# SQLite
+*.db
+
+# Output
+output/reports/*
+output/snapshots/*
+output/exports/*
+
+# Keep folders
+!output/reports/.gitkeep
+!output/snapshots/.gitkeep
+!output/exports/.gitkeep
