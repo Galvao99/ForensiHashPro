@@ -8,6 +8,8 @@ from app.models.analysis_result import (
 from app.models.digital_signature_result import DigitalSignatureResult
 from app.models.magic_number_result import MagicNumberResult
 from app.models.reference import Reference
+from app.models.comparison_result import ComparisonResult
+from app.models.comparison_section import ComparisonSection
 
 __all__ = [
     "AnalysisResult",
@@ -18,4 +20,6 @@ __all__ = [
     "Reference",
     "MagicNumberResult",
     "DigitalSignatureResult",
+    "ComparisonResult",
+    "ComparisonSection",
 ]
