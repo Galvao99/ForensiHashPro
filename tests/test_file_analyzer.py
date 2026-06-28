@@ -5,6 +5,8 @@ from app.engines.finding_engine import FindingsEngine
 from app.engines.hash_engine import HashEngine
 from app.engines.metadata_engine import MetadataEngine
 from app.models import AnalysisResult
+from app.engines.magic_number_engine import MagicNumberEngine
+from app.engines.digital_signature_engine import DigitalSignatureEngine
 
 
 class TestFileAnalyzer:
@@ -15,7 +17,15 @@ class TestFileAnalyzer:
         hash_engine = HashEngine()
         findings_engine = FindingsEngine()
         metadata_engine = MetadataEngine()
-        analyzer = FileAnalyzer(hash_engine, metadata_engine, findings_engine)        
+        magic_number_engine = MagicNumberEngine()
+        digital_signature_engine = DigitalSignatureEngine()
+        analyzer = FileAnalyzer(
+            hash_engine=hash_engine,
+            metadata_engine=metadata_engine,
+            findings_engine=findings_engine,
+            magic_number_engine=magic_number_engine,
+            digital_signature_engine=digital_signature_engine,
+        )
 
         result = analyzer.analyze(test_file)
 
@@ -30,3 +40,5 @@ class TestFileAnalyzer:
         assert result.hashes.sha384
         assert result.hashes.sha512
         assert result.metadata.raw
+        assert result.magic_numbers
+        assert result.digital_signature
