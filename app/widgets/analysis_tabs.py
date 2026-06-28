@@ -6,6 +6,8 @@ from app.pages.general_page import GeneralPage
 from app.pages.hash_page import HashPage
 from app.pages.metadata_page import MetadataPage
 from app.pages.timeline_page import TimelinePage
+from app.pages.magic_number_page import MagicNumberPage
+from app.pages.digital_signature_pages import DigitalSignaturePage
 
 
 class AnalysisTabs(QTabWidget):
@@ -21,12 +23,18 @@ class AnalysisTabs(QTabWidget):
         self.metadata_page = MetadataPage()
         self.finding_page = FindingPage()
         self.timeline_page = TimelinePage()
+        self.magic_number_page = MagicNumberPage()
+        self.digital_signature_page = DigitalSignaturePage()
+
+# =================================================== #
 
         self.addTab(self.general_page, "Geral")
         self.addTab(self.hash_page, "Hashes")
         self.addTab(self.metadata_page, "Metadados")
         self.addTab(self.finding_page, "Vestígios")
         self.addTab(self.timeline_page, "Timeline")
+        self.addTab(self.magic_number_page, "Magic Number")
+        self.addTab(self.digital_signature_page, "Assinatura Digital")
 
     def update_analysis(self, result: AnalysisResult) -> None:
         self.general_page.update_analysis(result)
@@ -34,3 +42,5 @@ class AnalysisTabs(QTabWidget):
         self.metadata_page.update_analysis(result)
         self.finding_page.update_analysis(result)
         self.timeline_page.update_analysis(result)
+        self.magic_number_page.update_analysis(result)
+        self.digital_signature_page.update_analysis(result)

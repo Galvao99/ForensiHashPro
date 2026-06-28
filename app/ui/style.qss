@@ -1,5 +1,5 @@
 QWidget {
-    background-color: #111827;
+    background-color: #0F172A;
     color: #E5E7EB;
     font-family: "Segoe UI";
     font-size: 13px;
@@ -7,68 +7,143 @@ QWidget {
 
 #Sidebar {
     background-color: #020617;
-    border-right: 1px solid #1F2937;
+    border-right: 1px solid #1E293B;
 }
 
 #SidebarTitle {
-    font-size: 24px;
+    font-size: 25px;
     font-weight: 800;
-    color: #FFFFFF;
+    color: #F8FAFC;
 }
 
 #SidebarSubtitle {
     font-size: 12px;
     font-weight: 700;
-    color: #60A5FA;
+    color: #38BDF8;
     letter-spacing: 2px;
 }
 
+#SidebarSectionTitle {
+    color: #94A3B8;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
 #Content {
-    background-color: #111827;
+    background-color: #0F172A;
 }
 
 #PageTitle {
     font-size: 24px;
     font-weight: 800;
-    color: #F9FAFB;
+    color: #F8FAFC;
+}
+
+#ClockLabel {
+    color: #93C5FD;
+    font-size: 13px;
+    font-weight: 600;
 }
 
 QPushButton {
-    background-color: #1F2937;
+    background-color: #111827;
     color: #E5E7EB;
-    border: 1px solid #374151;
+    border: 1px solid #334155;
     border-radius: 10px;
-    padding: 11px;
+    padding: 11px 12px;
     text-align: left;
     font-weight: 600;
 }
 
 QPushButton:hover {
     background-color: #2563EB;
-    border: 1px solid #3B82F6;
+    border: 1px solid #60A5FA;
 }
 
-#BaseCard {
-    background-color: #1F2937;
-    border: 1px solid #374151;
-    border-radius: 14px;
-    padding: 12px;
+#BaseCard, #InfoCard {
+    background-color: #111827;
+    border: 1px solid #334155;
+    border-radius: 16px;
+    padding: 14px;
 }
 
 #CardTitle {
-    font-size: 15px;
+    font-size: 16px;
     font-weight: 800;
-    color: #FFFFFF;
+    color: #F8FAFC;
 }
 
 #CardContent {
-    color: #D1D5DB;
+    color: #CBD5E1;
     font-family: "Segoe UI";
     font-size: 13px;
-    line-height: 1.4;
 }
-#ClockLabel {
-    color: #93C5FD;
-    font-size: 13px;
+
+#DashboardTitle {
+    font-size: 18px;
+    font-weight: 800;
+    color: #F8FAFC;
+    padding-bottom: 8px;
+}
+
+QTabWidget::pane {
+    border: 1px solid #334155;
+    border-radius: 14px;
+    background-color: #0B1120;
+    top: -1px;
+}
+
+QTabBar::tab {
+    background-color: #111827;
+    color: #CBD5E1;
+    border: 1px solid #334155;
+    padding: 10px 16px;
+    margin-right: 4px;
+    border-top-left-radius: 10px;
+    border-top-right-radius: 10px;
     font-weight: 600;
+}
+
+QTabBar::tab:selected {
+    background-color: #2563EB;
+    color: #FFFFFF;
+    border: 1px solid #60A5FA;
+}
+
+QTabBar::tab:hover {
+    background-color: #1E293B;
+}
+
+QListWidget, QTableWidget {
+    background-color: #111827;
+    color: #E5E7EB;
+    border: 1px solid #334155;
+    border-radius: 12px;
+    padding: 6px;
+    gridline-color: #334155;
+    selection-background-color: #2563EB;
+    selection-color: #FFFFFF;
+}
+
+QHeaderView::section {
+    background-color: #1E293B;
+    color: #F8FAFC;
+    border: none;
+    padding: 8px;
+    font-weight: 700;
+}
+
+QScrollBar:vertical {
+    background: #0F172A;
+    width: 10px;
+}
+
+QScrollBar::handle:vertical {
+    background: #334155;
+    border-radius: 5px;
+}
+
+QScrollBar::handle:vertical:hover {
+    background: #475569;
 }
