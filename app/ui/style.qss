@@ -27,7 +27,6 @@ QWidget {
     color: #94A3B8;
     font-size: 12px;
     font-weight: 700;
-    text-transform: uppercase;
 }
 
 #Content {
@@ -61,7 +60,12 @@ QPushButton:hover {
     border: 1px solid #60A5FA;
 }
 
-#BaseCard, #InfoCard {
+QPushButton:pressed {
+    background-color: #1D4ED8;
+}
+
+#BaseCard,
+#InfoCard {
     background-color: #111827;
     border: 1px solid #334155;
     border-radius: 16px;
@@ -81,7 +85,7 @@ QPushButton:hover {
 }
 
 #DashboardTitle {
-    font-size: 18px;
+    font-size: 17px;
     font-weight: 800;
     color: #F8FAFC;
     padding-bottom: 8px;
@@ -115,7 +119,8 @@ QTabBar::tab:hover {
     background-color: #1E293B;
 }
 
-QListWidget, QTableWidget {
+QListWidget,
+QTableWidget {
     background-color: #111827;
     color: #E5E7EB;
     border: 1px solid #334155;
@@ -132,6 +137,21 @@ QHeaderView::section {
     border: none;
     padding: 8px;
     font-weight: 700;
+}
+
+QProgressBar {
+    background-color: #111827;
+    border: 1px solid #334155;
+    border-radius: 10px;
+    color: #F8FAFC;
+    text-align: center;
+    height: 24px;
+    font-weight: 700;
+}
+
+QProgressBar::chunk {
+    background-color: #2563EB;
+    border-radius: 9px;
 }
 
 QScrollBar:vertical {

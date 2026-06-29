@@ -4,9 +4,7 @@ from pathlib import Path
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QFileDialog, QHBoxLayout, QLabel, QVBoxLayout, QWidget
 
-from app.engines.comparison_engine import ComparisonEngine
 from app.services.analysis_service import AnalysisService
-from app.services.export_service import ExportService
 from app.ui.sidebar import Sidebar
 from app.widgets.analysis_tabs import AnalysisTabs
 
@@ -18,15 +16,10 @@ class MainWindow(QWidget):
         super().__init__()
 
         self.analysis_service = analysis_service
-
         self.current_result = None
-        self.last_comparison_result = None
-
-        self.comparison_engine = ComparisonEngine()
-        self.export_service = ExportService()
 
         self.setWindowTitle("ForensiHash Pro")
-        self.resize(850, 550)
+        self.resize(1100, 700)
 
         self.clock_label = QLabel()
         self.clock_label.setObjectName("ClockLabel")
@@ -40,13 +33,15 @@ class MainWindow(QWidget):
         main_layout.setContentsMargins(0, 0, 0, 0)
 
         self.sidebar = Sidebar()
-        self.sidebar.open_file_button.clicked.connect(self.select_file)
-        self.sidebar.open_folder_button.clicked.connect(self.select_folder)
-        self.sidebar.file_list.itemClicked.connect(self.analyze_selected_file)
 
         self.content = self._build_content()
 
-        self.sidebar.compare_button.clicked.connect(self.compare_with_file)
+        self.sidebar.open_file_button.clicked.connect(self.select_file)
+        self.sidebar.open_folder_button.clicked.connect(self.select_folder)
+        self.sidebar.file_list.itemClicked.connect(self.analyze_selected_file)
+        self.sidebar.compare_button.clicked.connect(
+            self.analysis_tabs.show_comparison_tab
+        )
 
         main_layout.addWidget(self.sidebar)
         main_layout.addWidget(self.content, stretch=1)
@@ -64,7 +59,7 @@ class MainWindow(QWidget):
         header = QLabel("Análise de Arquivo")
         header.setObjectName("PageTitle")
 
-        self.analysis_tabs = AnalysisTabs()
+        self.analysis_tabs = AnalysisTabs(self.analysis_service)
 
         layout.addWidget(header)
         layout.addWidget(self.clock_label)
@@ -109,26 +104,3 @@ class MainWindow(QWidget):
             return
 
         self.analyze_file(Path(filename))
-
-    def compare_with_file(self) -> None:
-        if self.current_result is None:
-            return
-
-        filename, _ = QFileDialog.getOpenFileName(
-            self,
-            "Selecionar arquivo para comparação",
-        )
-
-        if not filename:
-            return
-
-        right_result = self.analysis_service.analyze(Path(filename))
-
-        comparison_result = self.comparison_engine.compare(
-            self.current_result,
-            right_result,
-        )
-
-        self.last_comparison_result = comparison_result
-        self.analysis_tabs.comparison_page.update_comparison(comparison_result)
-        self.analysis_tabs.show_comparison_tab()
