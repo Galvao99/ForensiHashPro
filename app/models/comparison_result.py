@@ -5,7 +5,7 @@ from app.models.comparison_section import ComparisonSection
 
 @dataclass(frozen=True)
 class ComparisonResult:
-    """Resultado da comparação entre duas análises forenses."""
-
+    left_file: str
+    right_file: str
     sections: list[ComparisonSection] = field(default_factory=list)
     technical_summary: str = ""

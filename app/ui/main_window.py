@@ -1,13 +1,13 @@
 from datetime import datetime
 from pathlib import Path
-from unittest import result
 
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QFileDialog, QHBoxLayout, QLabel, QVBoxLayout, QWidget
 
+from app.engines.comparison_engine import ComparisonEngine
 from app.services.analysis_service import AnalysisService
+from app.services.export_service import ExportService
 from app.ui.sidebar import Sidebar
-#from app.widgets.analysis_dashboard import AnalysisDashboard
 from app.widgets.analysis_tabs import AnalysisTabs
 
 
@@ -18,6 +18,12 @@ class MainWindow(QWidget):
         super().__init__()
 
         self.analysis_service = analysis_service
+
+        self.current_result = None
+        self.last_comparison_result = None
+
+        self.comparison_engine = ComparisonEngine()
+        self.export_service = ExportService()
 
         self.setWindowTitle("ForensiHash Pro")
         self.resize(850, 550)
@@ -40,6 +46,8 @@ class MainWindow(QWidget):
 
         self.content = self._build_content()
 
+        self.sidebar.compare_button.clicked.connect(self.compare_with_file)
+
         main_layout.addWidget(self.sidebar)
         main_layout.addWidget(self.content, stretch=1)
 
@@ -57,11 +65,10 @@ class MainWindow(QWidget):
         header.setObjectName("PageTitle")
 
         self.analysis_tabs = AnalysisTabs()
-        
+
         layout.addWidget(header)
         layout.addWidget(self.clock_label)
         layout.addWidget(self.analysis_tabs, stretch=1)
-        layout.addStretch()
 
         content.setLayout(layout)
         return content
@@ -71,10 +78,7 @@ class MainWindow(QWidget):
         self.clock_label.setText(f"Horário: {current_time}")
 
     def select_folder(self) -> None:
-        folder = QFileDialog.getExistingDirectory(
-            self,
-            "Selecionar Pasta",
-        )
+        folder = QFileDialog.getExistingDirectory(self, "Selecionar Pasta")
 
         if not folder:
             return
@@ -95,15 +99,36 @@ class MainWindow(QWidget):
 
     def analyze_file(self, file_path: Path) -> None:
         result = self.analysis_service.analyze(file_path)
+        self.current_result = result
         self.analysis_tabs.update_analysis(result)
 
     def select_file(self) -> None:
-        filename, _ = QFileDialog.getOpenFileName(
-            self,
-            "Selecionar Arquivo",
-        )
+        filename, _ = QFileDialog.getOpenFileName(self, "Selecionar Arquivo")
 
         if not filename:
             return
 
         self.analyze_file(Path(filename))
+
+    def compare_with_file(self) -> None:
+        if self.current_result is None:
+            return
+
+        filename, _ = QFileDialog.getOpenFileName(
+            self,
+            "Selecionar arquivo para comparação",
+        )
+
+        if not filename:
+            return
+
+        right_result = self.analysis_service.analyze(Path(filename))
+
+        comparison_result = self.comparison_engine.compare(
+            self.current_result,
+            right_result,
+        )
+
+        self.last_comparison_result = comparison_result
+        self.analysis_tabs.comparison_page.update_comparison(comparison_result)
+        self.analysis_tabs.show_comparison_tab()
