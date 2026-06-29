@@ -28,7 +28,7 @@ class AnalysisTabs(QTabWidget):
         self.digital_signature_page = DigitalSignaturePage()
         self.comparison_page = ComparisonPage()
 
-# =================================================== #
+        #===================================================
 
         self.addTab(self.general_page, "Geral")
         self.addTab(self.hash_page, "Hashes")
@@ -47,4 +47,6 @@ class AnalysisTabs(QTabWidget):
         self.timeline_page.update_analysis(result)
         self.magic_number_page.update_analysis(result)
         self.digital_signature_page.update_analysis(result)
-        self.comparison_page.update_analysis(result)
+
+    def show_comparison_tab(self) -> None:
+        self.setCurrentWidget(self.comparison_page)
