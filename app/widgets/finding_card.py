@@ -1,52 +1,77 @@
-from PySide6.QtWidgets import QLabel
+from PySide6.QtWidgets import QLabel, QScrollArea, QVBoxLayout, QWidget
 
 from app.models import Finding
 from app.widgets.base_card import BaseCard
+from app.widgets.finding_item_card import FindingItemCard
 
 
 class FindingCard(BaseCard):
-    """Card responsável pelos vestígios encontrados."""
+    """Painel robusto dos vestígios técnicos encontrados."""
 
     def __init__(self) -> None:
+        super().__init__("🧩 Vestígios Correlacionados")
 
-        super().__init__("⚠ Vestígios Técnicos")
-
-        self.content = QLabel(
-            "Nenhum vestígio encontrado."
+        self.subtitle = QLabel(
+            "Ponto de convergência entre metadados, hashes, magic number, assinatura digital, "
+            "timeline e demais elementos técnicos."
         )
+        self.subtitle.setObjectName("FindingSubtitle")
+        self.subtitle.setWordWrap(True)
 
-        self.content.setWordWrap(True)
+        self.items_container = QWidget()
+        self.items_layout = QVBoxLayout(self.items_container)
+        self.items_layout.setSpacing(12)
 
-        self.content.setObjectName("CardContent")
+        self.scroll_area = QScrollArea()
+        self.scroll_area.setWidgetResizable(True)
+        self.scroll_area.setWidget(self.items_container)
+        self.scroll_area.setObjectName("FindingScrollArea")
 
-        self.body_layout.addWidget(self.content)
+        self.body_layout.addWidget(self.subtitle)
+        self.body_layout.addWidget(self.scroll_area)
 
-    def update_findings(
-        self,
-        findings: list[Finding],
-    ) -> None:
+    def update_findings(self, findings: list[Finding]) -> None:
+        self._clear_items()
 
         if not findings:
-
-            self.content.setText(
-                "Nenhum vestígio técnico foi identificado."
+            empty = QLabel(
+                "Nenhum vestígio técnico foi identificado. "
+                "Quando houver inconsistências, producers relevantes, divergências temporais "
+                "ou ausência de elementos verificáveis, eles aparecerão nesta área."
             )
-
+            empty.setObjectName("FindingEmptyText")
+            empty.setWordWrap(True)
+            self.items_layout.addWidget(empty)
+            self.items_layout.addStretch()
             return
 
-        text = ""
+        ordered_findings = self._sort_findings(findings)
 
-        for finding in findings:
+        for finding in ordered_findings:
+            self.items_layout.addWidget(FindingItemCard(finding))
 
-            text += (
-                f"{finding.severity.value.upper()} | {finding.category}\n"
-                f"{finding.title}\n\n"
-                f"{finding.description}\n\n"
-                f"Fonte: {finding.evidence_source or '-'}\n"
-                f"Valor: {finding.observed_value or '-'}\n"
-                f"Recomendação: {finding.recommendation or '-'}\n"
-                f"Confiança: {finding.score:.0%}\n\n"
-                "──────────────────────────────\n\n"
-            )
+        self.items_layout.addStretch()
 
-        self.content.setText(text)
+    def _clear_items(self) -> None:
+        while self.items_layout.count():
+            item = self.items_layout.takeAt(0)
+            widget = item.widget()
+
+            if widget is not None:
+                widget.deleteLater()
+
+    def _sort_findings(self, findings: list[Finding]) -> list[Finding]:
+        severity_order = {
+            "critical": 0,
+            "warning": 1,
+            "info": 2,
+            "success": 3,
+        }
+
+        return sorted(
+            findings,
+            key=lambda finding: (
+                severity_order.get(finding.severity.value.lower(), 9),
+                -finding.score,
+            ),
+        )
