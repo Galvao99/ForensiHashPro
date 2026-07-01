@@ -510,3 +510,16 @@ QScrollBar::sub-line:vertical {
     padding: 4px 10px;
     font-weight: 900;
 }
+
+#MainScrollArea {
+    border: none;
+    background: transparent;
+}
+
+#MainScrollArea QWidget {
+    background: transparent;
+}
+
+QLabel {
+    qproperty-wordWrap: true;
+}

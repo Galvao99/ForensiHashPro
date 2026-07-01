@@ -1,8 +1,15 @@
 from datetime import datetime
 from pathlib import Path
 
-from PySide6.QtCore import QTimer
-from PySide6.QtWidgets import QFileDialog, QHBoxLayout, QLabel, QVBoxLayout, QWidget
+from PySide6.QtCore import QTimer, Qt
+from PySide6.QtWidgets import (
+    QFileDialog,
+    QHBoxLayout,
+    QLabel,
+    QScrollArea,
+    QVBoxLayout,
+    QWidget,
+)
 
 from app.services.analysis_service import AnalysisService
 from app.ui.sidebar import Sidebar
@@ -19,10 +26,12 @@ class MainWindow(QWidget):
         self.current_result = None
 
         self.setWindowTitle("ForensiHash Pro")
-        self.resize(1100, 700)
+        self.resize(1280, 820)
+        self.setMinimumSize(1050, 700)
 
         self.clock_label = QLabel()
         self.clock_label.setObjectName("ClockLabel")
+        self.clock_label.setAlignment(Qt.AlignRight)
 
         self.clock_timer = QTimer(self)
         self.clock_timer.timeout.connect(self.update_clock)
@@ -31,9 +40,9 @@ class MainWindow(QWidget):
 
         main_layout = QHBoxLayout()
         main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
 
         self.sidebar = Sidebar()
-
         self.content = self._build_content()
 
         self.sidebar.open_file_button.clicked.connect(self.select_file)
@@ -52,20 +61,34 @@ class MainWindow(QWidget):
         content = QWidget()
         content.setObjectName("Content")
 
-        layout = QVBoxLayout()
-        layout.setContentsMargins(24, 24, 24, 24)
-        layout.setSpacing(16)
+        root_layout = QVBoxLayout()
+        root_layout.setContentsMargins(28, 24, 28, 24)
+        root_layout.setSpacing(16)
+
+        header_layout = QHBoxLayout()
+        header_layout.setSpacing(12)
 
         header = QLabel("Análise de Arquivo")
         header.setObjectName("PageTitle")
 
+        header_layout.addWidget(header)
+        header_layout.addStretch()
+        header_layout.addWidget(self.clock_label)
+
         self.analysis_tabs = AnalysisTabs(self.analysis_service)
 
-        layout.addWidget(header)
-        layout.addWidget(self.clock_label)
-        layout.addWidget(self.analysis_tabs, stretch=1)
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setFrameShape(QScrollArea.NoFrame)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        scroll_area.setObjectName("MainScrollArea")
+        scroll_area.setWidget(self.analysis_tabs)
 
-        content.setLayout(layout)
+        root_layout.addLayout(header_layout)
+        root_layout.addWidget(scroll_area, stretch=1)
+
+        content.setLayout(root_layout)
         return content
 
     def update_clock(self) -> None:
@@ -98,7 +121,10 @@ class MainWindow(QWidget):
         self.analysis_tabs.update_analysis(result)
 
     def select_file(self) -> None:
-        filename, _ = QFileDialog.getOpenFileName(self, "Selecionar Arquivo")
+        filename, _ = QFileDialog.getOpenFileName(
+            self,
+            "Selecionar Arquivo",
+        )
 
         if not filename:
             return
