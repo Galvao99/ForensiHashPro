@@ -1,9 +1,11 @@
 QWidget {
-    background-color: #0F172A;
+    background-color: #0B1120;
     color: #E5E7EB;
-    font-family: "Segoe UI";
+    font-family: "Segoe UI", "Inter", "Arial";
     font-size: 13px;
 }
+
+/* SIDEBAR */
 
 #Sidebar {
     background-color: #020617;
@@ -11,102 +13,116 @@ QWidget {
 }
 
 #SidebarTitle {
-    font-size: 25px;
-    font-weight: 800;
+    font-size: 26px;
+    font-weight: 900;
     color: #F8FAFC;
 }
 
 #SidebarSubtitle {
-    font-size: 12px;
-    font-weight: 700;
+    font-size: 11px;
+    font-weight: 800;
     color: #38BDF8;
-    letter-spacing: 2px;
+    letter-spacing: 3px;
 }
 
 #SidebarSectionTitle {
-    color: #94A3B8;
-    font-size: 12px;
-    font-weight: 700;
+    color: #64748B;
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
 }
 
 #Content {
-    background-color: #0F172A;
+    background-color: #0B1120;
 }
 
 #PageTitle {
-    font-size: 24px;
-    font-weight: 800;
+    font-size: 25px;
+    font-weight: 900;
     color: #F8FAFC;
 }
 
 #ClockLabel {
-    color: #93C5FD;
-    font-size: 13px;
+    color: #60A5FA;
+    font-size: 12px;
     font-weight: 600;
 }
 
+/* BOTÕES */
+
 QPushButton {
-    background-color: #111827;
-    color: #E5E7EB;
-    border: 1px solid #334155;
-    border-radius: 10px;
-    padding: 11px 12px;
+    background-color: #0F172A;
+    color: #CBD5E1;
+    border: 1px solid #1E293B;
+    border-radius: 12px;
+    padding: 12px 14px;
     text-align: left;
-    font-weight: 600;
+    font-weight: 700;
 }
 
 QPushButton:hover {
-    background-color: #2563EB;
-    border: 1px solid #60A5FA;
+    background-color: #172554;
+    color: #FFFFFF;
+    border: 1px solid #2563EB;
 }
 
 QPushButton:pressed {
     background-color: #1D4ED8;
+    border: 1px solid #60A5FA;
 }
+
+/* CARDS */
 
 #BaseCard,
 #InfoCard {
     background-color: #111827;
+    border: 1px solid #243244;
+    border-radius: 18px;
+    padding: 16px;
+}
+
+#BaseCard:hover,
+#InfoCard:hover {
     border: 1px solid #334155;
-    border-radius: 16px;
-    padding: 14px;
 }
 
 #CardTitle {
     font-size: 16px;
-    font-weight: 800;
+    font-weight: 900;
     color: #F8FAFC;
 }
 
 #CardContent {
     color: #CBD5E1;
-    font-family: "Segoe UI";
     font-size: 13px;
+    line-height: 150%;
 }
 
 #DashboardTitle {
-    font-size: 17px;
-    font-weight: 800;
+    font-size: 18px;
+    font-weight: 900;
     color: #F8FAFC;
     padding-bottom: 8px;
 }
 
+/* TABS */
+
 QTabWidget::pane {
-    border: 1px solid #334155;
-    border-radius: 14px;
-    background-color: #0B1120;
+    border: 1px solid #1E293B;
+    border-radius: 18px;
+    background-color: #0F172A;
     top: -1px;
 }
 
 QTabBar::tab {
-    background-color: #111827;
-    color: #CBD5E1;
-    border: 1px solid #334155;
-    padding: 10px 16px;
-    margin-right: 4px;
-    border-top-left-radius: 10px;
-    border-top-right-radius: 10px;
-    font-weight: 600;
+    background-color: #0F172A;
+    color: #94A3B8;
+    border: 1px solid #1E293B;
+    padding: 11px 18px;
+    margin-right: 5px;
+    border-top-left-radius: 12px;
+    border-top-right-radius: 12px;
+    font-weight: 700;
 }
 
 QTabBar::tab:selected {
@@ -115,268 +131,305 @@ QTabBar::tab:selected {
     border: 1px solid #60A5FA;
 }
 
-QTabBar::tab:hover {
-    background-color: #1E293B;
+QTabBar::tab:hover:!selected {
+    background-color: #172554;
+    color: #E0F2FE;
 }
+
+/* LISTAS E TABELAS */
 
 QListWidget,
 QTableWidget {
-    background-color: #111827;
+    background-color: #0F172A;
     color: #E5E7EB;
-    border: 1px solid #334155;
-    border-radius: 12px;
-    padding: 6px;
-    gridline-color: #334155;
+    border: 1px solid #1E293B;
+    border-radius: 14px;
+    padding: 8px;
+    gridline-color: #1E293B;
     selection-background-color: #2563EB;
     selection-color: #FFFFFF;
 }
 
-QHeaderView::section {
-    background-color: #1E293B;
-    color: #F8FAFC;
-    border: none;
+QListWidget::item {
     padding: 8px;
-    font-weight: 700;
+    border-radius: 8px;
 }
 
-QProgressBar {
+QListWidget::item:hover {
+    background-color: #1E293B;
+}
+
+QListWidget::item:selected {
+    background-color: #2563EB;
+    color: #FFFFFF;
+}
+
+QTableWidget::item {
+    padding: 7px;
+}
+
+QHeaderView::section {
     background-color: #111827;
-    border: 1px solid #334155;
-    border-radius: 10px;
+    color: #F8FAFC;
+    border: none;
+    padding: 9px;
+    font-weight: 800;
+}
+
+/* PROGRESS */
+
+QProgressBar {
+    background-color: #1E293B;
+    border: none;
+    border-radius: 6px;
     color: #F8FAFC;
     text-align: center;
-    height: 24px;
-    font-weight: 700;
+    height: 22px;
+    font-weight: 800;
 }
 
 QProgressBar::chunk {
     background-color: #2563EB;
-    border-radius: 9px;
+    border-radius: 6px;
 }
 
+/* SCROLLBAR */
+
 QScrollBar:vertical {
-    background: #0F172A;
+    background: #0B1120;
     width: 10px;
 }
 
 QScrollBar::handle:vertical {
     background: #334155;
     border-radius: 5px;
+    min-height: 30px;
 }
 
 QScrollBar::handle:vertical:hover {
     background: #475569;
 }
 
+QScrollBar::add-line:vertical,
+QScrollBar::sub-line:vertical {
+    height: 0px;
+}
+
+/* RESUMO PERICIAL */
+
 #summaryCard {
-    background-color: #151922;
-    border: 1px solid #252b38;
-    border-radius: 16px;
+    background-color: #111827;
+    border: 1px solid #263244;
+    border-radius: 20px;
 }
 
 #summaryTitle {
-    color: #f4f7fb;
-    font-size: 20px;
-    font-weight: 700;
+    color: #F8FAFC;
+    font-size: 21px;
+    font-weight: 900;
 }
 
 #summaryScoreOk {
-    color: #6ee7a8;
+    color: #86EFAC;
     font-size: 15px;
-    font-weight: 700;
+    font-weight: 900;
 }
 
 #summaryScoreWarning {
-    color: #facc15;
+    color: #FDE68A;
     font-size: 15px;
-    font-weight: 700;
+    font-weight: 900;
 }
 
 #summaryScoreDanger {
-    color: #fb7185;
+    color: #FDA4AF;
     font-size: 15px;
-    font-weight: 700;
+    font-weight: 900;
 }
 
 #summaryProgressOk::chunk {
-    background-color: #22c55e;
-    border-radius: 5px;
+    background-color: #22C55E;
+    border-radius: 6px;
 }
 
 #summaryProgressWarning::chunk {
-    background-color: #eab308;
-    border-radius: 5px;
+    background-color: #EAB308;
+    border-radius: 6px;
 }
 
 #summaryProgressDanger::chunk {
-    background-color: #ef4444;
-    border-radius: 5px;
-}
-
-QProgressBar {
-    background-color: #252b38;
-    border: none;
-    border-radius: 5px;
-}
-
-#badge_ok {
-    background-color: rgba(34, 197, 94, 0.15);
-    color: #86efac;
-    border: 1px solid rgba(34, 197, 94, 0.35);
-    border-radius: 14px;
-    padding: 4px 10px;
-    font-weight: 600;
-}
-
-#badge_warning {
-    background-color: rgba(234, 179, 8, 0.15);
-    color: #fde68a;
-    border: 1px solid rgba(234, 179, 8, 0.35);
-    border-radius: 14px;
-    padding: 4px 10px;
-    font-weight: 600;
-}
-
-#badge_danger {
-    background-color: rgba(239, 68, 68, 0.15);
-    color: #fca5a5;
-    border: 1px solid rgba(239, 68, 68, 0.35);
-    border-radius: 14px;
-    padding: 4px 10px;
-    font-weight: 600;
-}
-
-#badge_info {
-    background-color: rgba(59, 130, 246, 0.15);
-    color: #93c5fd;
-    border: 1px solid rgba(59, 130, 246, 0.35);
-    border-radius: 14px;
-    padding: 4px 10px;
-    font-weight: 600;
-}
-
-#badge_neutral {
-    background-color: rgba(148, 163, 184, 0.12);
-    color: #cbd5e1;
-    border: 1px solid rgba(148, 163, 184, 0.25);
-    border-radius: 14px;
-    padding: 4px 10px;
-    font-weight: 600;
+    background-color: #EF4444;
+    border-radius: 6px;
 }
 
 #summarySectionTitle {
-    color: #e5e7eb;
+    color: #F8FAFC;
     font-size: 14px;
-    font-weight: 700;
+    font-weight: 900;
 }
 
 #summaryText {
-    color: #cbd5e1;
+    color: #CBD5E1;
     font-size: 13px;
 }
 
 #summaryTextMuted {
-    color: #64748b;
-    font-size: 13px;
+    color: #64748B;
+    font-size: 12px;
 }
+
+/* BADGES */
+
+#badge_ok {
+    background-color: rgba(34, 197, 94, 0.14);
+    color: #86EFAC;
+    border: 1px solid rgba(34, 197, 94, 0.34);
+    border-radius: 14px;
+    padding: 5px 11px;
+    font-weight: 800;
+}
+
+#badge_warning {
+    background-color: rgba(234, 179, 8, 0.14);
+    color: #FDE68A;
+    border: 1px solid rgba(234, 179, 8, 0.35);
+    border-radius: 14px;
+    padding: 5px 11px;
+    font-weight: 800;
+}
+
+#badge_danger {
+    background-color: rgba(239, 68, 68, 0.14);
+    color: #FCA5A5;
+    border: 1px solid rgba(239, 68, 68, 0.35);
+    border-radius: 14px;
+    padding: 5px 11px;
+    font-weight: 800;
+}
+
+#badge_info {
+    background-color: rgba(59, 130, 246, 0.14);
+    color: #93C5FD;
+    border: 1px solid rgba(59, 130, 246, 0.35);
+    border-radius: 14px;
+    padding: 5px 11px;
+    font-weight: 800;
+}
+
+#badge_neutral {
+    background-color: rgba(148, 163, 184, 0.12);
+    color: #CBD5E1;
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    border-radius: 14px;
+    padding: 5px 11px;
+    font-weight: 800;
+}
+
+/* NOTA DO PERITO */
 
 #expertNoteBox {
-    background-color: #10141d;
-    border-left: 4px solid #38bdf8;
-    border-radius: 10px;
-}
-
-#expertNoteTitle {
-    color: #e0f2fe;
-    font-size: 14px;
-    font-weight: 700;
-}
-
-#expertNoteText {
-    color: #cbd5e1;
-    font-size: 13px;
-}
-
-#metadataCard {
-    background-color: #151922;
-    border: 1px solid #252b38;
-    border-radius: 16px;
-}
-
-#metadataCardTitle {
-    color: #f4f7fb;
-    font-size: 18px;
-    font-weight: 700;
-}
-
-#metadataCountLabel {
-    color: #94a3b8;
-    font-size: 13px;
-    font-weight: 600;
-}
-
-#metadataHighlightsBox {
-    background-color: #10141d;
-    border: 1px solid #252b38;
+    background-color: #0B1220;
+    border-left: 4px solid #38BDF8;
     border-radius: 12px;
 }
 
+#expertNoteTitle {
+    color: #E0F2FE;
+    font-size: 14px;
+    font-weight: 900;
+}
+
+#expertNoteText {
+    color: #CBD5E1;
+    font-size: 13px;
+}
+
+/* METADADOS */
+
+#metadataCard {
+    background-color: #111827;
+    border: 1px solid #263244;
+    border-radius: 20px;
+}
+
+#metadataCardTitle {
+    color: #F8FAFC;
+    font-size: 19px;
+    font-weight: 900;
+}
+
+#metadataCountLabel {
+    color: #94A3B8;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+#metadataHighlightsBox {
+    background-color: #0B1220;
+    border: 1px solid #1E293B;
+    border-radius: 14px;
+}
+
 #metadataHighlightText {
-    color: #cbd5e1;
+    color: #CBD5E1;
     font-size: 13px;
 }
 
 #metadataInsightBox {
     background-color: rgba(56, 189, 248, 0.08);
-    border-left: 4px solid #38bdf8;
-    border-radius: 10px;
+    border-left: 4px solid #38BDF8;
+    border-radius: 12px;
 }
 
 #metadataInsightTitle {
-    color: #e0f2fe;
+    color: #E0F2FE;
     font-size: 14px;
-    font-weight: 700;
+    font-weight: 900;
 }
 
 #metadataInsightText {
-    color: #cbd5e1;
+    color: #CBD5E1;
     font-size: 13px;
 }
 
+/* VESTÍGIOS PREVIEW */
+
 #findingsPreviewCard {
-    background-color: #151922;
-    border: 1px solid #252b38;
-    border-radius: 16px;
+    background-color: #111827;
+    border: 1px solid #263244;
+    border-radius: 20px;
 }
 
 #findingsPreviewTitle {
-    color: #f4f7fb;
-    font-size: 18px;
-    font-weight: 700;
+    color: #F8FAFC;
+    font-size: 19px;
+    font-weight: 900;
 }
 
 #findingsPreviewSubtitle {
-    color: #94a3b8;
+    color: #94A3B8;
     font-size: 13px;
 }
 
 #findingsPreviewText {
-    color: #cbd5e1;
+    color: #CBD5E1;
     font-size: 13px;
 }
 
 #findingsPreviewMuted {
-    color: #64748b;
+    color: #64748B;
     font-size: 12px;
 }
 
+/* VESTÍGIOS COMPLETOS */
+
 #FindingSubtitle {
-    color: #94a3b8;
+    color: #94A3B8;
     font-size: 13px;
 }
 
 #FindingEmptyText {
-    color: #94a3b8;
+    color: #94A3B8;
     font-size: 13px;
 }
 
@@ -389,71 +442,71 @@ QProgressBar {
 #findingItemWarning,
 #findingItemCritical,
 #findingItemSuccess {
-    background-color: #151922;
-    border-radius: 14px;
-    padding: 8px;
+    background-color: #111827;
+    border-radius: 16px;
+    padding: 10px;
 }
 
 #findingItemInfo {
-    border: 1px solid rgba(59, 130, 246, 0.30);
+    border: 1px solid rgba(59, 130, 246, 0.35);
 }
 
 #findingItemWarning {
-    border: 1px solid rgba(234, 179, 8, 0.40);
+    border: 1px solid rgba(234, 179, 8, 0.42);
 }
 
 #findingItemCritical {
-    border: 1px solid rgba(239, 68, 68, 0.45);
+    border: 1px solid rgba(239, 68, 68, 0.48);
 }
 
 #findingItemSuccess {
-    border: 1px solid rgba(34, 197, 94, 0.35);
+    border: 1px solid rgba(34, 197, 94, 0.38);
 }
 
 #findingItemTitle {
-    color: #f4f7fb;
+    color: #F8FAFC;
     font-size: 15px;
-    font-weight: 700;
+    font-weight: 900;
 }
 
 #findingItemText {
-    color: #cbd5e1;
+    color: #CBD5E1;
     font-size: 13px;
 }
 
 #findingItemMuted {
-    color: #94a3b8;
+    color: #94A3B8;
     font-size: 12px;
 }
 
 #findingBadge_info {
     background-color: rgba(59, 130, 246, 0.15);
-    color: #93c5fd;
+    color: #93C5FD;
     border-radius: 10px;
     padding: 4px 10px;
-    font-weight: 700;
+    font-weight: 900;
 }
 
 #findingBadge_warning {
     background-color: rgba(234, 179, 8, 0.15);
-    color: #fde68a;
+    color: #FDE68A;
     border-radius: 10px;
     padding: 4px 10px;
-    font-weight: 700;
+    font-weight: 900;
 }
 
 #findingBadge_critical {
     background-color: rgba(239, 68, 68, 0.15);
-    color: #fca5a5;
+    color: #FCA5A5;
     border-radius: 10px;
     padding: 4px 10px;
-    font-weight: 700;
+    font-weight: 900;
 }
 
 #findingBadge_success {
     background-color: rgba(34, 197, 94, 0.15);
-    color: #86efac;
+    color: #86EFAC;
     border-radius: 10px;
     padding: 4px 10px;
-    font-weight: 700;
+    font-weight: 900;
 }

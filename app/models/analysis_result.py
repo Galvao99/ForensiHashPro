@@ -7,6 +7,7 @@ from app.enum.severity import Severity
 from app.models.digital_signature_result import DigitalSignatureResult
 from app.models.magic_number_result import MagicNumberResult
 from app.models.reference import Reference
+# from app.models.integrity_result import IntegrityResult
 
 
 @dataclass(frozen=True)
@@ -60,7 +61,7 @@ class Finding:
     score: float = 1.0
 
 
-@dataclass(frozen=True)
+@dataclass
 class AnalysisResult:
     """Resultado completo da análise de um arquivo."""
 
