@@ -5,6 +5,7 @@ from app.engines.metadata_engine import MetadataEngine
 from app.services.analysis_service import AnalysisService
 from app.engines.magic_number_engine import MagicNumberEngine
 from app.engines.digital_signature_engine import DigitalSignatureEngine
+# from app.engines.integrity_engine import IntegrityEngine
 
 
 class ApplicationFactory:
@@ -21,7 +22,8 @@ class ApplicationFactory:
             metadata_engine=metadata_engine,
             findings_engine=findings_engine,
             magic_number_engine=magic_number_engine,
-            digital_signature_engine=DigitalSignatureEngine()
+            digital_signature_engine=DigitalSignatureEngine(),
+            
         )
 
         return AnalysisService(analyzer)

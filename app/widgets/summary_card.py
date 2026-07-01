@@ -73,7 +73,7 @@ class SummaryCard(QWidget):
         note_layout.setContentsMargins(12, 10, 12, 10)
         note_layout.setSpacing(4)
 
-        note_title = QLabel("🧠 O Perito Observa")
+        note_title = QLabel("Observação")
         note_title.setObjectName("expertNoteTitle")
 
         note_layout.addWidget(note_title)

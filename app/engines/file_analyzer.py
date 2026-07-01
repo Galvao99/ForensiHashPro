@@ -1,12 +1,12 @@
 from datetime import datetime
 from pathlib import Path
 
+from app.engines.digital_signature_engine import DigitalSignatureEngine
 from app.engines.finding_engine import FindingsEngine
 from app.engines.hash_engine import HashEngine
+from app.engines.magic_number_engine import MagicNumberEngine
 from app.engines.metadata_engine import MetadataEngine
 from app.models import AnalysisResult, FileInfo
-from app.engines.magic_number_engine import MagicNumberEngine
-from app.engines.digital_signature_engine import DigitalSignatureEngine
 
 
 class FileAnalyzer:
@@ -22,13 +22,18 @@ class FileAnalyzer:
         magic_number_engine: MagicNumberEngine,
         digital_signature_engine: DigitalSignatureEngine,
     ) -> None:
+
         self.hash_engine = hash_engine
         self.metadata_engine = metadata_engine
         self.findings_engine = findings_engine
         self.magic_number_engine = magic_number_engine
         self.digital_signature_engine = digital_signature_engine
-        
-    def analyze(self, file_path: Path) -> AnalysisResult:
+
+    def analyze(
+        self,
+        file_path: Path,
+    ) -> AnalysisResult:
+
         stat = file_path.stat()
 
         file_info = FileInfo(
@@ -42,15 +47,20 @@ class FileAnalyzer:
         )
 
         hashes = self.hash_engine.calculate_all(file_path)
+
         metadata = self.metadata_engine.extract(file_path)
+
         magic_numbers = self.magic_number_engine.analyze(file_path)
+
         findings = self.findings_engine.analyze(metadata)
+
+        digital_signature = self.digital_signature_engine.analyze(file_path)
 
         return AnalysisResult(
             file_info=file_info,
             hashes=hashes,
             metadata=metadata,
-            magic_numbers=magic_numbers,
-            digital_signature=self.digital_signature_engine.analyze(file_path),
             findings=findings,
+            magic_numbers=magic_numbers,
+            digital_signature=digital_signature,
         )

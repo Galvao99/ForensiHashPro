@@ -10,6 +10,7 @@ from app.pages.magic_number_page import MagicNumberPage
 from app.pages.digital_signature_pages import DigitalSignaturePage
 from app.pages.comparison_workspace import ComparisonWorkspace
 from app.services.analysis_service import AnalysisService
+from app.pages.integrity_page import IntegrityPage
 
 
 class AnalysisTabs(QTabWidget):
@@ -27,6 +28,7 @@ class AnalysisTabs(QTabWidget):
         self.timeline_page = TimelinePage()
         self.magic_number_page = MagicNumberPage()
         self.digital_signature_page = DigitalSignaturePage()
+        self.integrity_page = IntegrityPage()
         self.comparison_page = ComparisonWorkspace(analysis_service)
 
         self.addTab(self.general_page, "Geral")
@@ -36,6 +38,7 @@ class AnalysisTabs(QTabWidget):
         self.addTab(self.timeline_page, "Timeline")
         self.addTab(self.magic_number_page, "Magic Number")
         self.addTab(self.digital_signature_page, "Assinatura Digital")
+        self.addTab(self.integrity_page, "Integridade")
         self.addTab(self.comparison_page, "Comparação")
 
     def update_analysis(self, result: AnalysisResult) -> None:
@@ -46,6 +49,7 @@ class AnalysisTabs(QTabWidget):
         self.timeline_page.update_analysis(result)
         self.magic_number_page.update_analysis(result)
         self.digital_signature_page.update_analysis(result)
+        self.integrity_page.update_analysis(result)
 
     def show_comparison_tab(self) -> None:
         self.setCurrentWidget(self.comparison_page)
