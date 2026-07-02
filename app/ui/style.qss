@@ -523,3 +523,70 @@ QScrollBar::sub-line:vertical {
 QLabel {
     qproperty-wordWrap: true;
 }
+
+#TechnicalTimeline {
+    background-color: #FFFFFF;
+    border: 1px solid #E5E7EB;
+    border-radius: 16px;
+    padding: 18px;
+}
+
+#SectionTitle {
+    font-size: 20px;
+    font-weight: 700;
+    color: #111827;
+}
+
+#SectionSubtitle {
+    font-size: 13px;
+    color: #6B7280;
+}
+
+#TimelineScroll {
+    border: none;
+    background-color: transparent;
+}
+
+#TimelinePoint {
+    background-color: transparent;
+}
+
+#TimelineConnector {
+    background-color: #CBD5E1;
+    border: none;
+}
+
+#TimelineTitle {
+    font-size: 14px;
+    font-weight: 700;
+    color: #111827;
+}
+
+#TimelineDate {
+    font-size: 13px;
+    font-weight: 600;
+    color: #374151;
+}
+
+#TimelineSource {
+    font-size: 11px;
+    color: #6B7280;
+    background-color: #F3F4F6;
+    border-radius: 8px;
+    padding: 3px 8px;
+}
+
+#TimelineDescription {
+    font-size: 12px;
+    color: #6B7280;
+}
+
+#TimelineResult {
+    background-color: #FFF7ED;
+    border: 1px solid #FDBA74;
+    border-radius: 12px;
+    padding: 12px;
+    font-size: 13px;
+    font-weight: 500;
+    color: #7C2D12;
+}
