@@ -24,6 +24,7 @@ class MainWindow(QWidget):
 
         self.analysis_service = analysis_service
         self.current_result = None
+        self.analysis_results = []
 
         self.setWindowTitle("ForensiHash Pro")
         self.resize(1280, 820)
@@ -111,14 +112,41 @@ class MainWindow(QWidget):
 
         self.sidebar.file_list.add_files(files)
 
+        self.analysis_results = []
+
+        for file_path in files:
+            try:
+                result = self.analysis_service.analyze(file_path)
+                self.analysis_results.append(result)
+            except Exception as error:
+                print(f"Erro ao analisar {file_path.name}: {error}")
+
+        self.analysis_tabs.update_hashes(self.analysis_results)
+
+        if self.analysis_results:
+            self.current_result = self.analysis_results[0]
+            self.analysis_tabs.update_analysis(self.current_result)
+
     def analyze_selected_file(self, item) -> None:
         file_path = item.data(1)
+
+        for result in self.analysis_results:
+            if Path(result.file_info.path) == Path(file_path):
+                self.current_result = result
+                self.analysis_tabs.update_analysis(result)
+                self.analysis_tabs.update_hashes(self.analysis_results)
+                return
+
         self.analyze_file(file_path)
 
     def analyze_file(self, file_path: Path) -> None:
         result = self.analysis_service.analyze(file_path)
         self.current_result = result
+
+        self.analysis_results = [result]
+
         self.analysis_tabs.update_analysis(result)
+        self.analysis_tabs.update_hashes(self.analysis_results)
 
     def select_file(self) -> None:
         filename, _ = QFileDialog.getOpenFileName(

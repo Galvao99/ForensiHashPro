@@ -46,7 +46,6 @@ class AnalysisTabs(QTabWidget):
 
     def update_analysis(self, result: AnalysisResult) -> None:
         self.general_page.update_analysis(result)
-        self.hash_page.update_analysis(result)
         self.metadata_page.update_analysis(result)
         self.finding_page.update_analysis(result)
         self.timeline_page.update_analysis(result)
@@ -54,6 +53,9 @@ class AnalysisTabs(QTabWidget):
         self.digital_signature_page.update_analysis(result)
         self.integrity_page.update_analysis(result)
         self.ocr_page.update_analysis(result)
+
+    def update_hashes(self, results: list[AnalysisResult]) -> None:
+        self.hash_page.update_results(results)       
 
     def show_comparison_tab(self) -> None:
         self.setCurrentWidget(self.comparison_page)
