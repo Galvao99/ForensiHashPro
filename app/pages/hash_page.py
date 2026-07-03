@@ -119,3 +119,7 @@ class HashPage(QWidget):
             return f"{size_bytes / (1024 * 1024):.2f} MB"
 
         return f"{size_bytes / (1024 * 1024 * 1024):.2f} GB"
+    
+    def update_results(self, results: list[AnalysisResult]) -> None:
+        self.results = results
+        self.refresh_table()
