@@ -542,6 +542,26 @@ QLabel {
     color: #6B7280;
 }
 
+/* TIMELINE TÉCNICA */
+
+#TechnicalTimeline {
+    background-color: #111827;
+    border: 1px solid #243244;
+    border-radius: 18px;
+    padding: 18px;
+}
+
+#SectionTitle {
+    font-size: 20px;
+    font-weight: 800;
+    color: #F8FAFC;
+}
+
+#SectionSubtitle {
+    font-size: 13px;
+    color: #94A3B8;
+}
+
 #TimelineScroll {
     border: none;
     background-color: transparent;
@@ -552,41 +572,141 @@ QLabel {
 }
 
 #TimelineConnector {
-    background-color: #CBD5E1;
+    background-color: #334155;
     border: none;
 }
 
 #TimelineTitle {
     font-size: 14px;
-    font-weight: 700;
-    color: #111827;
+    font-weight: 800;
+    color: #F8FAFC;
 }
 
 #TimelineDate {
     font-size: 13px;
     font-weight: 600;
-    color: #374151;
+    color: #CBD5E1;
 }
 
 #TimelineSource {
     font-size: 11px;
-    color: #6B7280;
-    background-color: #F3F4F6;
+    color: #CBD5E1;
+    background-color: #1E293B;
+    border: 1px solid #334155;
     border-radius: 8px;
     padding: 3px 8px;
 }
 
 #TimelineDescription {
     font-size: 12px;
-    color: #6B7280;
+    color: #94A3B8;
 }
 
 #TimelineResult {
-    background-color: #FFF7ED;
-    border: 1px solid #FDBA74;
+    background-color: rgba(251, 146, 60, 0.10);
+    border: 1px solid rgba(251, 146, 60, 0.35);
     border-radius: 12px;
     padding: 12px;
     font-size: 13px;
     font-weight: 500;
-    color: #7C2D12;
+    color: #FDBA74;
+}
+
+
+/* OCR */
+
+#PdfViewer {
+    background-color: #111827;
+    border: 1px solid #243244;
+    border-radius: 18px;
+    padding: 10px;
+}
+
+#PdfPageImage {
+    background-color: #F8FAFC;
+    border: 1px solid #334155;
+    border-radius: 10px;
+    margin-bottom: 14px;
+}
+
+#OcrTextViewer {
+    background-color: #111827;
+    border: 1px solid #243244;
+    border-radius: 18px;
+    padding: 10px;
+}
+
+#OcrTextArea {
+    background-color: #0B1220;
+    color: #CBD5E1;
+    border: 1px solid #1E293B;
+    border-radius: 12px;
+    padding: 12px;
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 12px;
+    selection-background-color: #2563EB;
+    selection-color: #FFFFFF;
+}
+
+QLineEdit {
+    background-color: #0B1220;
+    color: #E5E7EB;
+    border: 1px solid #1E293B;
+    border-radius: 12px;
+    padding: 10px 12px;
+    font-size: 13px;
+}
+
+QLineEdit:focus {
+    border: 1px solid #38BDF8;
+}
+
+QLineEdit::placeholder {
+    color: #64748B;
+}
+
+/* HASH PAGE */
+
+#HashSelector {
+    background-color: #0B1220;
+    color: #E5E7EB;
+    border: 1px solid #1E293B;
+    border-radius: 10px;
+    padding: 8px 12px;
+    font-weight: 700;
+}
+
+#HashSelector:hover {
+    border: 1px solid #38BDF8;
+}
+
+#HashSelector::drop-down {
+    border: none;
+    width: 28px;
+}
+
+#HashTable {
+    background-color: #0B1220;
+    color: #CBD5E1;
+    border: 1px solid #243244;
+    border-radius: 14px;
+    gridline-color: #1E293B;
+    selection-background-color: #2563EB;
+    selection-color: #FFFFFF;
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 12px;
+}
+
+#HashTable::item {
+    padding: 8px;
+    border-bottom: 1px solid #1E293B;
+}
+
+#HashTable::item:hover {
+    background-color: #1E293B;
+}
+
+#HashTable::item:selected {
+    background-color: #2563EB;
+    color: #FFFFFF;
 }
