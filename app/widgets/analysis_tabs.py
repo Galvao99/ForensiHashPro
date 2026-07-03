@@ -11,6 +11,7 @@ from app.pages.digital_signature_pages import DigitalSignaturePage
 from app.pages.comparison_workspace import ComparisonWorkspace
 from app.services.analysis_service import AnalysisService
 from app.pages.integrity_page import IntegrityPage
+from app.pages.ocr_page import OcrPage
 
 
 class AnalysisTabs(QTabWidget):
@@ -30,7 +31,8 @@ class AnalysisTabs(QTabWidget):
         self.digital_signature_page = DigitalSignaturePage()
         self.integrity_page = IntegrityPage()
         self.comparison_page = ComparisonWorkspace(analysis_service)
-
+        self.ocr_page = OcrPage()
+#========================================================================
         self.addTab(self.general_page, "Geral")
         self.addTab(self.hash_page, "Hashes")
         self.addTab(self.metadata_page, "Metadados")
@@ -40,6 +42,7 @@ class AnalysisTabs(QTabWidget):
         self.addTab(self.digital_signature_page, "Assinatura Digital")
         self.addTab(self.integrity_page, "Integridade")
         self.addTab(self.comparison_page, "Comparação")
+        self.addTab(self.ocr_page, "OCR e Busca")
 
     def update_analysis(self, result: AnalysisResult) -> None:
         self.general_page.update_analysis(result)
@@ -50,6 +53,7 @@ class AnalysisTabs(QTabWidget):
         self.magic_number_page.update_analysis(result)
         self.digital_signature_page.update_analysis(result)
         self.integrity_page.update_analysis(result)
+        self.ocr_page.update_analysis(result)
 
     def show_comparison_tab(self) -> None:
         self.setCurrentWidget(self.comparison_page)
