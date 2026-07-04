@@ -3,65 +3,51 @@ from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
     QLabel,
-    QScrollArea,
     QVBoxLayout,
     QWidget,
 )
 
-from app.models.timeline_event import TimelineEvent
 
-
-class TimelinePoint(QWidget):
-    def __init__(self, event: TimelineEvent, show_line: bool = True) -> None:
+class TimelineEventCard(QFrame):
+    def __init__(self, event) -> None:
         super().__init__()
 
-        self.setObjectName("TimelinePoint")
-
-        main_layout = QVBoxLayout(self)
-        main_layout.setAlignment(Qt.AlignTop | Qt.AlignHCenter)
-        main_layout.setSpacing(8)
-
-        top_layout = QHBoxLayout()
-        top_layout.setAlignment(Qt.AlignCenter)
-        top_layout.setSpacing(0)
+        self.setObjectName("TimelineEventCard")
 
         dot = QLabel("●")
-        dot.setObjectName("TimelineDot")
-        dot.setStyleSheet(f"color: {event.color}; font-size: 30px;")
+        dot.setObjectName("TimelineCardDot")
+        dot.setStyleSheet(f"color: {getattr(event, 'color', '#60A5FA')};")
         dot.setAlignment(Qt.AlignCenter)
 
-        top_layout.addWidget(dot)
-
-        if show_line:
-            line = QFrame()
-            line.setObjectName("TimelineConnector")
-            line.setFixedHeight(2)
-            line.setFixedWidth(110)
-            top_layout.addWidget(line)
-
         title = QLabel(event.title)
-        title.setObjectName("TimelineTitle")
+        title.setObjectName("TimelineCardTitle")
         title.setAlignment(Qt.AlignCenter)
+        title.setWordWrap(True)
 
         date = QLabel(event.formatted_date())
-        date.setObjectName("TimelineDate")
+        date.setObjectName("TimelineCardDate")
         date.setAlignment(Qt.AlignCenter)
 
         source = QLabel(event.source)
-        source.setObjectName("TimelineSource")
+        source.setObjectName("TimelineCardSource")
         source.setAlignment(Qt.AlignCenter)
+        source.setWordWrap(True)
 
         description = QLabel(event.description)
-        description.setObjectName("TimelineDescription")
-        description.setWordWrap(True)
+        description.setObjectName("TimelineCardDescription")
         description.setAlignment(Qt.AlignCenter)
-        description.setFixedWidth(180)
+        description.setWordWrap(True)
 
-        main_layout.addLayout(top_layout)
-        main_layout.addWidget(title)
-        main_layout.addWidget(date)
-        main_layout.addWidget(source)
-        main_layout.addWidget(description)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(8)
+
+        layout.addWidget(dot)
+        layout.addWidget(title)
+        layout.addWidget(date)
+        layout.addWidget(source)
+        layout.addWidget(description)
+        layout.addStretch()
 
 
 class TechnicalTimeline(QWidget):
@@ -70,60 +56,51 @@ class TechnicalTimeline(QWidget):
 
         self.setObjectName("TechnicalTimeline")
 
-        main_layout = QVBoxLayout(self)
-        main_layout.setSpacing(16)
+        self.title = QLabel("Eventos da Linha Temporal")
+        self.title.setObjectName("SectionTitle")
 
-        title = QLabel("Linha Temporal Técnica")
-        title.setObjectName("SectionTitle")
-
-        subtitle = QLabel(
-            "Comparação entre metadados, conteúdo contratual, assinatura digital, sistema de arquivos e abertura do arquivo."
+        self.subtitle = QLabel(
+            "Eventos técnicos identificados no documento analisado."
         )
-        subtitle.setObjectName("SectionSubtitle")
-        subtitle.setWordWrap(True)
+        self.subtitle.setObjectName("SectionSubtitle")
+        self.subtitle.setWordWrap(True)
 
-        self.scroll = QScrollArea()
-        self.scroll.setObjectName("TimelineScroll")
-        self.scroll.setWidgetResizable(True)
-        self.scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
-        self.scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.cards_container = QWidget()
+        self.cards_layout = QHBoxLayout(self.cards_container)
+        self.cards_layout.setContentsMargins(0, 0, 0, 0)
+        self.cards_layout.setSpacing(14)
 
-        self.timeline_container = QWidget()
-        self.timeline_layout = QHBoxLayout(self.timeline_container)
-        self.timeline_layout.setAlignment(Qt.AlignLeft)
-        self.timeline_layout.setSpacing(0)
+        self.result_label = QLabel()
+        self.result_label.setObjectName("TimelineResult")
+        self.result_label.setWordWrap(True)
 
-        self.scroll.setWidget(self.timeline_container)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(16)
 
-        self.result = QLabel("Nenhuma linha temporal gerada.")
-        self.result.setObjectName("TimelineResult")
-        self.result.setWordWrap(True)
+        layout.addWidget(self.title)
+        layout.addWidget(self.subtitle)
+        layout.addWidget(self.cards_container)
+        layout.addWidget(self.result_label)
 
-        main_layout.addWidget(title)
-        main_layout.addWidget(subtitle)
-        main_layout.addWidget(self.scroll)
-        main_layout.addWidget(self.result)
-
-    def update_timeline(
-        self,
-        events: list[TimelineEvent],
-        result_text: str,
-    ) -> None:
-        self._clear_layout()
+    def update_timeline(self, events, result_text: str) -> None:
+        self._clear_cards()
 
         if not events:
-            self.result.setText("Nenhum evento temporal foi identificado.")
+            self.result_label.setText("Nenhum evento temporal identificado.")
             return
 
-        for index, event in enumerate(events):
-            show_line = index < len(events) - 1
-            self.timeline_layout.addWidget(TimelinePoint(event, show_line))
+        events = sorted(events, key=lambda event: event.date)
 
-        self.result.setText(result_text)
+        for event in events:
+            card = TimelineEventCard(event)
+            self.cards_layout.addWidget(card, stretch=1)
 
-    def _clear_layout(self) -> None:
-        while self.timeline_layout.count():
-            item = self.timeline_layout.takeAt(0)
+        self.result_label.setText(result_text)
+
+    def _clear_cards(self) -> None:
+        while self.cards_layout.count():
+            item = self.cards_layout.takeAt(0)
             widget = item.widget()
 
             if widget:

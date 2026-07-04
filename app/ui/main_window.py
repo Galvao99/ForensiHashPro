@@ -17,15 +17,13 @@ from app.widgets.analysis_tabs import AnalysisTabs
 
 
 class MainWindow(QWidget):
-    """Janela principal do ForensiHash."""
-
     def __init__(self, analysis_service: AnalysisService) -> None:
         super().__init__()
 
         self.analysis_service = analysis_service
         self.current_result = None
         self.analysis_results = []
-
+        
         self.setWindowTitle("ForensiHash Pro")
         self.resize(1280, 820)
         self.setMinimumSize(1050, 700)
@@ -81,7 +79,7 @@ class MainWindow(QWidget):
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
         scroll_area.setFrameShape(QScrollArea.NoFrame)
-        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         scroll_area.setObjectName("MainScrollArea")
         scroll_area.setWidget(self.analysis_tabs)
@@ -128,25 +126,16 @@ class MainWindow(QWidget):
             self.analysis_tabs.update_analysis(self.current_result)
 
     def analyze_selected_file(self, item) -> None:
-        file_path = item.data(1)
+        file_path = Path(item.data(1))
 
         for result in self.analysis_results:
-            if Path(result.file_info.path) == Path(file_path):
+            if Path(result.file_info.path) == file_path:
                 self.current_result = result
                 self.analysis_tabs.update_analysis(result)
                 self.analysis_tabs.update_hashes(self.analysis_results)
                 return
 
         self.analyze_file(file_path)
-
-    def analyze_file(self, file_path: Path) -> None:
-        result = self.analysis_service.analyze(file_path)
-        self.current_result = result
-
-        self.analysis_results = [result]
-
-        self.analysis_tabs.update_analysis(result)
-        self.analysis_tabs.update_hashes(self.analysis_results)
 
     def select_file(self) -> None:
         filename, _ = QFileDialog.getOpenFileName(

@@ -7,13 +7,10 @@ from app.enum.severity import Severity
 from app.models.digital_signature_result import DigitalSignatureResult
 from app.models.magic_number_result import MagicNumberResult
 from app.models.reference import Reference
-# from app.models.integrity_result import IntegrityResult
 
 
 @dataclass(frozen=True)
 class FileInfo:
-    """Informações básicas do arquivo analisado."""
-
     name: str
     path: Path
     extension: str
@@ -25,8 +22,6 @@ class FileInfo:
 
 @dataclass(frozen=True)
 class HashResult:
-    """Hashes calculados para um arquivo."""
-
     md5: str
     sha1: str
     sha224: str
@@ -37,8 +32,6 @@ class HashResult:
 
 @dataclass(frozen=True)
 class MetadataResult:
-    """Metadados extraídos do arquivo."""
-
     raw: dict[str, Any] = field(default_factory=dict)
 
     def get(self, key: str, default: Any = None) -> Any:
@@ -47,8 +40,6 @@ class MetadataResult:
 
 @dataclass(frozen=True)
 class Finding:
-    """Vestígio técnico/pericial identificado durante a análise."""
-
     severity: Severity
     category: str
     title: str
@@ -62,9 +53,25 @@ class Finding:
 
 
 @dataclass
-class AnalysisResult:
-    """Resultado completo da análise de um arquivo."""
+class TimelineEvent:
+    title: str
+    date: datetime | None
+    source: str
+    description: str
+    severity: Severity = Severity.INFO
+    color: str = "#60A5FA"
+    needs_confirmation: bool = False
+    confirmed: bool = True
 
+    def formatted_date(self) -> str:
+        if not self.date:
+            return "Data não identificada"
+
+        return self.date.strftime("%d/%m/%Y %H:%M:%S")
+
+
+@dataclass
+class AnalysisResult:
     file_info: FileInfo
     hashes: HashResult
     metadata: MetadataResult
@@ -72,3 +79,4 @@ class AnalysisResult:
     magic_numbers: MagicNumberResult
     digital_signature: DigitalSignatureResult
     analyzed_at: datetime = field(default_factory=datetime.now)
+    timeline_events: list[TimelineEvent] = field(default_factory=list)
