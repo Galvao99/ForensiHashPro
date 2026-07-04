@@ -917,3 +917,108 @@ QProgressBar::chunk {
     color: #94a3b8;
     font-size: 11px;
 }
+
+/* =======================
+   BINARY ANALYSIS 
+   ======================= */
+
+#BinaryCard {
+    background-color: #101826;
+    border: 1px solid #22314a;
+    border-radius: 14px;
+}
+
+#CardTitle {
+    color: #F8FAFC;
+    font-size: 15px;
+    font-weight: 700;
+}
+
+#CardContent {
+    color: #CBD5E1;
+    font-size: 13px;
+}
+
+#BigGreenText {
+    color: #4ADE80;
+    font-size: 24px;
+    font-weight: 800;
+}
+
+#StatusBadge,
+#ConfidenceBadge {
+    padding: 5px 10px;
+    border-radius: 8px;
+    font-weight: 700;
+}
+
+#StatusBadge[kind="success"],
+#ConfidenceBadge[kind="success"] {
+    color: #86EFAC;
+    background-color: rgba(34, 197, 94, 0.16);
+    border: 1px solid rgba(34, 197, 94, 0.35);
+}
+
+#StatusBadge[kind="warning"],
+#ConfidenceBadge[kind="warning"] {
+    color: #FACC15;
+    background-color: rgba(250, 204, 21, 0.14);
+    border: 1px solid rgba(250, 204, 21, 0.35);
+}
+
+#StatusBadge[kind="danger"],
+#ConfidenceBadge[kind="danger"] {
+    color: #FCA5A5;
+    background-color: rgba(239, 68, 68, 0.14);
+    border: 1px solid rgba(239, 68, 68, 0.35);
+}
+
+#BinaryTable {
+    background-color: #0B1220;
+    color: #E5E7EB;
+    border: 1px solid #22314A;
+    gridline-color: #22314A;
+    border-radius: 8px;
+}
+
+#BinaryTable::item {
+    padding: 8px;
+}
+
+#HexPreview,
+#HexViewer {
+    background-color: #08111F;
+    color: #93C5FD;
+    border: 1px solid #1E3A5F;
+    border-radius: 10px;
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 12px;
+    padding: 10px;
+}
+
+#ConclusionBox {
+    background-color: rgba(124, 58, 237, 0.10);
+    color: #C4B5FD;
+    border: 1px solid rgba(124, 58, 237, 0.45);
+    border-radius: 10px;
+    padding: 10px;
+    font-weight: 600;
+}
+
+#SearchToolbar {
+    background-color: #101826;
+    border: 1px solid #22314A;
+    border-radius: 12px;
+}
+
+#PrimaryButton {
+    background-color: #2563EB;
+    color: white;
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-weight: 700;
+}
+
+#PrimaryButton:hover {
+    background-color: #1D4ED8;
+}

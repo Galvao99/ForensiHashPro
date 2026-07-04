@@ -6,7 +6,10 @@ from app.models.analysis_result import (
     MetadataResult,
 )
 from app.models.digital_signature_result import DigitalSignatureResult
-from app.models.magic_number_result import MagicNumberResult
+from app.models.magic_number_result import (
+    MagicNumberResult,
+    MagicNumberFinding,
+)
 from app.models.reference import Reference
 from app.models.comparison_result import ComparisonResult
 from app.models.comparison_section import ComparisonSection
@@ -20,8 +23,10 @@ __all__ = [
     "MetadataResult",
     "Reference",
     "MagicNumberResult",
+    "MagicNumberFinding",
     "DigitalSignatureResult",
     "ComparisonResult",
     "ComparisonSection",
+    "ScoreResult",
     "ScoreSection",
 ]
