@@ -1,3 +1,11 @@
+/* =========================================================
+   FORENSIHASH PRO - CLEAN DARK THEME
+   Versão limpa para substituir o QSS antigo
+   ========================================================= */
+
+/* =========================
+   GLOBAL
+   ========================= */
 QWidget {
     background-color: #0B1120;
     color: #E5E7EB;
@@ -5,8 +13,41 @@ QWidget {
     font-size: 13px;
 }
 
-/* SIDEBAR */
+QLabel {
+    background: transparent;
+}
 
+#Content,
+QWidget#TimelinePage {
+    background-color: #0B1120;
+}
+
+#PageTitle {
+    font-size: 25px;
+    font-weight: 900;
+    color: #F8FAFC;
+}
+
+#SectionTitle {
+    font-size: 20px;
+    font-weight: 900;
+    color: #F8FAFC;
+}
+
+#SectionSubtitle {
+    font-size: 13px;
+    color: #94A3B8;
+}
+
+#ClockLabel {
+    color: #60A5FA;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+/* =========================
+   SIDEBAR
+   ========================= */
 #Sidebar {
     background-color: #020617;
     border-right: 1px solid #1E293B;
@@ -29,33 +70,17 @@ QWidget {
     color: #64748B;
     font-size: 11px;
     font-weight: 800;
-    text-transform: uppercase;
 }
 
-#Content {
-    background-color: #0B1120;
-}
-
-#PageTitle {
-    font-size: 25px;
-    font-weight: 900;
-    color: #F8FAFC;
-}
-
-#ClockLabel {
-    color: #60A5FA;
-    font-size: 12px;
-    font-weight: 600;
-}
-
-/* BOTÕES */
-
+/* =========================
+   BUTTONS
+   ========================= */
 QPushButton {
     background-color: #0F172A;
     color: #CBD5E1;
     border: 1px solid #1E293B;
     border-radius: 12px;
-    padding: 12px 14px;
+    padding: 11px 14px;
     text-align: left;
     font-weight: 700;
 }
@@ -63,50 +88,17 @@ QPushButton {
 QPushButton:hover {
     background-color: #172554;
     color: #FFFFFF;
-    border: 1px solid #2563EB;
+    border-color: #2563EB;
 }
 
 QPushButton:pressed {
     background-color: #1D4ED8;
-    border: 1px solid #60A5FA;
+    border-color: #60A5FA;
 }
 
-/* CARDS */
-
-#BaseCard,
-#InfoCard {
-    background-color: #111827;
-    border: 1px solid #243244;
-    border-radius: 18px;
-    padding: 16px;
-}
-
-#BaseCard:hover,
-#InfoCard:hover {
-    border: 1px solid #334155;
-}
-
-#CardTitle {
-    font-size: 16px;
-    font-weight: 900;
-    color: #F8FAFC;
-}
-
-#CardContent {
-    color: #CBD5E1;
-    font-size: 13px;
-    line-height: 150%;
-}
-
-#DashboardTitle {
-    font-size: 18px;
-    font-weight: 900;
-    color: #F8FAFC;
-    padding-bottom: 8px;
-}
-
-/* TABS */
-
+/* =========================
+   TABS
+   ========================= */
 QTabWidget::pane {
     border: 1px solid #1E293B;
     border-radius: 18px;
@@ -128,7 +120,7 @@ QTabBar::tab {
 QTabBar::tab:selected {
     background-color: #2563EB;
     color: #FFFFFF;
-    border: 1px solid #60A5FA;
+    border-color: #60A5FA;
 }
 
 QTabBar::tab:hover:!selected {
@@ -136,8 +128,48 @@ QTabBar::tab:hover:!selected {
     color: #E0F2FE;
 }
 
-/* LISTAS E TABELAS */
+/* =========================
+   BASE CARDS
+   ========================= */
+#BaseCard,
+#InfoCard,
+#summaryCard,
+#metadataCard,
+#findingsPreviewCard {
+    background-color: #111827;
+    border: 1px solid #243244;
+    border-radius: 18px;
+    padding: 16px;
+}
 
+#BaseCard:hover,
+#InfoCard:hover,
+#summaryCard:hover,
+#metadataCard:hover,
+#findingsPreviewCard:hover {
+    border-color: #334155;
+}
+
+#CardTitle,
+#DashboardTitle,
+#summaryTitle,
+#metadataCardTitle,
+#findingsPreviewTitle {
+    color: #F8FAFC;
+    font-weight: 900;
+}
+
+#CardContent,
+#summaryText,
+#metadataHighlightText,
+#metadataInsightText,
+#findingsPreviewText {
+    color: #CBD5E1;
+}
+
+/* =========================
+   LISTS / TABLES
+   ========================= */
 QListWidget,
 QTableWidget {
     background-color: #0F172A;
@@ -165,7 +197,11 @@ QListWidget::item:selected {
 }
 
 QTableWidget::item {
-    padding: 7px;
+    padding: 8px;
+}
+
+QTableWidget::item:hover {
+    background-color: #1E293B;
 }
 
 QHeaderView::section {
@@ -176,8 +212,209 @@ QHeaderView::section {
     font-weight: 800;
 }
 
-/* PROGRESS */
+/* =========================
+   INPUTS
+   ========================= */
+QLineEdit,
+QDateTimeEdit,
+QComboBox,
+#HashSelector {
+    background-color: #0B1220;
+    color: #E5E7EB;
+    border: 1px solid #1E293B;
+    border-radius: 10px;
+    padding: 8px 12px;
+}
 
+QLineEdit:focus,
+QDateTimeEdit:focus,
+QComboBox:hover,
+#HashSelector:hover {
+    border-color: #38BDF8;
+}
+
+QLineEdit::placeholder {
+    color: #64748B;
+}
+
+/* =========================
+   SCROLL
+   ========================= */
+QScrollArea,
+#MainScrollArea,
+#FindingScrollArea,
+#TimelineScroll {
+    border: none;
+    background: transparent;
+}
+
+QScrollBar:vertical {
+    background: #0F172A;
+    width: 12px;
+    margin: 4px;
+    border-radius: 6px;
+}
+
+QScrollBar::handle:vertical {
+    background: #334155;
+    min-height: 40px;
+    border-radius: 6px;
+}
+
+QScrollBar::handle:vertical:hover {
+    background: #475569;
+}
+
+QScrollBar:horizontal {
+    background: #0F172A;
+    height: 12px;
+    margin: 4px;
+    border-radius: 6px;
+}
+
+QScrollBar::handle:horizontal {
+    background: #334155;
+    min-width: 40px;
+    border-radius: 6px;
+}
+
+QScrollBar::handle:horizontal:hover {
+    background: #475569;
+}
+
+QScrollBar::add-line,
+QScrollBar::sub-line {
+    width: 0px;
+    height: 0px;
+}
+
+/* =========================
+   SMART TIMELINE
+   ========================= */
+QWidget#SmartTimeline {
+    background-color: #0F172A;
+    border: 1px solid #243244;
+    border-radius: 16px;
+    min-height: 155px;
+}
+
+QFrame#SmartTimelineTrack {
+    background-color: #334155;
+    border: none;
+    margin-left: 45px;
+    margin-right: 45px;
+}
+
+QWidget#TimelineNode {
+    background: transparent;
+}
+
+QLabel#TimelineNodeDot {
+    font-size: 18px;
+    font-weight: 900;
+}
+
+QFrame#TimelineNodeLine {
+    background-color: #475569;
+    border: none;
+    min-width: 2px;
+    max-width: 2px;
+}
+
+QLabel#TimelineNodeTitle {
+    color: #F8FAFC;
+    font-size: 12px;
+    font-weight: 800;
+}
+
+QLabel#TimelineNodeDate {
+    color: #BFDBFE;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+/* =========================
+   TECHNICAL TIMELINE CARDS
+   ========================= */
+QWidget#TechnicalTimeline {
+    background: transparent;
+}
+
+QFrame#TimelineEventCard {
+    background-color: #111827;
+    border: 1px solid #243244;
+    border-radius: 16px;
+    min-height: 190px;
+}
+
+QFrame#TimelineEventCard:hover {
+    background-color: #162033;
+    border-color: #3B82F6;
+}
+
+QLabel#TimelineCardDot {
+    font-size: 22px;
+    font-weight: 900;
+}
+
+QLabel#TimelineCardTitle {
+    color: #FFFFFF;
+    font-size: 13px;
+    font-weight: 800;
+}
+
+QLabel#TimelineCardDate {
+    color: #BFDBFE;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+QLabel#TimelineCardSource {
+    color: #DBEAFE;
+    background-color: #0B1222;
+    border: 1px solid #334155;
+    border-radius: 8px;
+    padding: 5px 8px;
+    font-size: 11px;
+}
+
+QLabel#TimelineCardDescription {
+    color: #CBD5E1;
+    font-size: 12px;
+}
+
+QLabel#TimelineResult {
+    color: #FBBF24;
+    background-color: rgba(251, 146, 60, 0.10);
+    border: 1px solid rgba(251, 146, 60, 0.35);
+    border-radius: 12px;
+    padding: 12px;
+    font-size: 12px;
+}
+
+/* =========================
+   CONTRACT DATE CONFIRMATION
+   ========================= */
+QFrame#ContractDateConfirmationCard {
+    background-color: #111C33;
+    border: 1px solid #F59E0B;
+    border-radius: 14px;
+}
+
+QLabel#ContractDateTitle {
+    color: #FBBF24;
+    font-size: 15px;
+    font-weight: 800;
+}
+
+QLabel#ContractDateMessage {
+    color: #CBD5E1;
+    font-size: 13px;
+}
+
+/* =========================
+   SUMMARY / PROGRESS
+   ========================= */
 QProgressBar {
     background-color: #1E293B;
     border: none;
@@ -193,94 +430,38 @@ QProgressBar::chunk {
     border-radius: 6px;
 }
 
-/* SCROLLBAR */
-
-QScrollBar:vertical {
-    background: #0B1120;
-    width: 10px;
-}
-
-QScrollBar::handle:vertical {
-    background: #334155;
-    border-radius: 5px;
-    min-height: 30px;
-}
-
-QScrollBar::handle:vertical:hover {
-    background: #475569;
-}
-
-QScrollBar::add-line:vertical,
-QScrollBar::sub-line:vertical {
-    height: 0px;
-}
-
-/* RESUMO PERICIAL */
-
-#summaryCard {
-    background-color: #111827;
-    border: 1px solid #263244;
-    border-radius: 20px;
-}
-
-#summaryTitle {
-    color: #F8FAFC;
-    font-size: 21px;
-    font-weight: 900;
-}
-
 #summaryScoreOk {
     color: #86EFAC;
-    font-size: 15px;
     font-weight: 900;
 }
 
 #summaryScoreWarning {
     color: #FDE68A;
-    font-size: 15px;
     font-weight: 900;
 }
 
 #summaryScoreDanger {
     color: #FDA4AF;
-    font-size: 15px;
     font-weight: 900;
 }
 
 #summaryProgressOk::chunk {
     background-color: #22C55E;
-    border-radius: 6px;
 }
 
 #summaryProgressWarning::chunk {
     background-color: #EAB308;
-    border-radius: 6px;
 }
 
 #summaryProgressDanger::chunk {
     background-color: #EF4444;
-    border-radius: 6px;
 }
 
-#summarySectionTitle {
-    color: #F8FAFC;
-    font-size: 14px;
-    font-weight: 900;
-}
-
-#summaryText {
-    color: #CBD5E1;
-    font-size: 13px;
-}
-
-#summaryTextMuted {
-    color: #64748B;
-    font-size: 12px;
-}
-
-/* BADGES */
-
-#badge_ok {
+/* =========================
+   BADGES
+   ========================= */
+#badge_ok,
+#findingBadge_success {
     background-color: rgba(34, 197, 94, 0.14);
     color: #86EFAC;
     border: 1px solid rgba(34, 197, 94, 0.34);
@@ -289,7 +470,8 @@ QScrollBar::sub-line:vertical {
     font-weight: 800;
 }
 
-#badge_warning {
+#badge_warning,
+#findingBadge_warning {
     background-color: rgba(234, 179, 8, 0.14);
     color: #FDE68A;
     border: 1px solid rgba(234, 179, 8, 0.35);
@@ -298,7 +480,8 @@ QScrollBar::sub-line:vertical {
     font-weight: 800;
 }
 
-#badge_danger {
+#badge_danger,
+#findingBadge_critical {
     background-color: rgba(239, 68, 68, 0.14);
     color: #FCA5A5;
     border: 1px solid rgba(239, 68, 68, 0.35);
@@ -307,7 +490,8 @@ QScrollBar::sub-line:vertical {
     font-weight: 800;
 }
 
-#badge_info {
+#badge_info,
+#findingBadge_info {
     background-color: rgba(59, 130, 246, 0.14);
     color: #93C5FD;
     border: 1px solid rgba(59, 130, 246, 0.35);
@@ -325,14 +509,33 @@ QScrollBar::sub-line:vertical {
     font-weight: 800;
 }
 
-/* NOTA DO PERITO */
+/* =========================
+   METADATA / FINDINGS
+   ========================= */
+#metadataCountLabel,
+#findingsPreviewSubtitle,
+#findingsPreviewMuted,
+#FindingSubtitle,
+#FindingEmptyText,
+#findingItemMuted {
+    color: #94A3B8;
+    font-size: 12px;
+}
 
-#expertNoteBox {
+#metadataHighlightsBox {
     background-color: #0B1220;
+    border: 1px solid #1E293B;
+    border-radius: 14px;
+}
+
+#metadataInsightBox,
+#expertNoteBox {
+    background-color: rgba(56, 189, 248, 0.08);
     border-left: 4px solid #38BDF8;
     border-radius: 12px;
 }
 
+#metadataInsightTitle,
 #expertNoteTitle {
     color: #E0F2FE;
     font-size: 14px;
@@ -342,100 +545,6 @@ QScrollBar::sub-line:vertical {
 #expertNoteText {
     color: #CBD5E1;
     font-size: 13px;
-}
-
-/* METADADOS */
-
-#metadataCard {
-    background-color: #111827;
-    border: 1px solid #263244;
-    border-radius: 20px;
-}
-
-#metadataCardTitle {
-    color: #F8FAFC;
-    font-size: 19px;
-    font-weight: 900;
-}
-
-#metadataCountLabel {
-    color: #94A3B8;
-    font-size: 13px;
-    font-weight: 700;
-}
-
-#metadataHighlightsBox {
-    background-color: #0B1220;
-    border: 1px solid #1E293B;
-    border-radius: 14px;
-}
-
-#metadataHighlightText {
-    color: #CBD5E1;
-    font-size: 13px;
-}
-
-#metadataInsightBox {
-    background-color: rgba(56, 189, 248, 0.08);
-    border-left: 4px solid #38BDF8;
-    border-radius: 12px;
-}
-
-#metadataInsightTitle {
-    color: #E0F2FE;
-    font-size: 14px;
-    font-weight: 900;
-}
-
-#metadataInsightText {
-    color: #CBD5E1;
-    font-size: 13px;
-}
-
-/* VESTÍGIOS PREVIEW */
-
-#findingsPreviewCard {
-    background-color: #111827;
-    border: 1px solid #263244;
-    border-radius: 20px;
-}
-
-#findingsPreviewTitle {
-    color: #F8FAFC;
-    font-size: 19px;
-    font-weight: 900;
-}
-
-#findingsPreviewSubtitle {
-    color: #94A3B8;
-    font-size: 13px;
-}
-
-#findingsPreviewText {
-    color: #CBD5E1;
-    font-size: 13px;
-}
-
-#findingsPreviewMuted {
-    color: #64748B;
-    font-size: 12px;
-}
-
-/* VESTÍGIOS COMPLETOS */
-
-#FindingSubtitle {
-    color: #94A3B8;
-    font-size: 13px;
-}
-
-#FindingEmptyText {
-    color: #94A3B8;
-    font-size: 13px;
-}
-
-#FindingScrollArea {
-    border: none;
-    background: transparent;
 }
 
 #findingItemInfo,
@@ -474,148 +583,11 @@ QScrollBar::sub-line:vertical {
     font-size: 13px;
 }
 
-#findingItemMuted {
-    color: #94A3B8;
-    font-size: 12px;
-}
-
-#findingBadge_info {
-    background-color: rgba(59, 130, 246, 0.15);
-    color: #93C5FD;
-    border-radius: 10px;
-    padding: 4px 10px;
-    font-weight: 900;
-}
-
-#findingBadge_warning {
-    background-color: rgba(234, 179, 8, 0.15);
-    color: #FDE68A;
-    border-radius: 10px;
-    padding: 4px 10px;
-    font-weight: 900;
-}
-
-#findingBadge_critical {
-    background-color: rgba(239, 68, 68, 0.15);
-    color: #FCA5A5;
-    border-radius: 10px;
-    padding: 4px 10px;
-    font-weight: 900;
-}
-
-#findingBadge_success {
-    background-color: rgba(34, 197, 94, 0.15);
-    color: #86EFAC;
-    border-radius: 10px;
-    padding: 4px 10px;
-    font-weight: 900;
-}
-
-#MainScrollArea {
-    border: none;
-    background: transparent;
-}
-
-#MainScrollArea QWidget {
-    background: transparent;
-}
-
-QLabel {
-    qproperty-wordWrap: true;
-}
-
-#TechnicalTimeline {
-    background-color: #FFFFFF;
-    border: 1px solid #E5E7EB;
-    border-radius: 16px;
-    padding: 18px;
-}
-
-#SectionTitle {
-    font-size: 20px;
-    font-weight: 700;
-    color: #111827;
-}
-
-#SectionSubtitle {
-    font-size: 13px;
-    color: #6B7280;
-}
-
-/* TIMELINE TÉCNICA */
-
-#TechnicalTimeline {
-    background-color: #111827;
-    border: 1px solid #243244;
-    border-radius: 18px;
-    padding: 18px;
-}
-
-#SectionTitle {
-    font-size: 20px;
-    font-weight: 800;
-    color: #F8FAFC;
-}
-
-#SectionSubtitle {
-    font-size: 13px;
-    color: #94A3B8;
-}
-
-#TimelineScroll {
-    border: none;
-    background-color: transparent;
-}
-
-#TimelinePoint {
-    background-color: transparent;
-}
-
-#TimelineConnector {
-    background-color: #334155;
-    border: none;
-}
-
-#TimelineTitle {
-    font-size: 14px;
-    font-weight: 800;
-    color: #F8FAFC;
-}
-
-#TimelineDate {
-    font-size: 13px;
-    font-weight: 600;
-    color: #CBD5E1;
-}
-
-#TimelineSource {
-    font-size: 11px;
-    color: #CBD5E1;
-    background-color: #1E293B;
-    border: 1px solid #334155;
-    border-radius: 8px;
-    padding: 3px 8px;
-}
-
-#TimelineDescription {
-    font-size: 12px;
-    color: #94A3B8;
-}
-
-#TimelineResult {
-    background-color: rgba(251, 146, 60, 0.10);
-    border: 1px solid rgba(251, 146, 60, 0.35);
-    border-radius: 12px;
-    padding: 12px;
-    font-size: 13px;
-    font-weight: 500;
-    color: #FDBA74;
-}
-
-
-/* OCR */
-
-#PdfViewer {
+/* =========================
+   OCR
+   ========================= */
+#PdfViewer,
+#OcrTextViewer {
     background-color: #111827;
     border: 1px solid #243244;
     border-radius: 18px;
@@ -627,13 +599,6 @@ QLabel {
     border: 1px solid #334155;
     border-radius: 10px;
     margin-bottom: 14px;
-}
-
-#OcrTextViewer {
-    background-color: #111827;
-    border: 1px solid #243244;
-    border-radius: 18px;
-    padding: 10px;
 }
 
 #OcrTextArea {
@@ -648,43 +613,9 @@ QLabel {
     selection-color: #FFFFFF;
 }
 
-QLineEdit {
-    background-color: #0B1220;
-    color: #E5E7EB;
-    border: 1px solid #1E293B;
-    border-radius: 12px;
-    padding: 10px 12px;
-    font-size: 13px;
-}
-
-QLineEdit:focus {
-    border: 1px solid #38BDF8;
-}
-
-QLineEdit::placeholder {
-    color: #64748B;
-}
-
-/* HASH PAGE */
-
-#HashSelector {
-    background-color: #0B1220;
-    color: #E5E7EB;
-    border: 1px solid #1E293B;
-    border-radius: 10px;
-    padding: 8px 12px;
-    font-weight: 700;
-}
-
-#HashSelector:hover {
-    border: 1px solid #38BDF8;
-}
-
-#HashSelector::drop-down {
-    border: none;
-    width: 28px;
-}
-
+/* =========================
+   HASH PAGE
+   ========================= */
 #HashTable {
     background-color: #0B1220;
     color: #CBD5E1;
@@ -699,14 +630,4 @@ QLineEdit::placeholder {
 
 #HashTable::item {
     padding: 8px;
-    border-bottom: 1px solid #1E293B;
-}
-
-#HashTable::item:hover {
-    background-color: #1E293B;
-}
-
-#HashTable::item:selected {
-    background-color: #2563EB;
-    color: #FFFFFF;
 }
