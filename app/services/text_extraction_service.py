@@ -4,6 +4,17 @@ import fitz
 import pytesseract
 from pdf2image import convert_from_path
 
+ROOT = Path(__file__).resolve().parents[2]
+
+TESSERACT = (
+    ROOT
+    / "tools"
+    / "tesseract"
+    / "tesseract.exe"
+)
+
+if TESSERACT.exists():
+    pytesseract.pytesseract.tesseract_cmd = str(TESSERACT)
 
 class TextExtractionService:
     def extract_text(self, file_path: str | Path) -> str:

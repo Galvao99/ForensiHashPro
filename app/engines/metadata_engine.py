@@ -10,7 +10,7 @@ class MetadataEngine:
     """Responsável por extrair metadados usando o ExifTool."""
 
     def __init__(self, exiftool_path: Path | None = None) -> None:
-        self.exiftool_path = exiftool_path or Path("tools/exiftool.exe")
+        self.exiftool_path = exiftool_path or Path("tools/exiftool/exiftool.exe")
 
     def extract(self, file_path: Path) -> MetadataResult:
         if not self.exiftool_path.exists():

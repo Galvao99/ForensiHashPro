@@ -147,3 +147,18 @@ class MainWindow(QWidget):
             return
 
         self.analyze_file(Path(filename))
+
+    def analyze_file(self, file_path: Path) -> None:
+        try:
+            result = self.analysis_service.analyze(file_path)
+
+            self.current_result = result
+            self.analysis_results = [result]
+
+            self.sidebar.file_list.add_files([file_path])
+
+            self.analysis_tabs.update_analysis(result)
+            self.analysis_tabs.update_hashes(self.analysis_results)
+
+        except Exception as error:
+            print(f"Erro ao analisar {file_path.name}: {error}")
