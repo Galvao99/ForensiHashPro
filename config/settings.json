@@ -1,0 +1,5 @@
+{
+    "ip_provider": "ip2location",
+    "ip_api_key": "08E87CEAB902B7C13D1FDB5DFE13D6F0",
+    "request_timeout": 15
+}

@@ -492,6 +492,170 @@ class ProducerDatabase:
             common_uses=["envio de arquivo", "envio de imagem", "compartilhamento"],
             correlate_with=["EXIF", "tamanho", "datas", "nome do arquivo"],
         ),
+        "aspose": ProducerInfo(
+            name="Aspose.PDF",
+            category="Biblioteca PDF",
+            description="Biblioteca utilizada para criação, conversão, edição e manipulação programática de arquivos PDF.",
+            interpretation="Pode indicar geração, conversão ou processamento automatizado do documento por sistema que utiliza a biblioteca Aspose. Isoladamente, não indica adulteração.",
+            confidence=95,
+            risk_level="Atenção",
+            common_uses=["geração de PDF", "conversão", "processamento automatizado", "sistemas corporativos"],
+            correlate_with=["CreateDate", "ModifyDate", "Subject", "converted file", "estrutura PDF", "assinatura digital"],
+        ),
+
+        "spire.pdf": ProducerInfo(
+            name="Spire.PDF",
+            category="Biblioteca PDF",
+            description="Biblioteca utilizada para criação, conversão, leitura, edição e manipulação programática de arquivos PDF.",
+            interpretation="Pode indicar que o documento foi gerado ou processado por aplicação que utiliza Spire.PDF. Deve ser interpretado em conjunto com datas, metadados e estrutura do arquivo.",
+            confidence=95,
+            risk_level="Atenção",
+            common_uses=["sistemas corporativos", "conversão PDF", "manipulação documental", "geração automatizada"],
+            correlate_with=["CreateDate", "ModifyDate", "Producer", "Creator", "estrutura PDF", "logs do sistema"],
+        ),
+
+        "e-iceblue": ProducerInfo(
+            name="E-iceblue / Spire",
+            category="Biblioteca PDF",
+            description="Fornecedor da biblioteca Spire.PDF, utilizada para manipulação programática de documentos.",
+            interpretation="Pode indicar processamento documental por biblioteca Spire, especialmente em aplicações corporativas ou bancárias.",
+            confidence=90,
+            risk_level="Atenção",
+            common_uses=["geração PDF", "conversão", "processamento por sistema interno"],
+            correlate_with=["Spire.PDF", "datas", "metadados", "estrutura PDF"],
+        ),
+
+        "syncfusion": ProducerInfo(
+            name="Syncfusion PDF",
+            category="Biblioteca PDF",
+            description="Biblioteca utilizada por aplicações .NET, JavaScript e outras plataformas para gerar e manipular PDFs.",
+            interpretation="Pode indicar geração automatizada ou processamento por sistema corporativo que utiliza componentes Syncfusion.",
+            confidence=90,
+            risk_level="Informativo",
+            common_uses=["relatórios", "contratos", "sistemas web", "geração automatizada"],
+            correlate_with=["Creator", "CreateDate", "ModifyDate", "logs do sistema"],
+        ),
+
+        "devexpress": ProducerInfo(
+            name="DevExpress PDF",
+            category="Biblioteca/Componente corporativo",
+            description="Componente utilizado em sistemas corporativos para geração de relatórios e documentos PDF.",
+            interpretation="Pode indicar geração do documento por aplicação corporativa, painel administrativo ou sistema interno.",
+            confidence=90,
+            risk_level="Informativo",
+            common_uses=["relatórios", "dashboards", "sistemas internos", "exportação PDF"],
+            correlate_with=["Creator", "datas", "logs", "sistema emissor"],
+        ),
+
+        "telerik": ProducerInfo(
+            name="Telerik PDF",
+            category="Biblioteca/Componente corporativo",
+            description="Componente utilizado para geração e exportação de documentos em aplicações web e corporativas.",
+            interpretation="Pode indicar geração automatizada por sistema web ou aplicação interna.",
+            confidence=85,
+            risk_level="Informativo",
+            common_uses=["relatórios web", "sistemas corporativos", "exportação PDF"],
+            correlate_with=["URL", "logs", "Creator", "datas"],
+        ),
+
+        "pdfsharp": ProducerInfo(
+            name="PDFsharp",
+            category="Biblioteca PDF .NET",
+            description="Biblioteca .NET utilizada para criação e manipulação de documentos PDF.",
+            interpretation="Pode indicar geração ou manipulação automatizada por aplicação desenvolvida em .NET.",
+            confidence=90,
+            risk_level="Informativo",
+            common_uses=["sistemas .NET", "geração PDF", "relatórios", "processamento documental"],
+            correlate_with=["CreateDate", "ModifyDate", "logs do sistema", "sistema emissor"],
+        ),
+
+        "migradoc": ProducerInfo(
+            name="MigraDoc",
+            category="Biblioteca documental .NET",
+            description="Biblioteca associada ao PDFsharp, utilizada para criação estruturada de documentos e relatórios.",
+            interpretation="Pode indicar geração automatizada de documento por aplicação .NET.",
+            confidence=85,
+            risk_level="Informativo",
+            common_uses=["relatórios", "contratos", "documentos estruturados", "sistemas .NET"],
+            correlate_with=["PDFsharp", "datas", "Creator", "logs"],
+        ),
+
+        "qoppa": ProducerInfo(
+            name="Qoppa PDF",
+            category="Biblioteca PDF",
+            description="Biblioteca utilizada para criação, edição, assinatura e processamento de PDFs.",
+            interpretation="Pode indicar processamento por aplicação que utiliza componentes Qoppa.",
+            confidence=85,
+            risk_level="Informativo",
+            common_uses=["edição PDF", "assinatura", "renderização", "sistemas Java"],
+            correlate_with=["assinatura digital", "ModifyDate", "metadados", "estrutura PDF"],
+        ),
+
+        "openhtmltopdf": ProducerInfo(
+            name="OpenHTMLtoPDF",
+            category="Conversor HTML para PDF",
+            description="Biblioteca utilizada para converter HTML e CSS em PDF.",
+            interpretation="Pode indicar que o documento foi gerado a partir de template HTML por sistema web.",
+            confidence=90,
+            risk_level="Informativo",
+            common_uses=["contratos online", "relatórios web", "templates HTML", "sistemas Java"],
+            correlate_with=["URL", "logs", "template", "User-Agent"],
+        ),
+
+        "weasyprint": ProducerInfo(
+            name="WeasyPrint",
+            category="Conversor HTML para PDF",
+            description="Ferramenta Python utilizada para geração de PDFs a partir de HTML e CSS.",
+            interpretation="Pode indicar geração automatizada por sistema web ou script Python.",
+            confidence=90,
+            risk_level="Informativo",
+            common_uses=["relatórios", "contratos online", "templates HTML", "sistemas Python"],
+            correlate_with=["HTML", "logs", "CreateDate", "sistema emissor"],
+        ),
+
+        "borb": ProducerInfo(
+            name="borb",
+            category="Biblioteca PDF Python",
+            description="Biblioteca Python utilizada para criação, leitura e manipulação de arquivos PDF.",
+            interpretation="Pode indicar geração ou processamento programático por aplicação Python.",
+            confidence=85,
+            risk_level="Informativo",
+            common_uses=["automação", "relatórios", "manipulação PDF", "extração de dados"],
+            correlate_with=["CreateDate", "ModifyDate", "logs", "sistema emissor"],
+        ),
+
+        "pypdf": ProducerInfo(
+            name="pypdf / PyPDF2",
+            category="Biblioteca PDF Python",
+            description="Biblioteca Python utilizada para leitura, união, divisão e manipulação de PDFs.",
+            interpretation="Pode indicar manipulação automatizada do documento, como união, divisão, extração ou reorganização de páginas.",
+            confidence=85,
+            risk_level="Atenção",
+            common_uses=["merge", "split", "extração de páginas", "automação"],
+            correlate_with=["ModifyDate", "número de páginas", "estrutura PDF", "metadados"],
+        ),
+
+        "pikepdf": ProducerInfo(
+            name="pikepdf",
+            category="Biblioteca PDF Python",
+            description="Biblioteca Python baseada em qpdf, utilizada para manipulação estrutural de PDFs.",
+            interpretation="Pode indicar processamento técnico do arquivo, como otimização, edição estrutural ou reparo.",
+            confidence=85,
+            risk_level="Atenção",
+            common_uses=["otimização", "reparo", "manipulação estrutural", "automação"],
+            correlate_with=["qpdf", "estrutura PDF", "ModifyDate", "objetos PDF"],
+        ),
+
+        "qpdf": ProducerInfo(
+            name="qpdf",
+            category="Ferramenta estrutural PDF",
+            description="Ferramenta utilizada para transformação, inspeção, linearização, descriptografia e manipulação estrutural de PDFs.",
+            interpretation="Pode indicar processamento técnico estrutural do documento, não necessariamente alteração de conteúdo visual.",
+            confidence=90,
+            risk_level="Atenção",
+            common_uses=["linearização", "reparo", "otimização", "manipulação estrutural"],
+            correlate_with=["estrutura PDF", "incremental updates", "objetos", "ModifyDate"],
+        ),
     }
 
     @classmethod
@@ -506,3 +670,17 @@ class ProducerDatabase:
                 return producer
 
         return None
+
+    @classmethod
+    def find_all(cls, raw_value: str | None) -> list[ProducerInfo]:
+        if not raw_value:
+            return []
+
+        value = raw_value.lower()
+        results: list[ProducerInfo] = []
+
+        for key, producer in cls.PRODUCERS.items():
+            if key in value and producer not in results:
+                results.append(producer)
+
+        return results
