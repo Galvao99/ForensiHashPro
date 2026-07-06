@@ -42,8 +42,8 @@ class MainWindow(QWidget):
         main_layout.setSpacing(0)
 
         self.sidebar = Sidebar()
-        self.content = self._build_content()
-
+        self.content = self._build_content()     
+        
         self.sidebar.open_file_button.clicked.connect(self.select_file)
         self.sidebar.open_folder_button.clicked.connect(self.select_folder)
         self.sidebar.file_list.itemClicked.connect(self.analyze_selected_file)

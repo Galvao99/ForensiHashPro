@@ -12,6 +12,7 @@ from app.pages.comparison_workspace import ComparisonWorkspace
 from app.services.analysis_service import AnalysisService
 from app.pages.integrity_page import IntegrityPage
 from app.pages.ocr_page import OcrPage
+from app.pages.ip_pages import IpPage
 
 
 class AnalysisTabs(QTabWidget):
@@ -32,6 +33,7 @@ class AnalysisTabs(QTabWidget):
         self.integrity_page = IntegrityPage()
         self.comparison_page = ComparisonWorkspace(analysis_service)
         self.ocr_page = OcrPage()
+        self.ip_page = IpPage()
 #========================================================================
         self.addTab(self.general_page, "Geral")
         self.addTab(self.hash_page, "Hashes")
@@ -43,6 +45,7 @@ class AnalysisTabs(QTabWidget):
         self.addTab(self.integrity_page, "Integridade")
         self.addTab(self.comparison_page, "Comparação")
         self.addTab(self.ocr_page, "OCR e Busca")
+        self.addTab(self.ip_page, "🌐 IP")
 
     def update_analysis(self, result: AnalysisResult) -> None:
         self.general_page.update_analysis(result)
