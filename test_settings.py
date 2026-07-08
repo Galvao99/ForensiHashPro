@@ -1,20 +1,15 @@
-from app.integrations.ip.ip_service import IpAnalysisService
+# from app.investigation.correlation_engine import CorrelationEngine
+# from app.investigation.rules import MetadataContractDateRule
 
-text = """
-IP interno: 192.168.15.2
-IP público: 177.12.176.38
-IPv6: 2804:1b3:7140:e013:2d1b:9175:ad57:932e
-Loopback: 127.0.0.1
-"""
+# def test_correlation_engine(self):
 
-service = IpAnalysisService()
-results = service.analyze_text(text)
+#     engine = CorrelationEngine(
+#         rules=[
+#             MetadataContractDateRule(),
+#         ]
+#     )
 
-for result in results:
-    print(result.ip)
-    print(result.severity)
-    print(result.lookup_performed)
-    print(result.location_summary)
-    print(result.technical_summary)
-    print(result.message)
-    print("-" * 40)
+#     correlation_result = engine.evaluate(self.analysis_results)
+
+#     print(correlation_result.is_consistent)
+#     print(correlation_result.findings)
