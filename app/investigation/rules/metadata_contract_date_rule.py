@@ -1,9 +1,6 @@
-from datetime import datetime
-from typing import Any, Sequence
-
 from app.investigation.correlation_finding import CorrelationFinding
+from app.investigation.investigation_context import InvestigationContext
 from app.investigation.rules.base_correlation_rule import BaseCorrelationRule
-from app.models import AnalysisResult
 
 
 class MetadataContractDateRule(BaseCorrelationRule):
@@ -12,15 +9,15 @@ class MetadataContractDateRule(BaseCorrelationRule):
 
     def evaluate(
         self,
-        results: Sequence[AnalysisResult],
+        context: InvestigationContext,
     ) -> list[CorrelationFinding]:
         findings: list[CorrelationFinding] = []
 
-        for result in results:
-            contract_date = self._get_contract_date(result)
-            create_date = self._get_create_date(result)
+        for file_name, contract_date in context.contract_dates.items():
+            metadata_dates = context.metadata_dates.get(file_name, {})
+            create_date = self._find_create_date(metadata_dates)
 
-            if not contract_date or not create_date:
+            if not create_date:
                 continue
 
             if create_date.date() > contract_date.date():
@@ -35,9 +32,9 @@ class MetadataContractDateRule(BaseCorrelationRule):
                         ),
                         severity="warning",
                         rule_id=self.rule_id,
-                        related_files=[result.file_info.name],
+                        related_files=[file_name],
                         evidence={
-                            "arquivo": result.file_info.name,
+                            "arquivo": file_name,
                             "data_pactuacao": contract_date.isoformat(),
                             "data_criacao_metadados": create_date.isoformat(),
                         },
@@ -46,66 +43,15 @@ class MetadataContractDateRule(BaseCorrelationRule):
 
         return findings
 
-    def _get_contract_date(self, result: AnalysisResult) -> datetime | None:
-        value = getattr(result, "contract_date", None)
-
-        if isinstance(value, datetime):
-            return value
-
-        if isinstance(value, str):
-            return self._parse_date(value)
-
-        return None
-
-    def _get_create_date(self, result: AnalysisResult) -> datetime | None:
-        metadata = getattr(result, "metadata", None)
-
-        if metadata is None:
-            return None
-
-        data: dict[str, Any] = getattr(metadata, "metadata", {}) or {}
-
-        possible_keys = [
+    def _find_create_date(self, metadata_dates: dict) -> object | None:
+        for key in [
             "CreateDate",
             "PDF:CreateDate",
             "XMP:CreateDate",
             "FileCreateDate",
             "CreationDate",
-        ]
-
-        for key in possible_keys:
-            value = data.get(key)
-
-            parsed = self._parse_date(value)
-
-            if parsed:
-                return parsed
-
-        return None
-
-    def _parse_date(self, value: Any) -> datetime | None:
-        if not value:
-            return None
-
-        if isinstance(value, datetime):
-            return value
-
-        text = str(value).strip()
-
-        known_formats = [
-            "%Y:%m:%d %H:%M:%S%z",
-            "%Y:%m:%d %H:%M:%S",
-            "%Y-%m-%dT%H:%M:%S%z",
-            "%Y-%m-%dT%H:%M:%S",
-            "%Y%m%d%H%M%SZ",
-            "%d/%m/%Y",
-            "%d/%m/%Y %H:%M:%S",
-        ]
-
-        for fmt in known_formats:
-            try:
-                return datetime.strptime(text, fmt)
-            except ValueError:
-                continue
+        ]:
+            if key in metadata_dates:
+                return metadata_dates[key]
 
         return None

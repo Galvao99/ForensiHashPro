@@ -1,8 +1,7 @@
 from abc import ABC, abstractmethod
-from typing import Sequence
 
 from app.investigation.correlation_finding import CorrelationFinding
-from app.models import AnalysisResult
+from app.investigation.investigation_context import InvestigationContext
 
 
 class BaseCorrelationRule(ABC):
@@ -12,6 +11,6 @@ class BaseCorrelationRule(ABC):
     @abstractmethod
     def evaluate(
         self,
-        results: Sequence[AnalysisResult],
+        context: InvestigationContext,
     ) -> list[CorrelationFinding]:
         raise NotImplementedError
