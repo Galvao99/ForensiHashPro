@@ -7,6 +7,7 @@ from app.enum.severity import Severity
 from app.models.digital_signature_result import DigitalSignatureResult
 from app.models.magic_number_result import MagicNumberResult
 from app.models.reference import Reference
+from app.models.integrity_result import IntegrityResult
 
 
 @dataclass(frozen=True)
@@ -78,5 +79,6 @@ class AnalysisResult:
     findings: list[Finding]
     magic_numbers: MagicNumberResult
     digital_signature: DigitalSignatureResult
+    integrity: IntegrityResult
     analyzed_at: datetime = field(default_factory=datetime.now)
     timeline_events: list[TimelineEvent] = field(default_factory=list)
