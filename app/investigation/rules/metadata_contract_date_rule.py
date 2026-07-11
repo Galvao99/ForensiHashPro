@@ -1,111 +1,166 @@
 from datetime import datetime
-from typing import Any, Sequence
+from typing import Any
 
 from app.investigation.correlation_finding import CorrelationFinding
+from app.investigation.investigation_context import InvestigationContext
 from app.investigation.rules.base_correlation_rule import BaseCorrelationRule
-from app.models import AnalysisResult
+from app.models.badge import (
+    info_badge,
+    neutral_badge,
+    warning_badge,
+)
 
 
 class MetadataContractDateRule(BaseCorrelationRule):
+    """
+    Compara a data de criação registrada nos metadados
+    com a data de pactuação extraída do documento.
+    """
+
     rule_id = "metadata_contract_date"
     name = "Data de criação x data de pactuação"
 
+    CREATE_DATE_KEYS = (
+        "CreateDate",
+        "PDF:CreateDate",
+        "XMP:CreateDate",
+        "FileCreateDate",
+        "CreationDate",
+    )
+
     def evaluate(
         self,
-        results: Sequence[AnalysisResult],
+        context: InvestigationContext,
     ) -> list[CorrelationFinding]:
         findings: list[CorrelationFinding] = []
 
-        for result in results:
-            contract_date = self._get_contract_date(result)
-            create_date = self._get_create_date(result)
+        for file_name, contract_date in context.contract_dates.items():
+            metadata_dates = context.metadata_dates.get(
+                file_name,
+                {},
+            )
 
-            if not contract_date or not create_date:
+            create_date = self._find_create_date(metadata_dates)
+
+            if create_date is None:
                 continue
 
-            if create_date.date() > contract_date.date():
-                findings.append(
-                    CorrelationFinding(
-                        title="Data de criação posterior à pactuação",
-                        message=(
-                            "A data de criação identificada nos metadados do arquivo "
-                            "é posterior à data de pactuação extraída do conteúdo documental. "
-                            "Esse achado recomenda análise conjunta com a origem do arquivo, "
-                            "logs, trilha de contratação e cadeia de custódia."
-                        ),
-                        severity="warning",
-                        rule_id=self.rule_id,
-                        related_files=[result.file_info.name],
-                        evidence={
-                            "arquivo": result.file_info.name,
-                            "data_pactuacao": contract_date.isoformat(),
-                            "data_criacao_metadados": create_date.isoformat(),
-                        },
-                    )
+            difference_days = (
+                create_date.date() - contract_date.date()
+            ).days
+
+            if difference_days > 0:
+                self._add_creation_after_contract_finding(
+                    findings=findings,
+                    file_name=file_name,
+                    contract_date=contract_date,
+                    create_date=create_date,
+                    difference_days=difference_days,
                 )
+
+                continue
+
+            self._add_compatible_dates_finding(
+                findings=findings,
+                file_name=file_name,
+                contract_date=contract_date,
+                create_date=create_date,
+                difference_days=difference_days,
+            )
 
         return findings
 
-    def _get_contract_date(self, result: AnalysisResult) -> datetime | None:
-        value = getattr(result, "contract_date", None)
+    def _add_creation_after_contract_finding(
+        self,
+        *,
+        findings: list[CorrelationFinding],
+        file_name: str,
+        contract_date: datetime,
+        create_date: datetime,
+        difference_days: int,
+    ) -> None:
+        self.add_warning(
+            findings,
+            title="Criação posterior à pactuação",
+            description=(
+                f"O arquivo foi criado {difference_days} dia(s) "
+                "após a data de pactuação identificada."
+            ),
+            icon="calendar-warning",
+            source_file=file_name,
+            badges=[
+                warning_badge(
+                    f"+{difference_days} dia(s)",
+                    tooltip=(
+                        "Diferença entre a data de pactuação "
+                        "e a criação do arquivo."
+                    ),
+                ),
+                info_badge(
+                    "CreateDate",
+                    tooltip=(
+                        "Data de criação registrada "
+                        "nos metadados do arquivo."
+                    ),
+                ),
+                neutral_badge(
+                    f"Pactuação: {contract_date:%d/%m/%Y}",
+                ),
+                neutral_badge(
+                    f"Criação: {create_date:%d/%m/%Y}",
+                ),
+            ],
+            metadata={
+                "arquivo": file_name,
+                "data_pactuacao": contract_date.isoformat(),
+                "data_criacao_metadados": create_date.isoformat(),
+                "diferenca_dias": difference_days,
+            },
+        )
 
-        if isinstance(value, datetime):
-            return value
+    def _add_compatible_dates_finding(
+        self,
+        *,
+        findings: list[CorrelationFinding],
+        file_name: str,
+        contract_date: datetime,
+        create_date: datetime,
+        difference_days: int,
+    ) -> None:
+        self.add_ok(
+            findings,
+            title="Datas cronologicamente compatíveis",
+            description=(
+                "A data de criação do arquivo não é posterior "
+                "à data de pactuação identificada."
+            ),
+            icon="calendar-check",
+            source_file=file_name,
+            badges=[
+                info_badge("CreateDate"),
+                neutral_badge(
+                    f"Pactuação: {contract_date:%d/%m/%Y}",
+                ),
+                neutral_badge(
+                    f"Criação: {create_date:%d/%m/%Y}",
+                ),
+            ],
+            metadata={
+                "arquivo": file_name,
+                "data_pactuacao": contract_date.isoformat(),
+                "data_criacao_metadados": create_date.isoformat(),
+                "diferenca_dias": difference_days,
+            },
+        )
 
-        if isinstance(value, str):
-            return self._parse_date(value)
+    def _find_create_date(
+        self,
+        metadata_dates: dict[str, Any],
+    ) -> datetime | None:
+        for key in self.CREATE_DATE_KEYS:
+            value = metadata_dates.get(key)
 
-        return None
-
-    def _get_create_date(self, result: AnalysisResult) -> datetime | None:
-        metadata = getattr(result, "metadata", None)
-
-        if metadata is None:
-            return None
-
-        data: dict[str, Any] = getattr(metadata, "metadata", {}) or {}
-
-        possible_keys = [
-            "CreateDate",
-            "PDF:CreateDate",
-            "XMP:CreateDate",
-            "FileCreateDate",
-            "CreationDate",
-        ]
-
-        for key in possible_keys:
-            value = data.get(key)
-
-            parsed = self._parse_date(value)
-
-            if parsed:
-                return parsed
-
-        return None
-
-    def _parse_date(self, value: Any) -> datetime | None:
-        if not value:
-            return None
-
-        if isinstance(value, datetime):
-            return value
-
-        text = str(value).strip()
-
-        known_formats = [
-            "%Y:%m:%d %H:%M:%S%z",
-            "%Y:%m:%d %H:%M:%S",
-            "%Y-%m-%dT%H:%M:%S%z",
-            "%Y-%m-%dT%H:%M:%S",
-            "%Y%m%d%H%M%SZ",
-            "%d/%m/%Y",
-            "%d/%m/%Y %H:%M:%S",
-        ]
-
-        for fmt in known_formats:
-            try:
-                return datetime.strptime(text, fmt)
-            except ValueError:
-                continue
+            if isinstance(value, datetime):
+                return value
 
         return None

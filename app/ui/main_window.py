@@ -1,5 +1,6 @@
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 from PySide6.QtCore import QTimer, Qt
 from PySide6.QtWidgets import (
@@ -17,13 +18,17 @@ from app.widgets.analysis_tabs import AnalysisTabs
 
 
 class MainWindow(QWidget):
-    def __init__(self, analysis_service: AnalysisService) -> None:
+    def __init__(
+        self,
+        analysis_service: AnalysisService,
+    ) -> None:
         super().__init__()
 
         self.analysis_service = analysis_service
         self.current_result = None
         self.analysis_results = []
-        
+        self.correlation_result = None
+
         self.setWindowTitle("ForensiHash Pro")
         self.resize(1280, 820)
         self.setMinimumSize(1050, 700)
@@ -33,7 +38,9 @@ class MainWindow(QWidget):
         self.clock_label.setAlignment(Qt.AlignRight)
 
         self.clock_timer = QTimer(self)
-        self.clock_timer.timeout.connect(self.update_clock)
+        self.clock_timer.timeout.connect(
+            self.update_clock
+        )
         self.clock_timer.start(1000)
         self.update_clock()
 
@@ -42,17 +49,26 @@ class MainWindow(QWidget):
         main_layout.setSpacing(0)
 
         self.sidebar = Sidebar()
-        self.content = self._build_content()     
-        
-        self.sidebar.open_file_button.clicked.connect(self.select_file)
-        self.sidebar.open_folder_button.clicked.connect(self.select_folder)
-        self.sidebar.file_list.itemClicked.connect(self.analyze_selected_file)
+        self.content = self._build_content()
+
+        self.sidebar.open_file_button.clicked.connect(
+            self.select_file
+        )
+        self.sidebar.open_folder_button.clicked.connect(
+            self.select_folder
+        )
+        self.sidebar.file_list.itemClicked.connect(
+            self.analyze_selected_file
+        )
         self.sidebar.compare_button.clicked.connect(
             self.analysis_tabs.show_comparison_tab
         )
 
         main_layout.addWidget(self.sidebar)
-        main_layout.addWidget(self.content, stretch=1)
+        main_layout.addWidget(
+            self.content,
+            stretch=1,
+        )
 
         self.setLayout(main_layout)
 
@@ -61,7 +77,12 @@ class MainWindow(QWidget):
         content.setObjectName("Content")
 
         root_layout = QVBoxLayout()
-        root_layout.setContentsMargins(28, 24, 28, 24)
+        root_layout.setContentsMargins(
+            28,
+            24,
+            28,
+            24,
+        )
         root_layout.setSpacing(16)
 
         header_layout = QHBoxLayout()
@@ -72,30 +93,58 @@ class MainWindow(QWidget):
 
         header_layout.addWidget(header)
         header_layout.addStretch()
-        header_layout.addWidget(self.clock_label)
+        header_layout.addWidget(
+            self.clock_label
+        )
 
-        self.analysis_tabs = AnalysisTabs(self.analysis_service)
+        self.analysis_tabs = AnalysisTabs(
+            self.analysis_service
+        )
 
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
-        scroll_area.setFrameShape(QScrollArea.NoFrame)
-        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
-        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
-        scroll_area.setObjectName("MainScrollArea")
-        scroll_area.setWidget(self.analysis_tabs)
+        scroll_area.setFrameShape(
+            QScrollArea.NoFrame
+        )
+        scroll_area.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarAsNeeded
+        )
+        scroll_area.setVerticalScrollBarPolicy(
+            Qt.ScrollBarAsNeeded
+        )
+        scroll_area.setObjectName(
+            "MainScrollArea"
+        )
+        scroll_area.setWidget(
+            self.analysis_tabs
+        )
 
-        root_layout.addLayout(header_layout)
-        root_layout.addWidget(scroll_area, stretch=1)
+        root_layout.addLayout(
+            header_layout
+        )
+        root_layout.addWidget(
+            scroll_area,
+            stretch=1,
+        )
 
         content.setLayout(root_layout)
+
         return content
 
     def update_clock(self) -> None:
-        current_time = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-        self.clock_label.setText(f"Horário: {current_time}")
+        current_time = datetime.now().strftime(
+            "%d/%m/%Y %H:%M:%S"
+        )
+
+        self.clock_label.setText(
+            f"Horário: {current_time}"
+        )
 
     def select_folder(self) -> None:
-        folder = QFileDialog.getExistingDirectory(self, "Selecionar Pasta")
+        folder = QFileDialog.getExistingDirectory(
+            self,
+            "Selecionar Pasta",
+        )
 
         if not folder:
             return
@@ -111,28 +160,67 @@ class MainWindow(QWidget):
         self.sidebar.file_list.add_files(files)
 
         self.analysis_results = []
+        self.correlation_result = None
 
         for file_path in files:
             try:
-                result = self.analysis_service.analyze(file_path)
-                self.analysis_results.append(result)
+                result = self.analysis_service.analyze(
+                    file_path
+                )
+
+                self.analysis_results.append(
+                    result
+                )
+
             except Exception as error:
-                print(f"Erro ao analisar {file_path.name}: {error}")
+                print(
+                    f"Erro ao analisar "
+                    f"{file_path.name}: {error}"
+                )
 
-        self.analysis_tabs.update_hashes(self.analysis_results)
+        self.analysis_tabs.update_hashes(
+            self.analysis_results
+        )
 
-        if self.analysis_results:
-            self.current_result = self.analysis_results[0]
-            self.analysis_tabs.update_analysis(self.current_result)
+        if not self.analysis_results:
+            return
 
-    def analyze_selected_file(self, item) -> None:
+        self.current_result = (
+            self.analysis_results[0]
+        )
+
+        self.analysis_tabs.update_analysis(
+            self.current_result
+        )
+
+        self._run_investigation()
+
+    def analyze_selected_file(
+        self,
+        item,
+    ) -> None:
         file_path = Path(item.data(1))
 
         for result in self.analysis_results:
             if Path(result.file_info.path) == file_path:
                 self.current_result = result
-                self.analysis_tabs.update_analysis(result)
-                self.analysis_tabs.update_hashes(self.analysis_results)
+
+                self.analysis_tabs.update_analysis(
+                    result
+                )
+
+                self.analysis_tabs.update_hashes(
+                    self.analysis_results
+                )
+
+                if self.correlation_result is not None:
+                    self.analysis_tabs.update_investigation(
+                        current_result=result,
+                        correlation_result=(
+                            self.correlation_result
+                        ),
+                    )
+
                 return
 
         self.analyze_file(file_path)
@@ -146,19 +234,131 @@ class MainWindow(QWidget):
         if not filename:
             return
 
-        self.analyze_file(Path(filename))
+        self.analyze_file(
+            Path(filename)
+        )
 
-    def analyze_file(self, file_path: Path) -> None:
+    def analyze_file(
+        self,
+        file_path: Path,
+    ) -> None:
         try:
-            result = self.analysis_service.analyze(file_path)
+            result = self.analysis_service.analyze(
+                file_path
+            )
 
             self.current_result = result
             self.analysis_results = [result]
+            self.correlation_result = None
 
-            self.sidebar.file_list.add_files([file_path])
+            self.sidebar.file_list.add_files(
+                [file_path]
+            )
 
-            self.analysis_tabs.update_analysis(result)
-            self.analysis_tabs.update_hashes(self.analysis_results)
+            self.analysis_tabs.update_analysis(
+                result
+            )
+
+            self.analysis_tabs.update_hashes(
+                self.analysis_results
+            )
+
+            self._run_investigation()
 
         except Exception as error:
-            print(f"Erro ao analisar {file_path.name}: {error}")
+            print(
+                f"Erro ao analisar "
+                f"{file_path.name}: {error}"
+            )
+
+    def _run_investigation(self) -> None:
+        if not self.analysis_results:
+            return
+
+        try:
+            correlation_result = (
+                self._call_investigation_service()
+            )
+
+        except Exception as error:
+            print(
+                "Erro ao executar investigação: "
+                f"{error}"
+            )
+            return
+
+        if correlation_result is None:
+            print(
+                "Investigation Engine não retornou "
+                "um CorrelationResult."
+            )
+            return
+
+        self.correlation_result = (
+            correlation_result
+        )
+
+        self.analysis_tabs.update_investigation(
+            current_result=self.current_result,
+            correlation_result=(
+                correlation_result
+            ),
+        )
+
+    def _call_investigation_service(
+        self,
+    ) -> Any | None:
+        """
+        Tenta localizar o método atual da Investigation Engine.
+
+        Pode ser simplificado quando confirmarmos o nome definitivo
+        utilizado pelo AnalysisService.
+        """
+
+        method_names = (
+            "correlate",
+            "investigate",
+            "evaluate_correlations",
+            "run_investigation",
+        )
+
+        for method_name in method_names:
+            method = getattr(
+                self.analysis_service,
+                method_name,
+                None,
+            )
+
+            if callable(method):
+                return method(
+                    self.analysis_results
+                )
+
+        correlation_service = getattr(
+            self.analysis_service,
+            "correlation_service",
+            None,
+        )
+
+        if correlation_service is not None:
+            for method_name in (
+                "correlate",
+                "evaluate",
+                "investigate",
+                "run",
+            ):
+                method = getattr(
+                    correlation_service,
+                    method_name,
+                    None,
+                )
+
+                if callable(method):
+                    return method(
+                        self.analysis_results
+                    )
+
+        raise AttributeError(
+            "Nenhum método de investigação foi encontrado "
+            "no AnalysisService ou no CorrelationService."
+        )
