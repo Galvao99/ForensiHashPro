@@ -5,21 +5,22 @@ from app.engines.file_analyzer import FileAnalyzer
 from app.investigation.correlation_result import CorrelationResult
 from app.models import AnalysisResult
 from app.services.correlation_service import CorrelationService
+from app.services.text_extraction_service import (
+    TextExtractionService,
+)
 
 
 class AnalysisService:
     """
     Coordena a análise individual dos arquivos e a investigação
     correlacionada do conjunto de resultados.
-
-    O ForensiHash não salva análises automaticamente.
-    Exportações devem ser ações explícitas do usuário.
     """
 
     def __init__(
         self,
         analyzer: FileAnalyzer,
         correlation_service: CorrelationService | None = None,
+        text_extraction_service: TextExtractionService | None = None,
     ) -> None:
         self.analyzer = analyzer
 
@@ -29,22 +30,46 @@ class AnalysisService:
             else CorrelationService()
         )
 
+        self.text_extraction_service = (
+            text_extraction_service
+            if text_extraction_service is not None
+            else TextExtractionService()
+        )
+
     def analyze(
         self,
         file_path: Path,
     ) -> AnalysisResult:
         """
-        Executa a análise técnica individual de um arquivo.
+        Executa a análise técnica e armazena o texto extraído
+        no próprio AnalysisResult.
         """
 
-        return self.analyzer.analyze(file_path)
+        result = self.analyzer.analyze(file_path)
+
+        try:
+            result.extracted_text = (
+                self.text_extraction_service.extract_text(
+                    file_path
+                )
+            )
+
+        except Exception as error:
+            print(
+                "Falha durante a extração textual de "
+                f"{file_path.name}: {error}"
+            )
+
+            result.extracted_text = ""
+
+        return result
 
     def correlate(
         self,
         results: Sequence[AnalysisResult],
     ) -> CorrelationResult:
         """
-        Executa a investigação sobre o conjunto de arquivos analisados.
+        Executa a investigação sobre um ou mais arquivos.
         """
 
         result_list = list(results)
@@ -52,8 +77,10 @@ class AnalysisService:
         if not result_list:
             return CorrelationResult()
 
-        correlation_result = self.correlation_service.analyze(
-            result_list
+        correlation_result = (
+            self.correlation_service.analyze(
+                result_list
+            )
         )
 
         self._print_correlation_result(
@@ -66,10 +93,6 @@ class AnalysisService:
         self,
         results: Sequence[AnalysisResult],
     ) -> CorrelationResult:
-        """
-        Nome alternativo para a execução da investigação.
-        """
-
         return self.correlate(results)
 
     def _print_correlation_result(
@@ -98,28 +121,14 @@ class AnalysisService:
             description = getattr(
                 finding,
                 "description",
-                None,
+                "",
             )
-
-            if not description:
-                description = getattr(
-                    finding,
-                    "message",
-                    "",
-                )
 
             metadata = getattr(
                 finding,
                 "metadata",
-                None,
+                {},
             )
-
-            if metadata is None:
-                metadata = getattr(
-                    finding,
-                    "evidence",
-                    {},
-                )
 
             print("-" * 60)
             print(

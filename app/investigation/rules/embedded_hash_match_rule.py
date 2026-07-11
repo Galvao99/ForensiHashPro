@@ -3,17 +3,42 @@ import re
 from app.investigation.correlation_finding import CorrelationFinding
 from app.investigation.investigation_context import InvestigationContext
 from app.investigation.rules.base_correlation_rule import BaseCorrelationRule
+from app.models.badge import (
+    info_badge,
+    neutral_badge,
+    success_badge,
+)
 
 
 class EmbeddedHashMatchRule(BaseCorrelationRule):
+    """
+    Correlaciona hashes presentes no corpo textual de um documento
+    com os hashes calculados dos arquivos analisados.
+    """
+
     rule_id = "embedded_hash_match"
     name = "Hash textual compatível com arquivo analisado"
 
-    HASH_PATTERNS = {
-        "MD5": r"\b[a-fA-F0-9]{32}\b",
-        "SHA1": r"\b[a-fA-F0-9]{40}\b",
-        "SHA256": r"\b[a-fA-F0-9]{64}\b",
-        "SHA512": r"\b[a-fA-F0-9]{128}\b",
+    HASH_PATTERN = re.compile(
+        r"(?<![a-fA-F0-9])"
+        r"("
+        r"[a-fA-F0-9]{32}"
+        r"|[a-fA-F0-9]{40}"
+        r"|[a-fA-F0-9]{56}"
+        r"|[a-fA-F0-9]{64}"
+        r"|[a-fA-F0-9]{96}"
+        r"|[a-fA-F0-9]{128}"
+        r")"
+        r"(?![a-fA-F0-9])"
+    )
+
+    ALGORITHM_BY_LENGTH = {
+        32: "MD5",
+        40: "SHA-1",
+        56: "SHA-224",
+        64: "SHA-256",
+        96: "SHA-384",
+        128: "SHA-512",
     }
 
     def evaluate(
@@ -22,62 +47,125 @@ class EmbeddedHashMatchRule(BaseCorrelationRule):
     ) -> list[CorrelationFinding]:
         findings: list[CorrelationFinding] = []
 
-        calculated_lookup = self._build_hash_lookup(context)
+        normalized_hashes = self._build_hash_lookup(
+            context.calculated_hashes
+        )
 
         for source_file, text in context.extracted_texts.items():
             embedded_hashes = self._extract_hashes(text)
 
             for embedded_hash in embedded_hashes:
-                normalized = embedded_hash.lower()
-                matched = calculated_lookup.get(normalized)
+                matches = normalized_hashes.get(
+                    embedded_hash,
+                    [],
+                )
 
-                if not matched:
-                    continue
+                for target_file, algorithm in matches:
+                    if target_file == source_file:
+                        continue
 
-                matched_file, algorithm = matched
-
-                if matched_file == source_file:
-                    continue
-
-                findings.append(
-                    CorrelationFinding(
-                        title="Hash textual vinculado a outro arquivo",
-                        message=(
-                            f"Foi identificado no conteúdo do arquivo '{source_file}' "
-                            f"um valor compatível com hash que corresponde ao {algorithm} "
-                            f"calculado do arquivo '{matched_file}'. Esse achado sugere "
-                            "vínculo técnico entre os documentos analisados."
+                    self.add_ok(
+                        findings,
+                        title="Hash correspondente entre arquivos",
+                        description=(
+                            f"O hash presente no corpo de {source_file} "
+                            f"corresponde ao hash calculado de {target_file}."
                         ),
-                        severity="info",
-                        rule_id=self.rule_id,
-                        related_files=[source_file, matched_file],
-                        evidence={
+                        icon="hash",
+                        source_file=source_file,
+                        target_file=target_file,
+                        badges=[
+                            info_badge(algorithm),
+                            success_badge("Correspondência"),
+                            neutral_badge(source_file),
+                            neutral_badge(target_file),
+                        ],
+                        metadata={
                             "arquivo_origem": source_file,
-                            "arquivo_correspondente": matched_file,
+                            "arquivo_correspondente": target_file,
                             "algoritmo": algorithm,
-                            "hash_identificado": embedded_hash,
+                            "hash": embedded_hash,
                         },
                     )
-                )
 
         return findings
 
     def _build_hash_lookup(
         self,
-        context: InvestigationContext,
-    ) -> dict[str, tuple[str, str]]:
-        lookup: dict[str, tuple[str, str]] = {}
+        calculated_hashes: dict[str, dict[str, str]],
+    ) -> dict[str, list[tuple[str, str]]]:
+        lookup: dict[str, list[tuple[str, str]]] = {}
 
-        for file_name, hashes in context.calculated_hashes.items():
+        for file_name, hashes in calculated_hashes.items():
             for algorithm, hash_value in hashes.items():
-                lookup[hash_value.lower()] = (file_name, algorithm)
+                normalized_hash = self._normalize_hash(
+                    hash_value
+                )
+
+                if not normalized_hash:
+                    continue
+
+                lookup.setdefault(
+                    normalized_hash,
+                    [],
+                ).append(
+                    (
+                        file_name,
+                        self._format_algorithm(
+                            algorithm
+                        ),
+                    )
+                )
 
         return lookup
 
-    def _extract_hashes(self, text: str) -> set[str]:
-        found: set[str] = set()
+    def _extract_hashes(
+        self,
+        text: str,
+    ) -> set[str]:
+        hashes: set[str] = set()
 
-        for pattern in self.HASH_PATTERNS.values():
-            found.update(re.findall(pattern, text))
+        for match in self.HASH_PATTERN.finditer(
+            text or ""
+        ):
+            hashes.add(
+                self._normalize_hash(
+                    match.group(1)
+                )
+            )
 
-        return found
+        return hashes
+
+    @staticmethod
+    def _normalize_hash(
+        value: str,
+    ) -> str:
+        return "".join(
+            character
+            for character in str(value).strip().lower()
+            if character.isalnum()
+        )
+
+    @staticmethod
+    def _format_algorithm(
+        algorithm: str,
+    ) -> str:
+        normalized = str(
+            algorithm
+        ).strip().upper().replace(
+            "_",
+            "-",
+        )
+
+        aliases = {
+            "SHA1": "SHA-1",
+            "SHA224": "SHA-224",
+            "SHA256": "SHA-256",
+            "SHA384": "SHA-384",
+            "SHA512": "SHA-512",
+        }
+
+        return aliases.get(
+            normalized,
+            normalized,
+        )
