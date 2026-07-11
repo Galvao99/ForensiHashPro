@@ -5,9 +5,9 @@ from typing import Any
 
 from app.enum.severity import Severity
 from app.models.digital_signature_result import DigitalSignatureResult
+from app.models.integrity_result import IntegrityResult
 from app.models.magic_number_result import MagicNumberResult
 from app.models.reference import Reference
-from app.models.integrity_result import IntegrityResult
 
 
 @dataclass(frozen=True)
@@ -35,7 +35,11 @@ class HashResult:
 class MetadataResult:
     raw: dict[str, Any] = field(default_factory=dict)
 
-    def get(self, key: str, default: Any = None) -> Any:
+    def get(
+        self,
+        key: str,
+        default: Any = None,
+    ) -> Any:
         return self.raw.get(key, default)
 
 
@@ -68,7 +72,9 @@ class TimelineEvent:
         if not self.date:
             return "Data não identificada"
 
-        return self.date.strftime("%d/%m/%Y %H:%M:%S")
+        return self.date.strftime(
+            "%d/%m/%Y %H:%M:%S"
+        )
 
 
 @dataclass
@@ -80,5 +86,18 @@ class AnalysisResult:
     magic_numbers: MagicNumberResult
     digital_signature: DigitalSignatureResult
     integrity: IntegrityResult
-    analyzed_at: datetime = field(default_factory=datetime.now)
-    timeline_events: list[TimelineEvent] = field(default_factory=list)
+
+    analyzed_at: datetime = field(
+        default_factory=datetime.now
+    )
+
+    timeline_events: list[TimelineEvent] = field(
+        default_factory=list
+    )
+
+    # Texto nativo ou obtido por OCR.
+    extracted_text: str = ""
+
+    @property
+    def has_extracted_text(self) -> bool:
+        return bool(self.extracted_text.strip())
