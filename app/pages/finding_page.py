@@ -24,6 +24,7 @@ class FindingPage(QWidget):
     """
 
     FILTER_ALL = "all"
+    FILTER_CRITICAL = "critical"
     FILTER_ALERTS = "alerts"
     FILTER_SUCCESS = "success"
     FILTER_INFO = "info"
@@ -59,6 +60,11 @@ class FindingPage(QWidget):
         self.findings: list[object] = []
         self.current_filter = self.FILTER_ALL
 
+        self.summary_buttons: dict[
+            str,
+            QPushButton,
+        ] = {}
+
         self._build_ui()
 
     def _build_ui(self) -> None:
@@ -68,10 +74,6 @@ class FindingPage(QWidget):
 
         root.addWidget(
             self._build_header()
-        )
-
-        root.addWidget(
-            self._build_filter_bar()
         )
 
         body = QHBoxLayout()
@@ -162,110 +164,103 @@ class FindingPage(QWidget):
         layout.addWidget(title)
         layout.addWidget(subtitle)
 
-        summary = QHBoxLayout()
-        summary.setSpacing(8)
+        summary_layout = QHBoxLayout()
+        summary_layout.setSpacing(8)
 
-        self.total_summary = self._summary_badge(
-            "Total",
-            "neutral",
-        )
-        self.critical_summary = self._summary_badge(
-            "Críticos",
-            "critical",
-        )
-        self.warning_summary = self._summary_badge(
-            "Alertas",
-            "warning",
-        )
-        self.success_summary = self._summary_badge(
-            "Compatíveis",
-            "success",
-        )
-        self.info_summary = self._summary_badge(
-            "Informações",
-            "info",
+        self.summary_group = QButtonGroup(self)
+        self.summary_group.setExclusive(True)
+
+        summary_items = (
+            (
+                self.FILTER_ALL,
+                "Total",
+                "neutral",
+            ),
+            (
+                self.FILTER_CRITICAL,
+                "Críticos",
+                "critical",
+            ),
+            (
+                self.FILTER_ALERTS,
+                "Alertas",
+                "warning",
+            ),
+            (
+                self.FILTER_SUCCESS,
+                "Compatíveis",
+                "success",
+            ),
+            (
+                self.FILTER_INFO,
+                "Informações",
+                "info",
+            ),
         )
 
-        for widget in (
-            self.total_summary,
-            self.critical_summary,
-            self.warning_summary,
-            self.success_summary,
-            self.info_summary,
-        ):
-            summary.addWidget(widget)
+        for filter_value, label, summary_type in summary_items:
+            button = self._create_summary_button(
+                filter_value=filter_value,
+                label=label,
+                summary_type=summary_type,
+            )
 
-        summary.addStretch()
-        layout.addLayout(summary)
+            summary_layout.addWidget(button)
+
+        summary_layout.addStretch()
+        layout.addLayout(summary_layout)
 
         return container
 
-    def _summary_badge(
+    def _create_summary_button(
         self,
-        text: str,
-        badge_type: str,
-    ) -> QLabel:
-        label = QLabel(f"{text}: 0")
-        label.setObjectName(
-            "FindingSummaryBadge"
+        *,
+        filter_value: str,
+        label: str,
+        summary_type: str,
+    ) -> QPushButton:
+        button = QPushButton(
+            f"{label}: 0"
         )
-        label.setProperty(
+
+        button.setObjectName(
+            "FindingSummaryButton"
+        )
+        button.setProperty(
             "summaryType",
-            badge_type,
-        )
-        label.setAlignment(Qt.AlignCenter)
-
-        return label
-
-    def _build_filter_bar(self) -> QWidget:
-        container = QWidget()
-
-        layout = QHBoxLayout(container)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(8)
-
-        group = QButtonGroup(self)
-        group.setExclusive(True)
-
-        filters = (
-            ("Todos", self.FILTER_ALL),
-            ("Alertas", self.FILTER_ALERTS),
-            ("Compatíveis", self.FILTER_SUCCESS),
-            ("Informações", self.FILTER_INFO),
+            summary_type,
         )
 
-        for text, value in filters:
-            button = QPushButton(text)
-            button.setObjectName(
-                "FindingFilterButton"
+        button.setCheckable(True)
+
+        if filter_value == self.FILTER_ALL:
+            button.setChecked(True)
+
+        button.clicked.connect(
+            lambda checked,
+            selected_filter=filter_value: (
+                self._set_filter(selected_filter)
+                if checked
+                else None
             )
-            button.setCheckable(True)
+        )
 
-            if value == self.FILTER_ALL:
-                button.setChecked(True)
+        self.summary_group.addButton(button)
+        self.summary_buttons[
+            filter_value
+        ] = button
 
-            button.clicked.connect(
-                lambda checked,
-                filter_value=value: (
-                    self._set_filter(filter_value)
-                    if checked
-                    else None
-                )
-            )
-
-            group.addButton(button)
-            layout.addWidget(button)
-
-        layout.addStretch()
-
-        return container
+        return button
 
     def update_analysis(
         self,
         result: AnalysisResult,
     ) -> None:
         self.current_result = result
-        self.file_panel.update_analysis(result)
+
+        self.file_panel.update_analysis(
+            result
+        )
 
         self._collect_findings()
         self._render()
@@ -292,6 +287,7 @@ class FindingPage(QWidget):
             self.file_panel.update_analysis(
                 analysis_result
             )
+
         else:
             self.file_panel.clear()
 
@@ -302,14 +298,23 @@ class FindingPage(QWidget):
         findings: list[object] = []
 
         if self.current_result is not None:
-            findings.extend(
-                self.current_result.findings
+            legacy_findings = getattr(
+                self.current_result,
+                "findings",
+                [],
             )
+
+            if isinstance(legacy_findings, list):
+                findings.extend(
+                    legacy_findings
+                )
 
         if self.correlation_result is not None:
             current_file = self._current_file_name()
 
-            for finding in self.correlation_result.findings:
+            for finding in (
+                self.correlation_result.findings
+            ):
                 if self._belongs_to_current_file(
                     finding,
                     current_file,
@@ -317,6 +322,7 @@ class FindingPage(QWidget):
                     findings.append(finding)
 
         self.findings = findings
+
         self._update_summary()
 
     def _belongs_to_current_file(
@@ -362,7 +368,10 @@ class FindingPage(QWidget):
             self.left_layout.addStretch()
             return
 
-        categories: dict[str, list[object]] = {}
+        categories: dict[
+            str,
+            list[object],
+        ] = {}
 
         for finding in filtered:
             category = self._finding_category(
@@ -430,7 +439,7 @@ class FindingPage(QWidget):
             "InvestigationSectionCount"
         )
         count.setAlignment(Qt.AlignCenter)
-        count.setFixedSize(27, 23)
+        count.setMinimumSize(27, 23)
 
         header.addWidget(title)
         header.addWidget(count)
@@ -449,6 +458,107 @@ class FindingPage(QWidget):
             )
 
         return section
+
+    def _filtered_findings(
+        self,
+    ) -> list[object]:
+        if self.current_filter == self.FILTER_ALL:
+            return list(self.findings)
+
+        if self.current_filter == self.FILTER_CRITICAL:
+            return [
+                finding
+                for finding in self.findings
+                if self._severity(finding)
+                == "critical"
+            ]
+
+        if self.current_filter == self.FILTER_ALERTS:
+            return [
+                finding
+                for finding in self.findings
+                if self._severity(finding)
+                in {
+                    "warning",
+                    "critical",
+                }
+            ]
+
+        if self.current_filter == self.FILTER_SUCCESS:
+            return [
+                finding
+                for finding in self.findings
+                if self._severity(finding)
+                == "ok"
+            ]
+
+        if self.current_filter == self.FILTER_INFO:
+            return [
+                finding
+                for finding in self.findings
+                if self._severity(finding)
+                == "info"
+            ]
+
+        return list(self.findings)
+
+    def _set_filter(
+        self,
+        filter_value: str,
+    ) -> None:
+        self.current_filter = filter_value
+        self._render()
+
+    def _update_summary(self) -> None:
+        total = len(self.findings)
+
+        critical = self._count(
+            "critical"
+        )
+        warning = self._count(
+            "warning"
+        )
+        success = self._count(
+            "ok"
+        )
+        info = self._count(
+            "info"
+        )
+
+        values = {
+            self.FILTER_ALL: (
+                f"Total: {total}"
+            ),
+            self.FILTER_CRITICAL: (
+                f"Críticos: {critical}"
+            ),
+            self.FILTER_ALERTS: (
+                f"Alertas: {warning}"
+            ),
+            self.FILTER_SUCCESS: (
+                f"Compatíveis: {success}"
+            ),
+            self.FILTER_INFO: (
+                f"Informações: {info}"
+            ),
+        }
+
+        for key, text in values.items():
+            button = self.summary_buttons.get(key)
+
+            if button is not None:
+                button.setText(text)
+
+    def _count(
+        self,
+        severity: str,
+    ) -> int:
+        return sum(
+            1
+            for finding in self.findings
+            if self._severity(finding)
+            == severity
+        )
 
     def _finding_category(
         self,
@@ -498,6 +608,9 @@ class FindingPage(QWidget):
                 "conteúdo textual",
                 "data contratual",
                 "datas localizadas",
+                "json",
+                "dispositivo",
+                "navegador",
             )
         ):
             return "ocr"
@@ -566,81 +679,6 @@ class FindingPage(QWidget):
             return "integrity"
 
         return "other"
-
-    def _filtered_findings(
-        self,
-    ) -> list[object]:
-        if self.current_filter == self.FILTER_ALL:
-            return list(self.findings)
-
-        if self.current_filter == self.FILTER_ALERTS:
-            return [
-                finding
-                for finding in self.findings
-                if self._severity(finding)
-                in {
-                    "warning",
-                    "critical",
-                }
-            ]
-
-        if self.current_filter == self.FILTER_SUCCESS:
-            return [
-                finding
-                for finding in self.findings
-                if self._severity(finding) == "ok"
-            ]
-
-        if self.current_filter == self.FILTER_INFO:
-            return [
-                finding
-                for finding in self.findings
-                if self._severity(finding) == "info"
-            ]
-
-        return list(self.findings)
-
-    def _set_filter(
-        self,
-        filter_value: str,
-    ) -> None:
-        self.current_filter = filter_value
-        self._render()
-
-    def _update_summary(self) -> None:
-        total = len(self.findings)
-
-        critical = self._count("critical")
-        warning = self._count("warning")
-        success = self._count("ok")
-        info = self._count("info")
-
-        self.total_summary.setText(
-            f"Total: {total}"
-        )
-        self.critical_summary.setText(
-            f"Críticos: {critical}"
-        )
-        self.warning_summary.setText(
-            f"Alertas: {warning}"
-        )
-        self.success_summary.setText(
-            f"Compatíveis: {success}"
-        )
-        self.info_summary.setText(
-            f"Informações: {info}"
-        )
-
-    def _count(
-        self,
-        severity: str,
-    ) -> int:
-        return sum(
-            1
-            for finding in self.findings
-            if self._severity(finding)
-            == severity
-        )
 
     def _finding_sort_key(
         self,
@@ -727,8 +765,8 @@ class FindingPage(QWidget):
         title.setAlignment(Qt.AlignCenter)
 
         description = QLabel(
-            "Selecione outro filtro ou analise um arquivo "
-            "com informações técnicas disponíveis."
+            "Selecione outro indicador para visualizar "
+            "os demais resultados."
         )
         description.setObjectName(
             "FindingEmptyDescription"

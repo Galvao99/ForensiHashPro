@@ -49,8 +49,8 @@ class FileInvestigationPanel(QFrame):
         self.current_result: AnalysisResult | None = None
 
         self.setObjectName("FileInvestigationPanel")
-        self.setMinimumWidth(285)
-        self.setMaximumWidth(380)
+        self.setMinimumWidth(330)
+        self.setMaximumWidth(430)
 
         self._build_ui()
         self.clear()
@@ -391,12 +391,21 @@ class FileInvestigationPanel(QFrame):
 
     def _create_value_label(self) -> QLabel:
         label = QLabel()
+
         label.setObjectName(
             "InspectorFieldValue"
         )
+
         label.setWordWrap(True)
+
         label.setTextInteractionFlags(
             Qt.TextSelectableByMouse
+        )
+
+        label.setMinimumHeight(30)
+
+        label.setAlignment(
+            Qt.AlignLeft | Qt.AlignVCenter
         )
 
         return label
