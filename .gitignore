@@ -30,3 +30,4 @@ output/exports/*
 !output/reports/.gitkeep
 !output/snapshots/.gitkeep
 !output/exports/.gitkeep
+daycoval_test.json
