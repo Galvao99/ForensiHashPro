@@ -6,6 +6,7 @@ from typing import Any
 from app.enum.severity import Severity
 from app.models.digital_signature_result import DigitalSignatureResult
 from app.models.integrity_result import IntegrityResult
+from app.models.json_analysis_result import JsonAnalysisResult
 from app.models.magic_number_result import MagicNumberResult
 from app.models.reference import Reference
 
@@ -95,9 +96,17 @@ class AnalysisResult:
         default_factory=list
     )
 
-    # Texto nativo ou obtido por OCR.
     extracted_text: str = ""
+
+    json_analysis: JsonAnalysisResult | None = None
 
     @property
     def has_extracted_text(self) -> bool:
         return bool(self.extracted_text.strip())
+
+    @property
+    def has_json_analysis(self) -> bool:
+        return bool(
+            self.json_analysis
+            and self.json_analysis.is_valid
+        )

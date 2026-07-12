@@ -5,7 +5,7 @@ from typing import Any
 @dataclass(frozen=True, slots=True)
 class JsonField:
     """
-    Campo individual localizado em um documento JSON.
+    Campo simples extraído do documento JSON.
     """
 
     path: str
@@ -28,14 +28,13 @@ class JsonField:
 @dataclass(slots=True)
 class JsonAnalysisResult:
     """
-    Resultado consolidado da leitura de um arquivo JSON.
+    Resultado normalizado recebido do núcleo Rust.
     """
 
     is_valid: bool = False
-    is_large_file: bool = False
     streaming_used: bool = False
-
     root_type: str = ""
+
     total_fields: int = 0
     displayed_fields: int = 0
     truncated: bool = False
@@ -61,8 +60,6 @@ class JsonAnalysisResult:
             [],
         ).append(json_field)
 
-        self.displayed_fields = len(self.fields)
-
     def get_category(
         self,
         category: str,
@@ -76,10 +73,10 @@ class JsonAnalysisResult:
         self,
         key: str,
     ) -> list[JsonField]:
-        normalized_key = key.strip().lower()
+        normalized = key.strip().lower()
 
         return [
             field
             for field in self.fields
-            if field.key.lower() == normalized_key
+            if field.key.lower() == normalized
         ]
