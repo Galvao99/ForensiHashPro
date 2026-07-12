@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 from typing import Any
 
@@ -32,36 +34,25 @@ class FindingCard(QFrame):
 
     SEVERITY_ICONS = {
         "ok": "✓",
-        "info": "ℹ",
-        "warning": "⚠",
-        "critical": "✕",
+        "info": "i",
+        "warning": "!",
+        "critical": "×",
     }
 
     def __init__(
         self,
         finding: object,
-        parent=None,
+        parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
 
         self.finding = finding
-
         self.severity = self._normalize_severity(
-            getattr(
-                finding,
-                "severity",
-                "info",
-            )
+            getattr(finding, "severity", "info")
         )
 
-        self.setObjectName(
-            "InvestigationFindingCard"
-        )
-        self.setProperty(
-            "severity",
-            self.severity,
-        )
-
+        self.setObjectName("InvestigationFindingCard")
+        self.setProperty("severity", self.severity)
         self.setSizePolicy(
             QSizePolicy.Expanding,
             QSizePolicy.Minimum,
@@ -71,76 +62,58 @@ class FindingCard(QFrame):
 
     def _build_ui(self) -> None:
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(
-            16,
-            14,
-            16,
-            14,
-        )
-        layout.setSpacing(10)
+        layout.setContentsMargins(18, 16, 18, 16)
+        layout.setSpacing(11)
 
-        layout.addLayout(
-            self._build_header()
-        )
+        layout.addLayout(self._build_header())
 
         description = self._get_description()
-
         if description:
-            description_label = QLabel(
-                description
-            )
-            description_label.setObjectName(
-                "FindingDescription"
-            )
+            description_label = QLabel(description)
+            description_label.setObjectName("FindingDescription")
             description_label.setWordWrap(True)
             description_label.setTextInteractionFlags(
                 Qt.TextSelectableByMouse
             )
-
-            layout.addWidget(
-                description_label
+            description_label.setSizePolicy(
+                QSizePolicy.Expanding,
+                QSizePolicy.Minimum,
             )
+            layout.addWidget(description_label)
 
         badges = self._build_badges()
-
         if badges is not None:
             layout.addWidget(badges)
 
         relation = self._build_file_relation()
-
         if relation is not None:
             layout.addWidget(relation)
 
         metadata = self._get_metadata()
-
         if metadata:
             layout.addWidget(
-                self._build_details_section(
-                    metadata
-                )
+                self._build_details_section(metadata)
             )
 
     def _build_header(self) -> QHBoxLayout:
         layout = QHBoxLayout()
-        layout.setSpacing(10)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(11)
 
         icon = QLabel(
-            self.SEVERITY_ICONS.get(
-                self.severity,
-                "•",
-            )
+            self.SEVERITY_ICONS.get(self.severity, "•")
         )
-        icon.setObjectName(
-            "FindingSeverityIcon"
-        )
-        icon.setProperty(
-            "severity",
-            self.severity,
-        )
-        icon.setFixedSize(30, 30)
+        icon.setObjectName("FindingSeverityIcon")
+        icon.setProperty("severity", self.severity)
+        icon.setFixedSize(32, 32)
         icon.setAlignment(Qt.AlignCenter)
 
-        texts = QVBoxLayout()
+        texts_container = QWidget()
+        texts_container.setObjectName(
+            "FindingTransparentContainer"
+        )
+
+        texts = QVBoxLayout(texts_container)
         texts.setContentsMargins(0, 0, 0, 0)
         texts.setSpacing(2)
 
@@ -155,6 +128,10 @@ class FindingCard(QFrame):
         )
         title.setObjectName("FindingTitle")
         title.setWordWrap(True)
+        title.setSizePolicy(
+            QSizePolicy.Expanding,
+            QSizePolicy.Minimum,
+        )
 
         severity = QLabel(
             self.SEVERITY_LABELS.get(
@@ -162,36 +139,27 @@ class FindingCard(QFrame):
                 "Informação",
             )
         )
-        severity.setObjectName(
-            "FindingSeverityLabel"
-        )
-        severity.setProperty(
-            "severity",
-            self.severity,
-        )
+        severity.setObjectName("FindingSeverityLabel")
+        severity.setProperty("severity", self.severity)
 
         texts.addWidget(title)
         texts.addWidget(severity)
 
-        layout.addWidget(
-            icon,
-            alignment=Qt.AlignTop,
-        )
-        layout.addLayout(texts, stretch=1)
+        layout.addWidget(icon, alignment=Qt.AlignTop)
+        layout.addWidget(texts_container, stretch=1)
 
         return layout
 
     def _build_badges(self) -> QWidget | None:
-        badges = getattr(
-            self.finding,
-            "badges",
-            [],
-        )
+        badges = getattr(self.finding, "badges", [])
 
         if not badges:
             return None
 
         container = QWidget()
+        container.setObjectName(
+            "FindingTransparentContainer"
+        )
 
         grid = QGridLayout(container)
         grid.setContentsMargins(0, 0, 0, 0)
@@ -204,17 +172,23 @@ class FindingCard(QFrame):
             row = index // columns
             column = index % columns
 
-            grid.addWidget(
-                BadgeWidget(badge),
-                row,
-                column,
-                alignment=Qt.AlignLeft,
+            widget = BadgeWidget(badge)
+            widget.setSizePolicy(
+                QSizePolicy.Maximum,
+                QSizePolicy.Fixed,
             )
 
-        grid.setColumnStretch(
-            columns,
-            1,
-        )
+            grid.addWidget(
+                widget,
+                row,
+                column,
+                alignment=Qt.AlignLeft | Qt.AlignTop,
+            )
+
+        for column in range(columns):
+            grid.setColumnStretch(column, 0)
+
+        grid.setColumnStretch(columns, 1)
 
         return container
 
@@ -224,7 +198,6 @@ class FindingCard(QFrame):
             "source_file",
             None,
         )
-
         target_file = getattr(
             self.finding,
             "target_file",
@@ -235,49 +208,47 @@ class FindingCard(QFrame):
             return None
 
         container = QFrame()
-        container.setObjectName(
-            "FindingRelationBox"
+        container.setObjectName("FindingRelationBox")
+        container.setSizePolicy(
+            QSizePolicy.Expanding,
+            QSizePolicy.Minimum,
         )
 
         layout = QHBoxLayout(container)
-        layout.setContentsMargins(
-            10,
-            7,
-            10,
-            7,
-        )
+        layout.setContentsMargins(12, 9, 12, 9)
         layout.setSpacing(8)
 
         if source_file:
-            source = QLabel(
-                str(source_file)
-            )
-            source.setObjectName(
-                "FindingSourceFile"
-            )
+            source = QLabel(str(source_file))
+            source.setObjectName("FindingSourceFile")
             source.setWordWrap(True)
-
-            layout.addWidget(source)
+            source.setTextInteractionFlags(
+                Qt.TextSelectableByMouse
+            )
+            source.setSizePolicy(
+                QSizePolicy.Expanding,
+                QSizePolicy.Minimum,
+            )
+            layout.addWidget(source, stretch=1)
 
         if source_file and target_file:
             arrow = QLabel("→")
-            arrow.setObjectName(
-                "FindingRelationArrow"
-            )
+            arrow.setObjectName("FindingRelationArrow")
+            arrow.setAlignment(Qt.AlignCenter)
             layout.addWidget(arrow)
 
         if target_file:
-            target = QLabel(
-                str(target_file)
-            )
-            target.setObjectName(
-                "FindingTargetFile"
-            )
+            target = QLabel(str(target_file))
+            target.setObjectName("FindingTargetFile")
             target.setWordWrap(True)
-
-            layout.addWidget(target)
-
-        layout.addStretch()
+            target.setTextInteractionFlags(
+                Qt.TextSelectableByMouse
+            )
+            target.setSizePolicy(
+                QSizePolicy.Expanding,
+                QSizePolicy.Minimum,
+            )
+            layout.addWidget(target, stretch=1)
 
         return container
 
@@ -286,6 +257,9 @@ class FindingCard(QFrame):
         metadata: dict[str, Any],
     ) -> QWidget:
         container = QWidget()
+        container.setObjectName(
+            "FindingTransparentContainer"
+        )
 
         layout = QVBoxLayout(container)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -294,41 +268,35 @@ class FindingCard(QFrame):
         button = QPushButton(
             "Exibir detalhes técnicos"
         )
-        button.setObjectName(
-            "FindingDetailsButton"
-        )
+        button.setObjectName("FindingDetailsButton")
         button.setCheckable(True)
+        button.setCursor(Qt.PointingHandCursor)
+        button.setFocusPolicy(Qt.NoFocus)
 
         details = QLabel(
             self._format_metadata(metadata)
         )
-        details.setObjectName(
-            "FindingMetadata"
-        )
+        details.setObjectName("FindingMetadata")
         details.setWordWrap(True)
         details.setTextInteractionFlags(
             Qt.TextSelectableByMouse
         )
+        details.setSizePolicy(
+            QSizePolicy.Expanding,
+            QSizePolicy.Minimum,
+        )
         details.setVisible(False)
 
-        def toggle_details(
-            checked: bool,
-        ) -> None:
+        def toggle_details(checked: bool) -> None:
             details.setVisible(checked)
-
             button.setText(
                 "Ocultar detalhes técnicos"
                 if checked
                 else "Exibir detalhes técnicos"
             )
+            self.details_toggled.emit(checked)
 
-            self.details_toggled.emit(
-                checked
-            )
-
-        button.clicked.connect(
-            toggle_details
-        )
+        button.clicked.connect(toggle_details)
 
         layout.addWidget(
             button,
@@ -344,7 +312,6 @@ class FindingCard(QFrame):
             "description",
             "",
         )
-
         return str(description or "")
 
     def _get_metadata(self) -> dict[str, Any]:
@@ -379,7 +346,6 @@ class FindingCard(QFrame):
             "value",
             severity,
         )
-
         normalized = str(value).strip().lower()
 
         aliases = {

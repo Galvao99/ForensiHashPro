@@ -232,6 +232,7 @@ class FindingPage(QWidget):
         )
 
         button.setCheckable(True)
+        button.setFocusPolicy(Qt.NoFocus)
 
         if filter_value == self.FILTER_ALL:
             button.setChecked(True)

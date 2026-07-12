@@ -1244,411 +1244,38 @@ QProgressBar::chunk {
 }
 
 /* =========================================================
-   VESTÍGIOS 2.0
+   VESTÍGIOS 2.0 — BLOCO NOVO
+   Substitua os blocos antigos de Vestígios e Painel do Arquivo
+   por este bloco.
    ========================================================= */
+
+QWidget#FindingPage,
+QWidget#FindingLeftContent,
+QWidget#FindingTransparentContainer,
+QWidget#InspectorTransparentContainer,
+QWidget#InspectorInformationBlock {
+    background: transparent;
+    border: none;
+}
 
 QFrame#FindingPageHeader {
-    background-color: rgba(255, 255, 255, 0.035);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background-color: #141C2B;
+    border: 1px solid #273247;
     border-radius: 14px;
 }
 
 QLabel#FindingPageTitle {
-    font-size: 24px;
-    font-weight: 700;
-}
-
-QLabel#FindingPageSubtitle {
-    font-size: 13px;
-    color: #9da4ae;
-}
-
-QLabel#FindingSummaryBadge {
-    padding: 6px 11px;
-    border-radius: 8px;
-    font-size: 12px;
-    font-weight: 600;
-}
-
-QLabel#FindingSummaryBadge[summaryType="neutral"] {
-    background-color: rgba(148, 163, 184, 0.14);
-    color: #cbd5e1;
-}
-
-QLabel#FindingSummaryBadge[summaryType="success"] {
-    background-color: rgba(34, 197, 94, 0.14);
-    color: #86efac;
-}
-
-QLabel#FindingSummaryBadge[summaryType="info"] {
-    background-color: rgba(59, 130, 246, 0.14);
-    color: #93c5fd;
-}
-
-QLabel#FindingSummaryBadge[summaryType="warning"] {
-    background-color: rgba(245, 158, 11, 0.14);
-    color: #fcd34d;
-}
-
-QLabel#FindingSummaryBadge[summaryType="critical"] {
-    background-color: rgba(239, 68, 68, 0.14);
-    color: #fca5a5;
-}
-
-
-/* Filtros */
-
-QPushButton#FindingFilterButton {
-    min-height: 36px;
-    padding: 4px 14px;
-    border: 1px solid rgba(255, 255, 255, 0.10);
-    border-radius: 8px;
-    background-color: rgba(255, 255, 255, 0.035);
-    font-size: 12px;
-}
-
-QPushButton#FindingFilterButton:hover {
-    background-color: rgba(255, 255, 255, 0.07);
-}
-
-QPushButton#FindingFilterButton:checked {
-    background-color: rgba(59, 130, 246, 0.18);
-    border: 1px solid rgba(96, 165, 250, 0.50);
-    color: #bfdbfe;
-}
-
-
-/* Cards */
-
-QFrame#InvestigationFindingCard {
-    background-color: rgba(255, 255, 255, 0.035);
-    border: 1px solid rgba(255, 255, 255, 0.09);
-    border-radius: 14px;
-    padding: 4px;
-}
-
-QFrame#InvestigationFindingCard[severity="ok"] {
-    border-left: 4px solid #22c55e;
-}
-
-QFrame#InvestigationFindingCard[severity="info"] {
-    border-left: 4px solid #3b82f6;
-}
-
-QFrame#InvestigationFindingCard[severity="warning"] {
-    border-left: 4px solid #f59e0b;
-}
-
-QFrame#InvestigationFindingCard[severity="critical"] {
-    border-left: 4px solid #ef4444;
-}
-
-QLabel#FindingTitle {
-    font-size: 10px;
-    font-weight: 800;
-}
-
-QLabel#FindingDescription {
-    font-size: 14px;
-    color: #D8E1F0;
-}
-
-QLabel#FindingSeverityIcon {
-    border-radius: 8px;
-    font-size: 22px;
-    font-weight: 700;
-}
-
-QLabel#FindingSeverityIcon[severity="ok"] {
-    background-color: rgba(34, 197, 94, 0.14);
-    color: #86efac;
-}
-
-QLabel#FindingSeverityIcon[severity="info"] {
-    background-color: rgba(59, 130, 246, 0.14);
-    color: #93c5fd;
-}
-
-QLabel#FindingSeverityIcon[severity="warning"] {
-    background-color: rgba(245, 158, 11, 0.14);
-    color: #fcd34d;
-}
-
-QLabel#FindingSeverityIcon[severity="critical"] {
-    background-color: rgba(239, 68, 68, 0.14);
-    color: #fca5a5;
-}
-
-QLabel#FindingSeverityLabel {
-    font-size: 14px;
-    font-weight: 700;
-}
-
-QLabel#FindingSeverityLabel[severity="ok"] {
-    color: #86efac;
-}
-
-QLabel#FindingSeverityLabel[severity="info"] {
-    color: #93c5fd;
-}
-
-QLabel#FindingSeverityLabel[severity="warning"] {
-    color: #fcd34d;
-}
-
-QLabel#FindingSeverityLabel[severity="critical"] {
-    color: #fca5a5;
-}
-
-
-/* Badges */
-
-QLabel#EvidenceBadge {
-    padding: 5px 12px;
-    border-radius: 8px;
-    font-size: 12px;
-    font-weight: 700;
-}
-
-QLabel#EvidenceBadge[badgeType="success"] {
-    background-color: rgba(34, 197, 94, 0.14);
-    color: #86efac;
-}
-
-QLabel#EvidenceBadge[badgeType="info"] {
-    background-color: rgba(59, 130, 246, 0.14);
-    color: #93c5fd;
-}
-
-QLabel#EvidenceBadge[badgeType="warning"] {
-    background-color: rgba(245, 158, 11, 0.14);
-    color: #fcd34d;
-}
-
-QLabel#EvidenceBadge[badgeType="critical"] {
-    background-color: rgba(239, 68, 68, 0.14);
-    color: #fca5a5;
-}
-
-QLabel#EvidenceBadge[badgeType="neutral"] {
-    background-color: rgba(148, 163, 184, 0.13);
-    color: #cbd5e1;
-}
-
-
-/* Relação entre arquivos */
-
-QFrame#FindingRelationBox {
-    background-color: rgba(255, 255, 255, 0.025);
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    border-radius: 9px;
-    padding: 10px;
-}
-
-QLabel#FindingRelationArrow {
-    color: #64748b;
-    font-size: 15px;
-    font-weight: 700;
-}
-
-QLabel#FindingSourceFile,
-QLabel#FindingTargetFile {
-    font-size: 14px;
-    color: #aab1bc;
-}
-
-
-/* Detalhes */
-
-QPushButton#FindingDetailsButton {
-    border: none;
-    background: transparent;
-    color: #93c5fd;
-    font-size: 14px;
-    text-align: left;
-    padding: 3px 0;
-}
-
-QPushButton#FindingDetailsButton:hover {
-    color: #bfdbfe;
-}
-
-QLabel#FindingMetadata {
-    padding: 12px;
-    border-radius: 8px;
-    background-color: rgba(0, 0, 0, 0.18);
-    font-family: Consolas, "Courier New", monospace;
-    font-size: 13px;
-    color: #b8bec7;
-}
-
-
-/* Estado vazio */
-
-QFrame#FindingEmptyState {
-    background-color: rgba(255, 255, 255, 0.025);
-    border: 1px dashed rgba(255, 255, 255, 0.10);
-    border-radius: 14px;
-}
-
-QLabel#FindingEmptyIcon {
-    font-size: 32px;
-    color: #64748b;
-}
-
-QLabel#FindingEmptyTitle {
-    font-size: 14px;
-    font-weight: 700;
-}
-
-QLabel#FindingEmptyDescription {
-    color: #8f96a1;
-    font-size: 11px;
-}
-
-/* =========================================================
-   PAINEL INVESTIGATIVO
-   ========================================================= */
-
-QScrollArea#FindingLeftScroll {
-    background: transparent;
-    border: none;
-}
-
-QWidget#FindingLeftContent {
-    background: transparent;
-}
-
-QFrame#InvestigationSection {
-    background-color: rgba(255, 255, 255, 0.025);
-    border: 1px solid rgba(255, 255, 255, 0.075);
-    border-radius: 13px;
-}
-
-QLabel#InvestigationSectionTitle {
-    font-size: 20px;
-    font-weight: 800;
-}
-
-QLabel#InvestigationSectionCount {
-    border-radius: 7px;
-    background-color: rgba(148, 163, 184, 0.13);
-    color: #cbd5e1;
-    font-size: 13px;
-    font-weight: 700;
-}
-
-
-/* =========================================================
-   PAINEL DO ARQUIVO
-   ========================================================= */
-
-QFrame#FileInvestigationPanel {
-    background-color: rgba(255, 255, 255, 0.035);
-    border: 1px solid rgba(255, 255, 255, 0.09);
-    border-radius: 14px;
-}
-
-QLabel#InspectorTitle {
-    font-size: 20px;
-    font-weight: 700;
-}
-
-QLabel#InspectorFileName {
-    font-size: 15px;
-    font-weight: 700;
-    color: #93c5fd;
-}
-
-QLabel#InspectorSectionTitle {
-    font-size: 14px;
-    font-weight: 700;
-}
-
-QLabel#InspectorFieldTitle {
-    color: #87909c;
-    font-size: 11px;
-    font-weight: 700;
-}
-
-QLabel#InspectorFieldValue,
-QLineEdit#InspectorFieldValue{
-
-    min-height:30px;
-    padding:6px 10px;
-
-    font-size:12px;
-    color:#E5EDF9;
-
-}
-
-QFrame#InspectorSeparator {
-    background-color: rgba(255, 255, 255, 0.08);
-    border: none;
-    max-height: 1px;
-}
-
-QComboBox#InspectorHashCombo {
-    min-height: 30px;
-    padding: 2px 9px;
-    border: 1px solid rgba(255, 255, 255, 0.10);
-    border-radius: 8px;
-    background-color: rgba(255, 255, 255, 0.04);
-}
-
-QLabel#InspectorHashValue {
-    padding: 9px;
-    border-radius: 8px;
-    background-color: rgba(0, 0, 0, 0.20);
-    font-family: Consolas, monospace;
-    font-size: 11px;
-    color: #b8c2d0;
-}
-
-QPushButton#InspectorCopyButton {
-    min-height: 27px;
-    padding: 2px 10px;
-    border: 1px solid rgba(96, 165, 250, 0.35);
-    border-radius: 7px;
-    background-color: rgba(59, 130, 246, 0.10);
-    color: #93c5fd;
-    font-size: 12px;
-}
-
-QPushButton#InspectorCopyButton:hover {
-    background-color: rgba(59, 130, 246, 0.18);
-}
-
-QWidget#HomeInstructionItem {
-    background: transparent;
-    border: none;
-}
-
-QLabel#HomeInstructionNumber {
-    background-color: rgba(59, 130, 246, 0.14);
-    color: #93c5fd;
-    border: 1px solid rgba(59, 130, 246, 0.22);
-    border-radius: 8px;
-    font-size: 13px;
-    font-weight: 800;
-}
-
-/* =========================================================
-   VESTÍGIOS — HIERARQUIA REFINADA
-   ========================================================= */
-
-QLabel#FindingPageTitle {
+    color: #F8FAFC;
     font-size: 21px;
     font-weight: 800;
 }
 
 QLabel#FindingPageSubtitle {
-    font-size: 13px;
     color: #94A3B8;
+    font-size: 13px;
 }
 
-
-/* INDICADORES CLICÁVEIS */
+/* Resumo clicável */
 
 QPushButton#FindingSummaryButton {
     min-height: 30px;
@@ -1685,19 +1312,34 @@ QPushButton#FindingSummaryButton[summaryType="info"] {
     color: #93C5FD;
 }
 
-QPushButton#FindingSummaryButton:hover {
-    border-color: rgba(255, 255, 255, 0.20);
-}
-
+QPushButton#FindingSummaryButton:hover,
 QPushButton#FindingSummaryButton:checked {
-    border-color: currentColor;
-    background-color: rgba(59, 130, 246, 0.22);
+    border-color: rgba(255, 255, 255, 0.22);
 }
 
+/* Scrolls */
 
-/* SEÇÕES */
+QScrollArea#FindingLeftScroll,
+QScrollArea#FindingRightScroll {
+    background: transparent;
+    border: none;
+}
+
+QScrollArea#FindingLeftScroll > QWidget > QWidget,
+QScrollArea#FindingRightScroll > QWidget > QWidget {
+    background: transparent;
+}
+
+/* Seções */
+
+QFrame#InvestigationSection {
+    background-color: #111827;
+    border: 1px solid #273247;
+    border-radius: 13px;
+}
 
 QLabel#InvestigationSectionTitle {
+    color: #F8FAFC;
     font-size: 18px;
     font-weight: 800;
 }
@@ -1707,19 +1349,71 @@ QLabel#InvestigationSectionCount {
     min-height: 24px;
     padding: 1px 6px;
     border-radius: 7px;
-    background-color: rgba(148, 163, 184, 0.13);
+    background-color: #242E40;
     color: #CBD5E1;
     font-size: 12px;
     font-weight: 700;
 }
 
+/* Cards: todos os interiores ficam no mesmo azul-cinza */
 
-/* CARDS */
+QFrame#InvestigationFindingCard {
+    background-color: #1A2232;
+    border: 1px solid #303B50;
+    border-radius: 14px;
+}
+
+QFrame#InvestigationFindingCard[severity="ok"] {
+    border-left: 4px solid #22C55E;
+}
+
+QFrame#InvestigationFindingCard[severity="info"] {
+    border-left: 4px solid #3B82F6;
+}
+
+QFrame#InvestigationFindingCard[severity="warning"] {
+    border-left: 4px solid #F59E0B;
+}
+
+QFrame#InvestigationFindingCard[severity="critical"] {
+    border-left: 4px solid #EF4444;
+}
 
 QLabel#FindingTitle {
+    color: #F8FAFC;
+    font-size: 17px;
+    font-weight: 800;
+}
+
+QLabel#FindingDescription {
+    color: #D8E1F0;
+    font-size: 13px;
+}
+
+QLabel#FindingSeverityIcon {
+    border-radius: 8px;
     font-size: 18px;
     font-weight: 800;
-    color: #F8FAFC;
+}
+
+QLabel#FindingSeverityIcon[severity="ok"] {
+    background-color: rgba(34, 197, 94, 0.16);
+    color: #86EFAC;
+}
+
+QLabel#FindingSeverityIcon[severity="info"] {
+    background-color: rgba(59, 130, 246, 0.16);
+    color: #93C5FD;
+}
+
+QLabel#FindingSeverityIcon[severity="warning"] {
+    background-color: rgba(245, 158, 11, 0.16);
+    color: #FCD34D;
+}
+
+QLabel#FindingSeverityIcon[severity="critical"] {
+    background-color: rgba(239, 68, 68, 0.16);
+    color: #FCA5A5;
 }
 
 QLabel#FindingSeverityLabel {
@@ -1727,15 +1421,23 @@ QLabel#FindingSeverityLabel {
     font-weight: 700;
 }
 
-QLabel#FindingDescription {
-    font-size: 14px;
-    color: #D8E1F0;
+QLabel#FindingSeverityLabel[severity="ok"] {
+    color: #86EFAC;
 }
 
-QLabel#FindingSeverityIcon {
-    font-size: 19px;
-    font-weight: 800;
+QLabel#FindingSeverityLabel[severity="info"] {
+    color: #93C5FD;
 }
+
+QLabel#FindingSeverityLabel[severity="warning"] {
+    color: #FCD34D;
+}
+
+QLabel#FindingSeverityLabel[severity="critical"] {
+    color: #FCA5A5;
+}
+
+/* Badges: apenas o próprio badge recebe cor */
 
 QLabel#EvidenceBadge {
     min-height: 23px;
@@ -1745,13 +1447,52 @@ QLabel#EvidenceBadge {
     font-weight: 700;
 }
 
-QLabel#FindingSourceFile,
-QLabel#FindingTargetFile {
-    min-height: 25px;
-    padding: 4px 8px;
-    font-size: 12px;
+QLabel#EvidenceBadge[badgeType="success"] {
+    background-color: rgba(34, 197, 94, 0.16);
+    color: #86EFAC;
+}
+
+QLabel#EvidenceBadge[badgeType="info"] {
+    background-color: rgba(59, 130, 246, 0.16);
+    color: #93C5FD;
+}
+
+QLabel#EvidenceBadge[badgeType="warning"] {
+    background-color: rgba(245, 158, 11, 0.16);
+    color: #FCD34D;
+}
+
+QLabel#EvidenceBadge[badgeType="critical"] {
+    background-color: rgba(239, 68, 68, 0.16);
+    color: #FCA5A5;
+}
+
+QLabel#EvidenceBadge[badgeType="neutral"] {
+    background-color: rgba(148, 163, 184, 0.14);
     color: #CBD5E1;
 }
+
+/* Relação de arquivos sem faixa azul-escura */
+
+QFrame#FindingRelationBox {
+    background-color: #20293A;
+    border: 1px solid #334056;
+    border-radius: 9px;
+}
+
+QLabel#FindingSourceFile,
+QLabel#FindingTargetFile {
+    color: #D7E0EE;
+    font-size: 12px;
+}
+
+QLabel#FindingRelationArrow {
+    color: #7F8CA3;
+    font-size: 15px;
+    font-weight: 700;
+}
+
+/* Detalhes técnicos */
 
 QPushButton#FindingDetailsButton {
     min-height: 24px;
@@ -1764,74 +1505,221 @@ QPushButton#FindingDetailsButton {
     text-align: left;
 }
 
+QPushButton#FindingDetailsButton:hover {
+    color: #BFDBFE;
+    background: transparent;
+    border: none;
+}
+
 QLabel#FindingMetadata {
     padding: 12px;
+    border: 1px solid #334056;
     border-radius: 8px;
-    background-color: #070D18;
+    background-color: #20293A;
     color: #CBD5E1;
     font-family: Consolas, "Courier New", monospace;
     font-size: 12px;
 }
 
+/* Estado vazio */
 
-/* PAINEL DO ARQUIVO */
+QFrame#FindingEmptyState {
+    background-color: #141C2B;
+    border: 1px dashed #334056;
+    border-radius: 14px;
+}
 
+QLabel#FindingEmptyTitle {
+    color: #F8FAFC;
+    font-size: 14px;
+    font-weight: 700;
+}
+
+QLabel#FindingEmptyDescription {
+    color: #8F9AAF;
+    font-size: 12px;
+}
+
+/* =========================================================
+   PAINEL LATERAL DO ARQUIVO — VERSÃO FINAL
+   Compatível com QLineEdit e QPlainTextEdit
+   ========================================================= */
+
+QScrollArea#FindingRightScroll {
+    background: transparent;
+    border: none;
+}
+
+QScrollArea#FindingRightScroll > QWidget > QWidget {
+    background: transparent;
+}
+
+QFrame#FileInvestigationPanel {
+    background-color: #141C2B;
+    border: 1px solid #2B374B;
+    border-radius: 14px;
+}
+
+QWidget#InspectorTransparentContainer,
 QWidget#InspectorInformationBlock {
     background: transparent;
     border: none;
 }
 
+QLabel#InspectorTitle {
+    min-height: 26px;
+    max-height: 26px;
+    padding: 0px;
+    margin: 0px;
+    background: transparent;
+    border: none;
+    color: #F8FAFC;
+    font-size: 19px;
+    font-weight: 800;
+}
+
+QLabel#InspectorFileName {
+    padding: 0px;
+    margin: 0px;
+    background: transparent;
+    border: none;
+    color: #78B5FF;
+    font-size: 14px;
+    font-weight: 700;
+}
+
+QLabel#InspectorSectionTitle {
+    min-height: 22px;
+    max-height: 22px;
+    padding: 0px;
+    margin: 0px;
+    background: transparent;
+    border: none;
+    color: #F8FAFC;
+    font-size: 14px;
+    font-weight: 700;
+}
+
 QLabel#InspectorFieldTitle {
     min-height: 18px;
+    max-height: 18px;
+    padding: 0px;
+    margin: 0px;
     background: transparent;
-    color: #94A3B8;
+    border: none;
+    color: #A8B5C9;
     font-size: 11px;
     font-weight: 700;
 }
 
-QLabel#InspectorFieldValue {
-    min-height: 30px;
-    padding: 5px 8px;
-    background-color: rgba(5, 10, 22, 0.48);
-    border: 1px solid rgba(148, 163, 184, 0.06);
-    border-radius: 6px;
-    color: #E2E8F0;
+QLineEdit#InspectorSingleValue {
+    min-height: 40px;
+    max-height: 40px;
+    padding: 0px 10px;
+    margin: 0px;
+    background-color: #1A2232;
+    border: 1px solid #354157;
+    border-radius: 7px;
+    color: #E5EDF9;
     font-size: 12px;
+    selection-background-color: #2563EB;
+    selection-color: #FFFFFF;
 }
 
-QLabel#InspectorHashValue {
-    min-height: 48px;
-    padding: 9px;
+QLineEdit#InspectorSingleValue:focus {
+    border-color: #4F8FD8;
+}
+
+QPlainTextEdit#InspectorMultiValue {
+    padding: 8px 10px;
+    margin: 0px;
+    background-color: #1A2232;
+    border: 1px solid #354157;
+    border-radius: 7px;
+    color: #E5EDF9;
+    font-size: 12px;
+    selection-background-color: #2563EB;
+    selection-color: #FFFFFF;
+}
+
+QPlainTextEdit#InspectorMultiValue:focus {
+    border-color: #4F8FD8;
+}
+
+QFrame#InspectorSeparator {
+    min-height: 1px;
+    max-height: 1px;
+    background-color: #2A3549;
+    border: none;
+    margin: 0px;
+}
+
+QComboBox#InspectorHashCombo {
+    min-height: 42px;
+    max-height: 42px;
+    padding: 0px 10px;
+    color: #E5EDF9;
+    background-color: #1A2232;
+    border: 1px solid #354157;
     border-radius: 8px;
-    background-color: rgba(5, 10, 22, 0.62);
-    color: #CBD5E1;
+}
+
+QComboBox#InspectorHashCombo:hover {
+    border-color: #4F8FD8;
+}
+
+QComboBox#InspectorHashCombo::drop-down {
+    width: 28px;
+    border: none;
+}
+
+QComboBox#InspectorHashCombo QAbstractItemView {
+    color: #E5EDF9;
+    background-color: #1A2232;
+    border: 1px solid #354157;
+    selection-background-color: #2E5F9A;
+    selection-color: #FFFFFF;
+}
+
+QPlainTextEdit#InspectorHashValue {
+    padding: 9px 10px;
+    margin: 0px;
+    background-color: #1A2232;
+    border: 1px solid #354157;
+    border-radius: 8px;
+    color: #D5E2F3;
     font-family: Consolas, "Courier New", monospace;
     font-size: 11px;
+    selection-background-color: #2563EB;
+    selection-color: #FFFFFF;
 }
 
-
-/* PROGRESSO FINO */
-
-QFrame#AnalysisProgressContainer {
-    background-color: rgba(17, 26, 45, 0.72);
-    border: 1px solid #1D2A42;
-    border-radius: 8px;
+QPushButton#InspectorCopyButton {
+    min-height: 32px;
+    max-height: 32px;
+    padding: 0px 11px;
+    background: transparent;
+    border: 1px solid #396B9F;
+    border-radius: 7px;
+    color: #93C5FD;
+    font-size: 12px;
+    font-weight: 700;
 }
 
-QLabel#AnalysisStatusLabel {
-    color: #94A3B8;
-    font-size: 11px;
+QPushButton#InspectorCopyButton:hover {
+    background-color: #213A59;
+    border-color: #5A9BE0;
+    color: #FFFFFF;
 }
 
-QProgressBar#AnalysisProgressBar {
-    min-height: 4px;
-    max-height: 4px;
-    border: none;
-    border-radius: 2px;
-    background-color: #172238;
+QPushButton#InspectorCopyButton:disabled {
+    color: #64748B;
+    border-color: #334155;
 }
 
-QProgressBar#AnalysisProgressBar::chunk {
-    border-radius: 2px;
-    background-color: #3B82F6;
+QPushButton#InspectorCopyButton:focus,
+QPushButton#FindingDetailsButton:focus,
+QPushButton#FindingSummaryButton:focus {
+    outline: none;
 }
+
