@@ -1,4 +1,4 @@
-<div align="center">
+<p align="center">
 
 ![Python](https://img.shields.io/badge/Python-3.12-blue)
 ![PySide6](https://img.shields.io/badge/PySide6-Qt6-success)
