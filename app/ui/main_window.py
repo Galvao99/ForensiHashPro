@@ -1,6 +1,5 @@
 from datetime import datetime
 from pathlib import Path
-from typing import Any
 
 from PySide6.QtCore import (
     QEasingCurve,
@@ -15,6 +14,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QProgressBar,
+    QSplitter,
     QVBoxLayout,
     QWidget,
 )
@@ -45,11 +45,24 @@ class MainWindow(QWidget):
         self.analysis_thread: QThread | None = None
         self.analysis_worker: AnalysisWorker | None = None
 
-        self.progress_animation = QPropertyAnimation()
+        self.progress_animation = (
+            QPropertyAnimation()
+        )
 
-        self.setWindowTitle("ForensiHash Pro")
-        self.resize(1440, 900)
-        self.setMinimumSize(1100, 720)
+        self.setWindowTitle(
+            "ForensiHash Pro"
+        )
+
+        self.resize(
+            1440,
+            900,
+        )
+
+        # Permite uso em notebooks sem destruir o layout.
+        self.setMinimumSize(
+            960,
+            640,
+        )
 
         self.sidebar = Sidebar()
 
@@ -90,10 +103,17 @@ class MainWindow(QWidget):
         self.progress_bar.setObjectName(
             "AnalysisProgressBar"
         )
-        self.progress_bar.setRange(0, 100)
+        self.progress_bar.setRange(
+            0,
+            100,
+        )
         self.progress_bar.setValue(0)
-        self.progress_bar.setTextVisible(False)
-        self.progress_bar.setVisible(False)
+        self.progress_bar.setTextVisible(
+            False
+        )
+        self.progress_bar.setVisible(
+            False
+        )
 
         self._build_ui()
         self._connect_signals()
@@ -106,10 +126,22 @@ class MainWindow(QWidget):
 
         self.update_clock()
 
-        self.workspace.show_page("home")
-        self.sidebar.set_active_page(None)
+        self.workspace.show_page(
+            "home"
+        )
+
+        self.sidebar.set_active_page(
+            None
+        )
 
     def _build_ui(self) -> None:
+        """
+        Constrói a janela utilizando um divisor horizontal.
+
+        O usuário pode alterar manualmente a largura
+        da sidebar e da área principal.
+        """
+
         main_layout = QHBoxLayout(self)
         main_layout.setContentsMargins(
             0,
@@ -119,15 +151,60 @@ class MainWindow(QWidget):
         )
         main_layout.setSpacing(0)
 
-        main_layout.addWidget(self.sidebar)
+        self.main_splitter = QSplitter(
+            Qt.Horizontal
+        )
+        self.main_splitter.setObjectName(
+            "MainWindowSplitter"
+        )
+
+        # Evita que qualquer painel seja totalmente fechado.
+        self.main_splitter.setChildrenCollapsible(
+            False
+        )
+
+        self.content_widget = (
+            self._build_content()
+        )
+
+        self.main_splitter.addWidget(
+            self.sidebar
+        )
+
+        self.main_splitter.addWidget(
+            self.content_widget
+        )
+
+        # Sidebar cresce menos.
+        self.main_splitter.setStretchFactor(
+            0,
+            0,
+        )
+
+        # Workspace recebe o espaço excedente.
+        self.main_splitter.setStretchFactor(
+            1,
+            1,
+        )
+
+        # Larguras iniciais.
+        self.main_splitter.setSizes(
+            [320, 1120]
+        )
+
         main_layout.addWidget(
-            self._build_content(),
-            stretch=1,
+            self.main_splitter
         )
 
     def _build_content(self) -> QWidget:
+        """
+        Cria a área principal do aplicativo.
+        """
+
         content = QWidget()
-        content.setObjectName("Content")
+        content.setObjectName(
+            "Content"
+        )
 
         layout = QVBoxLayout(content)
         layout.setContentsMargins(
@@ -147,11 +224,15 @@ class MainWindow(QWidget):
         title_layout.addWidget(
             self.page_title
         )
+
         title_layout.addWidget(
             self.context_label
         )
 
-        header.addLayout(title_layout)
+        header.addLayout(
+            title_layout
+        )
+
         header.addStretch()
 
         header.addWidget(
@@ -177,6 +258,10 @@ class MainWindow(QWidget):
         return content
 
     def _build_progress_area(self) -> QWidget:
+        """
+        Cria o painel de progresso.
+        """
+
         container = QFrame()
         container.setObjectName(
             "AnalysisProgressContainer"
@@ -192,12 +277,21 @@ class MainWindow(QWidget):
         )
         layout.setSpacing(4)
 
-        layout.addWidget(self.status_label)
-        layout.addWidget(self.progress_bar)
+        layout.addWidget(
+            self.status_label
+        )
+
+        layout.addWidget(
+            self.progress_bar
+        )
 
         return container
 
     def _connect_signals(self) -> None:
+        """
+        Conecta os eventos da interface.
+        """
+
         self.sidebar.open_file_button.clicked.connect(
             self.select_file
         )
@@ -226,6 +320,10 @@ class MainWindow(QWidget):
         self,
         page_key: str,
     ) -> None:
+        """
+        Exibe uma página do workspace.
+        """
+
         if not self.workspace.show_page(
             page_key
         ):
@@ -244,16 +342,29 @@ class MainWindow(QWidget):
         )
 
     def show_home_page(self) -> None:
-        self.workspace.show_page("home")
+        """
+        Exibe a página inicial.
+        """
+
+        self.workspace.show_page(
+            "home"
+        )
+
         self.current_page_key = "home"
 
         self.page_title.setText(
             "Área inicial"
         )
 
-        self.sidebar.set_active_page(None)
+        self.sidebar.set_active_page(
+            None
+        )
 
     def update_clock(self) -> None:
+        """
+        Atualiza o relógio.
+        """
+
         self.clock_label.setText(
             datetime.now().strftime(
                 "%d/%m/%Y %H:%M:%S"
@@ -261,6 +372,10 @@ class MainWindow(QWidget):
         )
 
     def select_folder(self) -> None:
+        """
+        Abre uma pasta e inicia a análise.
+        """
+
         folder = QFileDialog.getExistingDirectory(
             self,
             "Selecionar pasta",
@@ -274,13 +389,19 @@ class MainWindow(QWidget):
         files = sorted(
             (
                 path
-                for path in folder_path.rglob("*")
+                for path in folder_path.rglob(
+                    "*"
+                )
                 if path.is_file()
             ),
-            key=lambda path: str(path).lower(),
+            key=lambda path: str(
+                path
+            ).lower(),
         )
 
-        self.current_folder_path = folder_path
+        self.current_folder_path = (
+            folder_path
+        )
 
         self.sidebar.file_list.add_files(
             files
@@ -292,19 +413,27 @@ class MainWindow(QWidget):
 
         self.workspace.home_page.update_workspace(
             file_count=len(files),
-            folder_path=str(folder_path),
+            folder_path=str(
+                folder_path
+            ),
         )
 
         self.show_home_page()
 
         self._start_analysis(
-            files=files,
+            files=files
         )
 
     def select_file(self) -> None:
-        filename, _ = QFileDialog.getOpenFileName(
-            self,
-            "Selecionar arquivo",
+        """
+        Abre um único arquivo.
+        """
+
+        filename, _ = (
+            QFileDialog.getOpenFileName(
+                self,
+                "Selecionar arquivo",
+            )
         )
 
         if not filename:
@@ -319,7 +448,7 @@ class MainWindow(QWidget):
         )
 
         self._start_analysis(
-            files=[file_path],
+            files=[file_path]
         )
 
     def _start_analysis(
@@ -327,6 +456,10 @@ class MainWindow(QWidget):
         *,
         files: list[Path],
     ) -> None:
+        """
+        Inicia a análise em uma thread separada.
+        """
+
         if not files:
             self._show_status(
                 "Nenhum arquivo disponível para análise.",
@@ -344,18 +477,26 @@ class MainWindow(QWidget):
         self.current_result = None
         self.correlation_result = None
 
-        self._set_interface_busy(True)
+        self._set_interface_busy(
+            True
+        )
 
         self._show_status(
             "Preparando análise...",
             progress=0,
         )
 
-        self.analysis_thread = QThread(self)
+        self.analysis_thread = QThread(
+            self
+        )
 
-        self.analysis_worker = AnalysisWorker(
-            analysis_service=self.analysis_service,
-            files=files,
+        self.analysis_worker = (
+            AnalysisWorker(
+                analysis_service=(
+                    self.analysis_service
+                ),
+                files=files,
+            )
         )
 
         self.analysis_worker.moveToThread(
@@ -412,6 +553,10 @@ class MainWindow(QWidget):
         self,
         result: AnalysisResult,
     ) -> None:
+        """
+        Recebe cada arquivo analisado.
+        """
+
         self.analysis_results.append(
             result
         )
@@ -432,26 +577,47 @@ class MainWindow(QWidget):
         file_path: str,
         error: str,
     ) -> None:
+        """
+        Registra falha em um arquivo específico.
+        """
+
         print(
-            f"Erro ao analisar {file_path}: {error}"
+            f"Erro ao analisar {file_path}: "
+            f"{error}"
         )
 
     def _on_investigation_completed(
         self,
         correlation_result,
     ) -> None:
-        self.correlation_result = correlation_result
+        """
+        Recebe o resultado das correlações.
+        """
+
+        self.correlation_result = (
+            correlation_result
+        )
 
         self.workspace.update_investigation(
-            current_result=self.current_result,
-            correlation_result=correlation_result,
+            current_result=(
+                self.current_result
+            ),
+            correlation_result=(
+                correlation_result
+            ),
         )
 
     def _on_analysis_completed(
         self,
         results: list,
     ) -> None:
-        self.analysis_results = list(results)
+        """
+        Finaliza a análise completa.
+        """
+
+        self.analysis_results = list(
+            results
+        )
 
         if not self.analysis_results:
             self._show_status(
@@ -474,17 +640,23 @@ class MainWindow(QWidget):
 
         if self.correlation_result is not None:
             self.workspace.update_investigation(
-                current_result=self.current_result,
+                current_result=(
+                    self.current_result
+                ),
                 correlation_result=(
                     self.correlation_result
                 ),
             )
 
-        if self.current_folder_path is not None:
+        if (
+            self.current_folder_path
+            is not None
+        ):
             self.context_label.setText(
                 (
                     f"{self.current_folder_path.name} • "
-                    f"{len(self.analysis_results)} arquivo(s)"
+                    f"{len(self.analysis_results)} "
+                    "arquivo(s)"
                 )
             )
 
@@ -522,13 +694,23 @@ class MainWindow(QWidget):
         self,
         error: str,
     ) -> None:
+        """
+        Exibe falha geral da análise.
+        """
+
         self._show_status(
             f"Falha na análise: {error}",
             progress=0,
         )
 
     def _on_thread_finished(self) -> None:
-        self._set_interface_busy(False)
+        """
+        Limpa as referências da thread.
+        """
+
+        self._set_interface_busy(
+            False
+        )
 
         self.analysis_thread = None
         self.analysis_worker = None
@@ -537,13 +719,27 @@ class MainWindow(QWidget):
         self,
         item,
     ) -> None:
+        """
+        Exibe o resultado correspondente
+        ao arquivo selecionado.
+        """
+
+        raw_file_path = item.data(
+            Qt.UserRole
+        )
+
+        if raw_file_path is None:
+            return
+
         file_path = Path(
-            item.data(1)
+            str(raw_file_path)
         )
 
         for result in self.analysis_results:
             if (
-                Path(result.file_info.path)
+                Path(
+                    result.file_info.path
+                )
                 == file_path
             ):
                 self.current_result = result
@@ -556,7 +752,10 @@ class MainWindow(QWidget):
                     self.analysis_results
                 )
 
-                if self.correlation_result is not None:
+                if (
+                    self.correlation_result
+                    is not None
+                ):
                     self.workspace.update_investigation(
                         current_result=result,
                         correlation_result=(
@@ -577,7 +776,7 @@ class MainWindow(QWidget):
                 return
 
         self._start_analysis(
-            files=[file_path],
+            files=[file_path]
         )
 
     def _update_progress(
@@ -585,6 +784,10 @@ class MainWindow(QWidget):
         value: int,
         message: str,
     ) -> None:
+        """
+        Atualiza suavemente a barra de progresso.
+        """
+
         self.status_label.setText(
             message
         )
@@ -592,6 +795,7 @@ class MainWindow(QWidget):
         self.progress_container.setVisible(
             True
         )
+
         self.progress_bar.setVisible(
             True
         )
@@ -617,7 +821,10 @@ class MainWindow(QWidget):
         self.progress_animation.setEndValue(
             max(
                 0,
-                min(100, value),
+                min(
+                    100,
+                    value,
+                ),
             )
         )
 
@@ -632,6 +839,10 @@ class MainWindow(QWidget):
         message: str,
         progress: int,
     ) -> None:
+        """
+        Exibe o painel de progresso.
+        """
+
         self.progress_container.setVisible(
             True
         )
@@ -642,7 +853,14 @@ class MainWindow(QWidget):
         )
 
     def _hide_progress(self) -> None:
-        self.progress_bar.setVisible(False)
+        """
+        Oculta o painel de progresso.
+        """
+
+        self.progress_bar.setVisible(
+            False
+        )
+
         self.progress_container.setVisible(
             False
         )
@@ -655,23 +873,45 @@ class MainWindow(QWidget):
         self,
         busy: bool,
     ) -> None:
+        """
+        Bloqueia os controles durante uma análise.
+        """
+
+        enabled = not busy
+
         self.sidebar.open_file_button.setEnabled(
-            not busy
+            enabled
         )
 
         self.sidebar.open_folder_button.setEnabled(
-            not busy
+            enabled
+        )
+
+        self.sidebar.file_list.setEnabled(
+            enabled
+        )
+
+        self.sidebar.file_search.setEnabled(
+            enabled
         )
 
     def closeEvent(self, event) -> None:
+        """
+        Encerra a thread antes de fechar a aplicação.
+        """
+
         if (
             self.analysis_worker is not None
-            and self.analysis_thread is not None
+            and self.analysis_thread
+            is not None
             and self.analysis_thread.isRunning()
         ):
             self.analysis_worker.cancel()
 
             self.analysis_thread.quit()
-            self.analysis_thread.wait(3000)
+
+            self.analysis_thread.wait(
+                3000
+            )
 
         super().closeEvent(event)

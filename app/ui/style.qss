@@ -46,112 +46,722 @@ QWidget#TimelinePage {
 }
 
 /* =========================================================
-   NOVA SIDEBAR
+   SIDEBAR — ESTRUTURA PRINCIPAL
    ========================================================= */
 
+/*
+   Define o painel lateral completo.
+*/
 QFrame#Sidebar {
-    min-width: 250px;
-    max-width: 310px;
-    background-color: #070d1d;
-    border-right: 1px solid #1d2a42;
+
+    /* Cor principal do fundo da sidebar. */
+    background-color: #070D1D;
+
+    /* Linha discreta entre sidebar e conteúdo. */
+    border-right: 1px solid #1D2A42;
 }
 
+
+/*
+   Remove fundos adicionais dos painéis internos.
+   Isso evita retângulos com cores diferentes.
+*/
+QWidget#SidebarBrand,
+QWidget#SidebarFilePanel,
+QWidget#SidebarAnalysisPanel,
+QWidget#SidebarFileHeader,
+QWidget#SidebarNavigationContainer {
+
+    /* Mantém o mesmo fundo da sidebar. */
+    background: transparent;
+
+    /* Remove bordas herdadas. */
+    border: none;
+}
+
+
+/* =========================================================
+   MARCA
+   ========================================================= */
+
+/*
+   Nome principal do aplicativo.
+*/
 QLabel#SidebarTitle {
+
+    /* Cor clara do nome. */
     color: #F8FAFC;
-    font-size: 24px;
-    font-weight: 800;
+
+    /* Tamanho da fonte. */
+    font-size: 15px;
+
+    /* Peso visual. */
+    font-weight: 700;
 }
 
+
+/*
+   Texto PRO abaixo da marca.
+*/
 QLabel#SidebarSubtitle {
+
+    /* Cor azul da identidade visual. */
     color: #38BDF8;
+
+    /* Tamanho reduzido. */
     font-size: 11px;
+
+    /* Peso forte. */
     font-weight: 800;
-    letter-spacing: 2px;
+
+    /* Espaçamento entre letras. */
+    letter-spacing: 1px;
 }
 
-QListWidget#SidebarFileList {
+
+/* =========================================================
+   TÍTULOS DAS SEÇÕES
+   ========================================================= */
+
+/*
+   Estilo utilizado nos títulos:
+   CASO, ARQUIVOS, ANÁLISE e FERRAMENTAS.
+*/
+QLabel#SidebarSectionTitle {
+
+    /* Cor secundária clara. */
+    color: #A7B4C9;
+
+    /* Tamanho compacto. */
+    font-size: 11px;
+
+    /* Peso médio. */
+    font-weight: 700;
+
+    /* Espaçamento entre letras. */
+    letter-spacing: 1px;
+
+    /* Pequeno espaço interno lateral. */
+    padding: 2px 2px;
+}
+
+
+/* =========================================================
+   BOTÕES DE AÇÃO
+   ========================================================= */
+
+/*
+   Botões:
+   - Abrir arquivo;
+   - Abrir pasta;
+   - Exportar.
+*/
+QPushButton#SidebarActionButton {
+
+    /* Altura mínima confortável. */
+    min-height: 40px;
+
+    /* Espaçamento interno horizontal. */
+    padding: 0 12px;
+
+    /* Alinha o conteúdo à esquerda. */
+    text-align: left;
+
+    /* Fundo padrão do botão. */
+    background-color: #10192C;
+
+    /* Borda discreta. */
+    border: 1px solid #202E49;
+
+    /* Arredondamento. */
+    border-radius: 9px;
+
+    /* Cor do texto. */
+    color: #D7E2F5;
+
+    /* Tamanho da fonte. */
+    font-size: 13px;
+
+    /* Peso da fonte. */
+    font-weight: 700;
+}
+
+
+/*
+   Estado quando o mouse passa sobre
+   um botão de ação.
+*/
+QPushButton#SidebarActionButton:hover {
+
+    /* Clareia levemente o fundo. */
+    background-color: #17233A;
+
+    /* Reforça a borda. */
+    border-color: #31507C;
+
+    /* Clareia o texto. */
+    color: #FFFFFF;
+}
+
+
+/*
+   Estado durante o clique.
+*/
+QPushButton#SidebarActionButton:pressed {
+
+    /* Fundo azul discreto. */
+    background-color: #1D355C;
+
+    /* Borda azul. */
+    border-color: #3B82F6;
+}
+
+
+/* =========================================================
+   SEPARADORES HORIZONTAIS
+   ========================================================= */
+
+/*
+   Linha horizontal usada entre grupos.
+*/
+QFrame#SidebarSeparator {
+
+    /* Altura fixa de um pixel. */
+    min-height: 1px;
+    max-height: 1px;
+
+    /* Cor da linha. */
+    background-color: #1D2A42;
+
+    /* Remove borda própria do frame. */
+    border: none;
+
+    /* Espaçamento acima. */
+    margin-top: 3px;
+
+    /* Espaçamento abaixo. */
+    margin-bottom: 3px;
+}
+
+
+/* =========================================================
+   DIVISOR AJUSTÁVEL
+   ========================================================= */
+
+/*
+   Componente que divide:
+   - navegador de arquivos;
+   - menu de análise.
+*/
+QSplitter#SidebarContentSplitter {
+
+    /* Fundo transparente para não criar outro painel. */
+    background: transparent;
+
+    /* Remove bordas. */
+    border: none;
+}
+
+
+/*
+   Barra que o usuário arrasta
+   para redimensionar os painéis.
+*/
+QSplitter#SidebarContentSplitter::handle {
+
+    /* Espessura vertical da área arrastável. */
+    height: 7px;
+
+    /* Fundo transparente por padrão. */
+    background: transparent;
+
+    /* Linha central discreta. */
+    border-top: 1px solid #26344D;
+
+    /* Linha inferior discreta. */
+    border-bottom: 1px solid transparent;
+}
+
+
+/*
+   Destaque do divisor quando o mouse passa.
+*/
+QSplitter#SidebarContentSplitter::handle:hover {
+
+    /* Azul discreto indicando que é ajustável. */
+    border-top-color: #3B82F6;
+
+    /* Pequeno realce de fundo. */
+    background-color: rgba(59, 130, 246, 0.06);
+}
+
+
+/* =========================================================
+   CONTADOR DE ARQUIVOS
+   ========================================================= */
+
+/*
+   Badge que mostra a quantidade
+   de arquivos carregados.
+*/
+QLabel#SidebarFileCount {
+
+    /* Largura mínima. */
+    min-width: 24px;
+
+    /* Largura máxima. */
+    max-width: 42px;
+
+    /* Altura mínima. */
+    min-height: 22px;
+
+    /* Altura máxima. */
+    max-height: 22px;
+
+    /* Espaçamento horizontal interno. */
+    padding: 0 6px;
+
+    /* Fundo azul translúcido. */
+    background-color: rgba(59, 130, 246, 0.16);
+
+    /* Cor do número. */
+    color: #93C5FD;
+
+    /* Borda azul discreta. */
+    border: 1px solid rgba(59, 130, 246, 0.28);
+
+    /* Arredondamento. */
+    border-radius: 7px;
+
+    /* Tamanho da fonte. */
+    font-size: 11px;
+
+    /* Peso forte. */
+    font-weight: 800;
+}
+
+
+/* =========================================================
+   PESQUISA DE ARQUIVOS
+   ========================================================= */
+
+/*
+   Campo utilizado para filtrar
+   os arquivos pelo nome.
+*/
+QLineEdit#SidebarFileSearch {
+
+    /* Altura mínima. */
+    min-height: 34px;
+
+    /* Altura máxima. */
+    max-height: 34px;
+
+    /* Espaçamento interno. */
+    padding: 0 10px;
+
+    /* Fundo discreto. */
+    background-color: #0E1728;
+
+    /* Cor do texto digitado. */
+    color: #E5E7EB;
+
+    /* Borda padrão. */
+    border: 1px solid #25334D;
+
+    /* Arredondamento. */
+    border-radius: 8px;
+
+    /* Tamanho da fonte. */
     font-size: 12px;
 }
 
+
+/*
+   Campo quando o mouse passa.
+*/
+QLineEdit#SidebarFileSearch:hover {
+
+    /* Reforça levemente a borda. */
+    border-color: #36557F;
+}
+
+
+/*
+   Campo quando recebe foco.
+*/
+QLineEdit#SidebarFileSearch:focus {
+
+    /* Borda azul de foco. */
+    border-color: #3B82F6;
+}
+
+
+/*
+   Texto exibido antes da digitação.
+*/
+QLineEdit#SidebarFileSearch::placeholder {
+
+    /* Cor mais suave. */
+    color: #64748B;
+}
+
+
+/* =========================================================
+   LISTA DE ARQUIVOS
+   ========================================================= */
+
+/*
+   Estrutura externa da lista.
+*/
+QListWidget#SidebarFileList {
+
+    /* Fundo integrado à sidebar. */
+    background: transparent;
+
+    /* Remove borda externa. */
+    border: none;
+
+    /* Remove arredondamento externo. */
+    border-radius: 0;
+
+    /* Remove espaço interno desnecessário. */
+    padding: 0;
+
+    /* Remove contorno padrão de foco. */
+    outline: none;
+
+    /* Tamanho da fonte. */
+    font-size: 12px;
+}
+
+
+/*
+   Cada linha da lista de arquivos.
+*/
 QListWidget#SidebarFileList::item {
-    min-height: 32px;
-    padding: 4px 8px;
-}
 
-QFrame#SidebarSeparator {
-    max-height: 1px;
-    background-color: #1d2a42;
-    border: none;
-    margin-top: 4px;
-    margin-bottom: 4px;
-}
+    /* Altura necessária para nome e detalhes. */
+    min-height: 64px;
 
-QLabel#SidebarSectionTitle {
-    color: #687b9c;
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 1px;
-    padding: 2px 4px;
-}
+    /* Remove margens externas. */
+    margin: 0;
 
-QPushButton#SidebarActionButton {
-    min-height: 42px;
-    padding: 0 12px;
-    text-align: left;
-    border: 1px solid #202e49;
-    border-radius: 9px;
-    background-color: #111a2d;
-    color: #d7e2f5;
-    font-size: 13px;
-    font-weight: 700;
-}
+    /* Remove preenchimento do QListWidgetItem. */
+    padding: 0;
 
-QPushButton#SidebarActionButton:hover {
-    background-color: #17233a;
-    border-color: #31507c;
-}
-
-QScrollArea#SidebarNavigationScroll {
+    /* Fundo padrão transparente. */
     background: transparent;
-    border: none;
+
+    /* Borda transparente para impedir mudanças de tamanho. */
+    border: 1px solid transparent;
+
+    /* Arredondamento visual. */
+    border-radius: 10px;
 }
 
-QWidget#SidebarNavigationContainer {
+
+/*
+   Arquivo quando o mouse passa sobre ele.
+*/
+QListWidget#SidebarFileList::item:hover {
+
+    /* Fundo de destaque somente no hover. */
+    background-color: rgba(59, 130, 246, 0.08);
+
+    /* Borda muito discreta. */
+    border-color: rgba(59, 130, 246, 0.20);
+}
+
+
+/*
+   Arquivo selecionado.
+*/
+QListWidget#SidebarFileList::item:selected {
+
+    /* Fundo discreto para indicar seleção. */
+    background-color: rgba(59, 130, 246, 0.12);
+
+    /* Linha lateral azul. */
+    border-left: 2px solid #3B82F6;
+
+    /* Outras bordas permanecem transparentes. */
+    border-top-color: transparent;
+    border-right-color: transparent;
+    border-bottom-color: transparent;
+
+    /* Cor clara do texto. */
+    color: #FFFFFF;
+}
+
+
+/*
+   Widget interno de cada arquivo.
+*/
+QWidget#SidebarFileItemWidget {
+
+    /* Não cria outro retângulo por cima do item. */
     background: transparent;
+
+    /* Remove qualquer borda interna. */
+    border: none;
 }
 
-QPushButton#SidebarNavigationButton {
-    min-height: 42px;
-    border: none;
+
+/*
+   Badge PDF, IMG, DOC, ZIP ou TXT.
+*/
+QLabel#SidebarFileTypeIcon {
+
+    /* Fundo azul escuro. */
+    background-color: #17233A;
+
+    /* Cor do texto. */
+    color: #8FB7ED;
+
+    /* Borda discreta. */
+    border: 1px solid #2A3D5D;
+
+    /* Arredondamento. */
     border-radius: 8px;
-    background-color: transparent;
+
+    /* Fonte compacta. */
+    font-size: 9px;
+
+    /* Peso forte. */
+    font-weight: 900;
+}
+
+
+/*
+   Nome principal do arquivo.
+*/
+QLabel#SidebarFileName {
+
+    /* Fundo transparente. */
+    background: transparent;
+
+    /* Remove borda. */
+    border: none;
+
+    /* Cor principal. */
+    color: #E8EEF8;
+
+    /* Tamanho da fonte. */
+    font-size: 12px;
+
+    /* Peso da fonte. */
+    font-weight: 700;
+}
+
+
+/*
+   Extensão e tamanho do arquivo.
+*/
+QLabel#SidebarFileDetails {
+
+    /* Fundo transparente. */
+    background: transparent;
+
+    /* Remove borda. */
+    border: none;
+
+    /* Cor secundária. */
+    color: #71839F;
+
+    /* Tamanho menor. */
+    font-size: 10px;
+
+    /* Peso médio. */
+    font-weight: 600;
+}
+
+
+/* =========================================================
+   NAVEGAÇÃO DAS ANÁLISES
+   ========================================================= */
+
+/*
+   Scroll que contém os botões técnicos.
+*/
+QScrollArea#SidebarNavigationScroll {
+
+    /* Fundo transparente. */
+    background: transparent;
+
+    /* Remove borda. */
+    border: none;
+}
+
+
+/*
+   Remove fundos criados pelo viewport
+   interno do QScrollArea.
+*/
+QScrollArea#SidebarNavigationScroll > QWidget > QWidget {
+
+    /* Mantém integração com a sidebar. */
+    background: transparent;
+
+    /* Remove bordas. */
+    border: none;
+}
+
+
+/*
+   Botões:
+   Geral, Hashes, Metadados, Vestígios etc.
+*/
+QPushButton#SidebarNavigationButton {
+
+    /* Altura suficiente para leitura. */
+    min-height: 38px;
+
+    /* Remove o fundo de cartão. */
+    background: transparent;
+
+    /* Remove todas as bordas. */
+    border: none;
+
+    /* Pequeno arredondamento usado no hover. */
+    border-radius: 7px;
+
+    /* Alinha o conteúdo à esquerda. */
     text-align: left;
+
+    /* Remove preenchimento global de QPushButton. */
+    padding: 0;
 }
 
+
+/*
+   Botão de análise quando o mouse passa.
+*/
 QPushButton#SidebarNavigationButton:hover {
-    background-color: rgba(59, 130, 246, 0.09);
+
+    /* Único fundo de destaque forte. */
+    background-color: rgba(59, 130, 246, 0.10);
+
+    /* Continua sem bordas. */
+    border: none;
 }
 
+
+/*
+   Página atualmente selecionada.
+*/
 QPushButton#SidebarNavigationButton:checked {
-    background-color: rgba(59, 130, 246, 0.17);
-    border-left: 3px solid #3b82f6;
+
+    /* Evita o retângulo preenchido. */
+    background: transparent;
+
+    /* Pequena linha azul à esquerda. */
+    border-left: 2px solid #3B82F6;
+
+    /* Remove as demais bordas. */
+    border-top: none;
+    border-right: none;
+    border-bottom: none;
 }
 
+
+/*
+   Página selecionada com mouse sobre ela.
+*/
+QPushButton#SidebarNavigationButton:checked:hover {
+
+    /* Mantém o destaque do hover. */
+    background-color: rgba(59, 130, 246, 0.10);
+
+    /* Preserva a linha lateral. */
+    border-left: 2px solid #3B82F6;
+}
+
+
+/*
+   Ícone dos botões técnicos.
+*/
 QLabel#SidebarNavigationIcon {
-    color: #7691bd;
-    font-size: 15px;
+
+    /* Cor padrão suave. */
+    color: #7691BD;
+
+    /* Tamanho do ícone textual. */
+    font-size: 14px;
+
+    /* Peso da fonte. */
     font-weight: 700;
+
+    /* Fundo transparente. */
+    background: transparent;
+
+    /* Remove borda. */
+    border: none;
 }
 
+
+/*
+   Texto dos botões técnicos.
+*/
 QLabel#SidebarNavigationText {
-    color: #c4d0e4;
+
+    /* Cor padrão. */
+    color: #C4D0E4;
+
+    /* Tamanho da fonte. */
     font-size: 13px;
+
+    /* Peso médio. */
+    font-weight: 600;
+
+    /* Fundo transparente. */
+    background: transparent;
+
+    /* Remove borda. */
+    border: none;
+}
+
+
+/*
+   Ícone da página selecionada.
+*/
+QPushButton#SidebarNavigationButton:checked QLabel#SidebarNavigationIcon {
+
+    /* Azul de destaque. */
+    color: #60A5FA;
+}
+
+
+/*
+   Texto da página selecionada.
+*/
+QPushButton#SidebarNavigationButton:checked QLabel#SidebarNavigationText {
+
+    /* Texto claro. */
+    color: #FFFFFF;
+
+    /* Reforça o peso. */
     font-weight: 700;
 }
 
-QPushButton#SidebarNavigationButton:checked QLabel#SidebarNavigationIcon,
-QPushButton#SidebarNavigationButton:checked QLabel#SidebarNavigationText {
-    color: #ffffff;
+
+/*
+   Ícone no hover.
+*/
+QPushButton#SidebarNavigationButton:hover QLabel#SidebarNavigationIcon {
+
+    /* Clareia o ícone. */
+    color: #93C5FD;
+}
+
+
+/*
+   Texto no hover.
+*/
+QPushButton#SidebarNavigationButton:hover QLabel#SidebarNavigationText {
+
+    /* Clareia o texto. */
+    color: #FFFFFF;
 }
 
 
@@ -838,23 +1448,738 @@ QProgressBar::chunk {
     selection-color: #FFFFFF;
 }
 
-/* =========================
-   HASH PAGE
-   ========================= */
-#HashTable {
-    background-color: #0B1220;
-    color: #CBD5E1;
-    border: 1px solid #243244;
-    border-radius: 14px;
-    gridline-color: #1E293B;
-    selection-background-color: #2563EB;
-    selection-color: #FFFFFF;
-    font-family: Consolas, "Courier New", monospace;
-    font-size: 12px;
+/* =========================================================
+   HASH PAGE 2.1 — ESTRUTURA PRINCIPAL
+   ========================================================= */
+
+/*
+   Página completa de hashes.
+*/
+QWidget#HashPage {
+
+    /* Mantém o fundo integrado ao workspace. */
+    background: transparent;
+
+    /* Remove qualquer borda herdada. */
+    border: none;
 }
 
-#HashTable::item {
+
+/*
+   Área do título e subtítulo.
+*/
+QWidget#HashHeader {
+
+    /* Não cria um retângulo adicional. */
+    background: transparent;
+
+    /* Remove bordas herdadas. */
+    border: none;
+}
+
+
+/* =========================================================
+   CARDS CLICÁVEIS
+   ========================================================= */
+
+/*
+   Estilo base dos quatro cards.
+*/
+QPushButton#HashSummaryButton {
+
+    /* Altura mínima do card. */
+    min-height: 76px;
+
+    /* Remove o padding global de QPushButton. */
+    padding: 0;
+
+    /* Alinha o layout interno à esquerda. */
+    text-align: left;
+
+    /* Fundo principal do card. */
+    background-color: #111827;
+
+    /* Borda padrão discreta. */
+    border: 1px solid #243244;
+
+    /* Arredondamento do card. */
+    border-radius: 12px;
+}
+
+
+/*
+   Card quando o mouse passa.
+*/
+QPushButton#HashSummaryButton:hover {
+
+    /* Clareia levemente o fundo. */
+    background-color: #151F31;
+
+    /* Reforça a borda. */
+    border-color: #3A4A63;
+}
+
+
+/*
+   Card ativo como filtro.
+*/
+QPushButton#HashSummaryButton:checked {
+
+    /* Fundo azul discreto. */
+    background-color: rgba(37, 99, 235, 0.13);
+
+    /* Borda azul mais visível. */
+    border: 2px solid #3B82F6;
+}
+
+
+/*
+   Card ativo durante o hover.
+*/
+QPushButton#HashSummaryButton:checked:hover {
+
+    /* Mantém o estado selecionado. */
+    background-color: rgba(37, 99, 235, 0.18);
+
+    /* Mantém a borda azul. */
+    border-color: #60A5FA;
+}
+
+
+/*
+   Card de todos os arquivos.
+*/
+QPushButton#HashSummaryButton[cardType="total"] {
+
+    /* Linha lateral azul. */
+    border-left: 4px solid #3B82F6;
+}
+
+
+/*
+   Card de arquivos únicos.
+*/
+QPushButton#HashSummaryButton[cardType="unique"] {
+
+    /* Linha lateral verde. */
+    border-left: 4px solid #22C55E;
+}
+
+
+/*
+   Card de duplicados.
+*/
+QPushButton#HashSummaryButton[cardType="duplicate"] {
+
+    /* Linha lateral amarela. */
+    border-left: 4px solid #F59E0B;
+}
+
+
+/*
+   Card de grupos.
+*/
+QPushButton#HashSummaryButton[cardType="groups"] {
+
+    /* Linha lateral roxa. */
+    border-left: 4px solid #8B5CF6;
+}
+
+
+/*
+   Ícone presente em cada card.
+*/
+QLabel#HashSummaryIcon {
+
+    /* Fundo neutro padrão. */
+    background-color: rgba(148, 163, 184, 0.10);
+
+    /* Borda discreta. */
+    border: 1px solid rgba(148, 163, 184, 0.18);
+
+    /* Formato arredondado. */
+    border-radius: 9px;
+
+    /* Cor padrão do ícone. */
+    color: #CBD5E1;
+
+    /* Tamanho do ícone textual. */
+    font-size: 18px;
+
+    /* Peso visual. */
+    font-weight: 800;
+}
+
+
+/*
+   Ícone do card total.
+*/
+QLabel#HashSummaryIcon[cardType="total"] {
+
+    /* Fundo azul translúcido. */
+    background-color: rgba(59, 130, 246, 0.14);
+
+    /* Cor azul clara. */
+    color: #93C5FD;
+
+    /* Borda azul discreta. */
+    border-color: rgba(59, 130, 246, 0.28);
+}
+
+
+/*
+   Ícone do card único.
+*/
+QLabel#HashSummaryIcon[cardType="unique"] {
+
+    /* Fundo verde translúcido. */
+    background-color: rgba(34, 197, 94, 0.14);
+
+    /* Cor verde clara. */
+    color: #86EFAC;
+
+    /* Borda verde discreta. */
+    border-color: rgba(34, 197, 94, 0.28);
+}
+
+
+/*
+   Ícone do card duplicado.
+*/
+QLabel#HashSummaryIcon[cardType="duplicate"] {
+
+    /* Fundo amarelo translúcido. */
+    background-color: rgba(245, 158, 11, 0.14);
+
+    /* Cor amarela clara. */
+    color: #FCD34D;
+
+    /* Borda amarela discreta. */
+    border-color: rgba(245, 158, 11, 0.28);
+}
+
+
+/*
+   Ícone do card de grupos.
+*/
+QLabel#HashSummaryIcon[cardType="groups"] {
+
+    /* Fundo roxo translúcido. */
+    background-color: rgba(139, 92, 246, 0.14);
+
+    /* Cor roxa clara. */
+    color: #C4B5FD;
+
+    /* Borda roxa discreta. */
+    border-color: rgba(139, 92, 246, 0.28);
+}
+
+
+/*
+   Número principal dos cards.
+*/
+QLabel#HashSummaryValue {
+
+    /* Fundo transparente. */
+    background: transparent;
+
+    /* Remove borda. */
+    border: none;
+
+    /* Cor principal. */
+    color: #F8FAFC;
+
+    /* Tamanho grande. */
+    font-size: 22px;
+
+    /* Peso forte. */
+    font-weight: 800;
+}
+
+
+/*
+   Número do total.
+*/
+QLabel#HashSummaryValue[cardType="total"] {
+
+    /* Azul claro. */
+    color: #93C5FD;
+}
+
+
+/*
+   Número dos únicos.
+*/
+QLabel#HashSummaryValue[cardType="unique"] {
+
+    /* Verde claro. */
+    color: #86EFAC;
+}
+
+
+/*
+   Número dos duplicados.
+*/
+QLabel#HashSummaryValue[cardType="duplicate"] {
+
+    /* Amarelo claro. */
+    color: #FCD34D;
+}
+
+
+/*
+   Número dos grupos.
+*/
+QLabel#HashSummaryValue[cardType="groups"] {
+
+    /* Roxo claro. */
+    color: #C4B5FD;
+}
+
+
+/*
+   Descrição inferior de cada card.
+*/
+QLabel#HashSummaryTitle {
+
+    /* Fundo transparente. */
+    background: transparent;
+
+    /* Remove borda. */
+    border: none;
+
+    /* Cor secundária. */
+    color: #94A3B8;
+
+    /* Tamanho compacto. */
+    font-size: 11px;
+
+    /* Peso médio. */
+    font-weight: 600;
+}
+
+
+/*
+   Clareia o título quando o card está ativo.
+*/
+QPushButton#HashSummaryButton:checked QLabel#HashSummaryTitle {
+
+    /* Cor clara. */
+    color: #E5E7EB;
+}
+
+
+/* =========================================================
+   BARRA DO ALGORITMO
+   ========================================================= */
+
+/*
+   Barra abaixo dos cards.
+*/
+QFrame#HashToolbar {
+
+    /* Fundo integrado ao tema. */
+    background-color: #101827;
+
+    /* Borda discreta. */
+    border: 1px solid #22314A;
+
+    /* Arredondamento. */
+    border-radius: 10px;
+}
+
+
+/*
+   Texto explicativo da barra.
+*/
+QLabel#HashToolbarInformation {
+
+    /* Fundo transparente. */
+    background: transparent;
+
+    /* Remove borda. */
+    border: none;
+
+    /* Cor secundária. */
+    color: #7F8FA8;
+
+    /* Tamanho da fonte. */
+    font-size: 11px;
+}
+
+
+/*
+   Texto Algoritmo.
+*/
+QLabel#HashToolbarLabel {
+
+    /* Fundo transparente. */
+    background: transparent;
+
+    /* Remove borda. */
+    border: none;
+
+    /* Cor clara. */
+    color: #A8B5C9;
+
+    /* Tamanho compacto. */
+    font-size: 12px;
+
+    /* Peso médio. */
+    font-weight: 700;
+}
+
+
+/*
+   Seletor de algoritmo.
+*/
+QComboBox#HashSelector {
+
+    /* Largura mínima. */
+    min-width: 130px;
+
+    /* Altura mínima. */
+    min-height: 31px;
+
+    /* Espaço interno. */
+    padding: 0 10px;
+
+    /* Fundo do campo. */
+    background-color: #0B1220;
+
+    /* Cor do texto. */
+    color: #E5E7EB;
+
+    /* Borda padrão. */
+    border: 1px solid #293850;
+
+    /* Arredondamento. */
+    border-radius: 7px;
+
+    /* Tamanho da fonte. */
+    font-size: 12px;
+
+    /* Peso médio. */
+    font-weight: 600;
+}
+
+
+/*
+   Seletor no hover ou foco.
+*/
+QComboBox#HashSelector:hover,
+QComboBox#HashSelector:focus {
+
+    /* Borda azul. */
+    border-color: #3B82F6;
+}
+
+
+/*
+   Área da seta.
+*/
+QComboBox#HashSelector::drop-down {
+
+    /* Largura reservada. */
+    width: 26px;
+
+    /* Remove borda adicional. */
+    border: none;
+}
+
+
+/*
+   Lista suspensa de algoritmos.
+*/
+QComboBox#HashSelector QAbstractItemView {
+
+    /* Fundo da lista. */
+    background-color: #111827;
+
+    /* Cor dos itens. */
+    color: #E5E7EB;
+
+    /* Borda da lista. */
+    border: 1px solid #293850;
+
+    /* Fundo da seleção. */
+    selection-background-color: #2563EB;
+
+    /* Cor da seleção. */
+    selection-color: #FFFFFF;
+}
+
+
+/* =========================================================
+   TÍTULO DA TABELA
+   ========================================================= */
+
+/*
+   Título que muda conforme o filtro.
+*/
+QLabel#HashTableTitle {
+
+    /* Fundo transparente. */
+    background: transparent;
+
+    /* Remove borda. */
+    border: none;
+
+    /* Cor principal. */
+    color: #E8EEF8;
+
+    /* Tamanho da fonte. */
+    font-size: 14px;
+
+    /* Peso forte. */
+    font-weight: 700;
+
+    /* Pequeno espaço lateral. */
+    padding-left: 2px;
+}
+
+
+/* =========================================================
+   TABELA
+   ========================================================= */
+
+/*
+   Estrutura da tabela.
+*/
+QTableWidget#HashTable {
+
+    /* Fundo da tabela. */
+    background-color: #0B1220;
+
+    /* Cor padrão do texto. */
+    color: #CBD5E1;
+
+    /* Borda externa. */
+    border: 1px solid #243244;
+
+    /* Arredondamento. */
+    border-radius: 12px;
+
+    /* Remove linhas de grade. */
+    gridline-color: transparent;
+
+    /* Fundo da seleção. */
+    selection-background-color: rgba(37, 99, 235, 0.22);
+
+    /* Cor da seleção. */
+    selection-color: #FFFFFF;
+
+    /* Fonte apropriada para hashes. */
+    font-family: Consolas, "Courier New", monospace;
+
+    /* Tamanho da fonte. */
+    font-size: 11px;
+
+    /* Remove contorno de foco. */
+    outline: none;
+}
+
+
+/*
+   Cada célula da tabela.
+*/
+QTableWidget#HashTable::item {
+
+    /* Espaçamento interno. */
     padding: 8px;
+
+    /* Linha inferior discreta. */
+    border-bottom: 1px solid #172235;
+}
+
+
+/*
+   Célula no hover.
+*/
+QTableWidget#HashTable::item:hover {
+
+    /* Destaque discreto. */
+    background-color: rgba(59, 130, 246, 0.06);
+}
+
+
+/*
+   Célula selecionada.
+*/
+QTableWidget#HashTable::item:selected {
+
+    /* Fundo azul translúcido. */
+    background-color: rgba(37, 99, 235, 0.22);
+
+    /* Texto branco. */
+    color: #FFFFFF;
+}
+
+
+/*
+   Cabeçalho das colunas.
+*/
+QTableWidget#HashTable QHeaderView::section {
+
+    /* Fundo do cabeçalho. */
+    background-color: #111827;
+
+    /* Cor do texto. */
+    color: #DCE6F5;
+
+    /* Remove borda geral. */
+    border: none;
+
+    /* Linha inferior. */
+    border-bottom: 1px solid #293850;
+
+    /* Divisão visual entre colunas. */
+    border-right: 1px solid #1D293B;
+
+    /* Espaçamento interno. */
+    padding: 10px 8px;
+
+    /* Peso forte. */
+    font-weight: 700;
+
+    /* Tamanho compacto. */
+    font-size: 11px;
+}
+
+
+/*
+   Cabeçalho durante o hover.
+
+   Esse destaque também ajuda a indicar
+   que as colunas podem ser redimensionadas.
+*/
+QTableWidget#HashTable QHeaderView::section:hover {
+
+    /* Fundo um pouco mais claro. */
+    background-color: #172235;
+
+    /* Cor branca. */
+    color: #FFFFFF;
+}
+
+
+/* =========================================================
+   STATUS
+   ========================================================= */
+
+/*
+   Contêiner do badge de status.
+*/
+QWidget#HashStatusContainer {
+
+    /* Fundo transparente. */
+    background: transparent;
+
+    /* Remove borda. */
+    border: none;
+}
+
+
+/*
+   Formato base do badge.
+*/
+QLabel#HashStatusBadge {
+
+    /* Altura mínima. */
+    min-height: 23px;
+
+    /* Espaçamento horizontal. */
+    padding: 0 9px;
+
+    /* Arredondamento. */
+    border-radius: 7px;
+
+    /* Tamanho da fonte. */
+    font-size: 10px;
+
+    /* Peso forte. */
+    font-weight: 700;
+}
+
+
+/*
+   Arquivo único.
+*/
+QLabel#HashStatusBadge[statusType="unique"] {
+
+    /* Fundo verde translúcido. */
+    background-color: rgba(34, 197, 94, 0.14);
+
+    /* Texto verde. */
+    color: #86EFAC;
+
+    /* Borda verde. */
+    border: 1px solid rgba(34, 197, 94, 0.30);
+}
+
+
+/*
+   Arquivo duplicado ou grupo duplicado.
+*/
+QLabel#HashStatusBadge[statusType="duplicate"] {
+
+    /* Fundo amarelo translúcido. */
+    background-color: rgba(245, 158, 11, 0.14);
+
+    /* Texto amarelo. */
+    color: #FCD34D;
+
+    /* Borda amarela. */
+    border: 1px solid rgba(245, 158, 11, 0.32);
+}
+
+
+/*
+   Hash indisponível.
+*/
+QLabel#HashStatusBadge[statusType="unavailable"] {
+
+    /* Fundo neutro. */
+    background-color: rgba(148, 163, 184, 0.12);
+
+    /* Texto neutro. */
+    color: #CBD5E1;
+
+    /* Borda neutra. */
+    border: 1px solid rgba(148, 163, 184, 0.24);
+}
+
+
+/* =========================================================
+   ESTADO VAZIO
+   ========================================================= */
+
+/*
+   Mensagem exibida quando não existem
+   resultados para o filtro.
+*/
+QLabel#HashEmptyLabel {
+
+    /* Altura mínima. */
+    min-height: 180px;
+
+    /* Cor secundária. */
+    color: #94A3B8;
+
+    /* Fundo discreto. */
+    background-color: #101827;
+
+    /* Borda tracejada. */
+    border: 1px dashed #334155;
+
+    /* Arredondamento. */
+    border-radius: 12px;
+
+    /* Tamanho da fonte. */
+    font-size: 13px;
+
+    /* Peso médio. */
+    font-weight: 600;
 }
 
 /* ========================
@@ -1723,3 +3048,188 @@ QPushButton#FindingSummaryButton:focus {
     outline: none;
 }
 
+/* =========================================================
+   RESPONSIVIDADE — DIVISOR PRINCIPAL
+   ========================================================= */
+
+/*
+   Divisor horizontal entre:
+   - sidebar;
+   - área principal do aplicativo.
+*/
+QSplitter#MainWindowSplitter {
+
+    /* Mantém o fundo integrado à janela. */
+    background: transparent;
+
+    /* Remove qualquer borda externa. */
+    border: none;
+}
+
+
+/*
+   Área vertical utilizada para arrastar
+   a largura entre sidebar e workspace.
+*/
+QSplitter#MainWindowSplitter::handle {
+
+    /* Define a largura da área arrastável. */
+    width: 5px;
+
+    /* Mantém o divisor discreto. */
+    background-color: transparent;
+
+    /* Linha sutil que indica a divisão. */
+    border-left: 1px solid #1D2A42;
+}
+
+
+/*
+   Destaque quando o cursor passa
+   sobre o divisor horizontal.
+*/
+QSplitter#MainWindowSplitter::handle:hover {
+
+    /* Azul translúcido indicando que pode ser arrastado. */
+    background-color: rgba(59, 130, 246, 0.10);
+
+    /* Reforça a linha central. */
+    border-left-color: #3B82F6;
+}
+
+
+/* =========================================================
+   RESPONSIVIDADE — DIVISOR DA SIDEBAR
+   ========================================================= */
+
+/*
+   Divisor vertical entre:
+   - navegador de arquivos;
+   - páginas de análise.
+*/
+QSplitter#SidebarContentSplitter {
+
+    /* Evita criação de outro fundo. */
+    background: transparent;
+
+    /* Remove bordas externas. */
+    border: none;
+}
+
+
+/*
+   Barra horizontal usada para ajustar
+   a altura das duas áreas.
+*/
+QSplitter#SidebarContentSplitter::handle {
+
+    /* Define a altura da região arrastável. */
+    height: 7px;
+
+    /* Mantém o fundo transparente. */
+    background: transparent;
+
+    /* Linha superior discreta. */
+    border-top: 1px solid #26344D;
+}
+
+
+/*
+   Destaque da barra ao passar o mouse.
+*/
+QSplitter#SidebarContentSplitter::handle:hover {
+
+    /* Fundo azul muito suave. */
+    background-color: rgba(59, 130, 246, 0.06);
+
+    /* Linha azul indicando interação. */
+    border-top-color: #3B82F6;
+}
+
+
+/* =========================================================
+   SIDEBAR RESPONSIVA
+   ========================================================= */
+
+/*
+   A largura não é mais limitada pelo QSS.
+
+   O tamanho será controlado pelo QSplitter
+   e pelo mínimo definido no código Python.
+*/
+QFrame#Sidebar {
+
+    /* Fundo principal da sidebar. */
+    background-color: #070D1D;
+
+    /* Linha de separação da área principal. */
+    border-right: 1px solid #1D2A42;
+}
+
+
+/* =========================================================
+   HASH — BOTÃO DE AJUSTE DAS COLUNAS
+   ========================================================= */
+
+/*
+   Botão que restaura a distribuição
+   automática das colunas.
+*/
+QPushButton#HashResetColumnsButton {
+
+    /* Altura compacta. */
+    min-height: 31px;
+
+    /* Espaçamento interno horizontal. */
+    padding: 0 11px;
+
+    /* Fundo transparente no estado padrão. */
+    background: transparent;
+
+    /* Borda discreta. */
+    border: 1px solid #293850;
+
+    /* Arredondamento. */
+    border-radius: 7px;
+
+    /* Cor do texto. */
+    color: #94A3B8;
+
+    /* Tamanho da fonte. */
+    font-size: 11px;
+
+    /* Peso da fonte. */
+    font-weight: 700;
+
+    /* Centraliza o texto do botão. */
+    text-align: center;
+}
+
+
+/*
+   Botão quando o cursor passa sobre ele.
+*/
+QPushButton#HashResetColumnsButton:hover {
+
+    /* Fundo azul suave. */
+    background-color: rgba(59, 130, 246, 0.10);
+
+    /* Borda azul. */
+    border-color: #3B82F6;
+
+    /* Texto branco. */
+    color: #FFFFFF;
+}
+
+
+/*
+   Botão durante o clique.
+*/
+QPushButton#HashResetColumnsButton:pressed {
+
+    /* Fundo um pouco mais intenso. */
+    background-color: rgba(37, 99, 235, 0.20);
+
+    /* Borda azul clara. */
+    border-color: #60A5FA;
+}
