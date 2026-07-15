@@ -4,6 +4,7 @@ from typing import Any
 from app.models import AnalysisResult
 from app.models.timeline_event import TimelineEvent
 from app.services.contract_date_extractor import ContractDateExtractor
+from app.services.contract_date_selector import ContractDateSelector
 from app.services.text_extraction_service import TextExtractionService
 
 
@@ -11,6 +12,7 @@ class TimelineService:
     def __init__(self) -> None:
         self.text_service = TextExtractionService()
         self.date_extractor = ContractDateExtractor()
+        self.date_selector = ContractDateSelector()
 
     def build_timeline(
         self,
@@ -78,13 +80,15 @@ class TimelineService:
             )
 
         text = self.text_service.extract_text(file_info.path)
-        contract_date = self.date_extractor.get_best_contract_date(text)
+        contract_date = self.date_selector.select(
+            self.date_extractor.extract(text)
+        )
 
         if contract_date:
             events.append(
                 TimelineEvent(
-                    title=contract_date.label,
-                    date=contract_date.date,
+                    title="Data contratual provável",
+                    date=contract_date.extracted_date.value,
                     description=(
                         "Data identificada automaticamente no conteúdo textual do documento. "
                         "A classificação considera o contexto textual encontrado. "
@@ -132,7 +136,11 @@ class TimelineService:
             metadata_modification_date=metadata_modification_date,
             system_created_at=file_info.created_at,
             system_modified_at=file_info.modified_at,
-            contract_date=contract_date.date if contract_date else None,
+            contract_date=(
+                contract_date.extracted_date.value
+                if contract_date
+                else None
+            ),
             digital_signature_date=digital_signature_date,
             opening_date=opening_date,
         )

@@ -5,6 +5,8 @@ from app.investigation.investigation_context import (
     InvestigationContext,
 )
 from app.models import AnalysisResult
+from app.services.contract_date_extractor import ContractDateExtractor
+from app.services.contract_date_selector import ContractDateSelector
 
 
 class InvestigationContextBuilder:
@@ -42,6 +44,18 @@ class InvestigationContextBuilder:
         "FileModifyDate",
         "ModDate",
     )
+
+    def __init__(
+        self,
+        contract_date_extractor: ContractDateExtractor | None = None,
+        contract_date_selector: ContractDateSelector | None = None,
+    ) -> None:
+        self.contract_date_extractor = (
+            contract_date_extractor or ContractDateExtractor()
+        )
+        self.contract_date_selector = (
+            contract_date_selector or ContractDateSelector()
+        )
 
     def build(
         self,
@@ -283,7 +297,18 @@ class InvestigationContextBuilder:
             if parsed is not None:
                 return parsed
 
-        return None
+        text = self._extract_text(result)
+
+        if not text:
+            return None
+
+        extracted_dates = self.contract_date_extractor.extract(text)
+        candidate = self.contract_date_selector.select(extracted_dates)
+
+        if candidate is None:
+            return None
+
+        return candidate.extracted_date.value
 
     # ==============================================================
     # METADADOS / PRODUCER / CREATOR
