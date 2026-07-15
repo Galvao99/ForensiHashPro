@@ -1,7 +1,6 @@
 from datetime import datetime
 from pathlib import Path
 
-from app.enum.severity import Severity
 from app.models.analysis_result import (
     AnalysisResult,
     FileInfo,
@@ -31,8 +30,22 @@ def test_analysis_result_allows_integrity_assignment() -> None:
         hashes=HashResult("a", "b", "c", "d", "e", "f"),
         metadata=MetadataResult(),
         findings=[],
-        magic_numbers=MagicNumberResult(),
-        digital_signature=DigitalSignatureResult(),
+        magic_numbers=MagicNumberResult(
+            detected_type="PDF",
+            signature="25 50 44 46",
+            extension_matches=True,
+        ),
+        digital_signature=DigitalSignatureResult(
+            has_signature=False,
+        ),
+        integrity=IntegrityResult(
+            score=0,
+            technical_status="pending",
+            is_structurally_valid=False,
+            hash_verified=False,
+            magic_number_verified=False,
+            digital_signature_present=False,
+        ),
     )
 
     result.integrity = IntegrityResult(
@@ -42,7 +55,6 @@ def test_analysis_result_allows_integrity_assignment() -> None:
         magic_number_verified=True,
         digital_signature_present=False,
         technical_status="ok",
-        findings=[Finding(Severity.INFO, "test", "title", "desc")],
     )
 
     assert result.integrity is not None

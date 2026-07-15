@@ -9,5 +9,5 @@ class EvaluationItem:
     """
 
     title: str
-    passed: bool
+    passed: bool | None
     description: str

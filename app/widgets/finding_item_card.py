@@ -53,10 +53,6 @@ class FindingItemCard(QWidget):
         layout.addWidget(self._line("Valor esperado", self.finding.expected_value))
         layout.addWidget(self._line("Recomendação", self.finding.recommendation))
 
-        score = QLabel(f"Confiança/Peso técnico: {self.finding.score:.0%}")
-        score.setObjectName("findingItemMuted")
-        layout.addWidget(score)
-
         main_layout.addWidget(card)
 
     def _line(self, label: str, value: str | None) -> QLabel:

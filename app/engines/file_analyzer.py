@@ -93,11 +93,14 @@ class FileAnalyzer:
             )
         )
 
-        pdf_structure = (
-            self.pdf_structure_engine.analyze(
-                file_path
+        pdf_structure = None
+
+        if magic_numbers.detected_format == "PDF":
+            pdf_structure = (
+                self.pdf_structure_engine.analyze(
+                    file_path
+                )
             )
-        )
 
         integrity = self._build_integrity_result(
             hashes=hashes,
@@ -162,106 +165,64 @@ class FileAnalyzer:
             )
         )
 
-        magic_number_verified = bool(
-            getattr(
-                magic_numbers,
-                "is_match",
-                False,
+        magic_number_verified = (
+            magic_numbers.extension_matches
+        )
+
+        digital_signature_present = (
+            digital_signature.has_signature
+        )
+        digital_signature_analysis_status = getattr(
+            digital_signature,
+            "analysis_status",
+            None,
+        )
+        digital_signature_error = getattr(
+            digital_signature,
+            "error_message",
+            None,
+        )
+
+        pdf_structure_applicable = (
+            pdf_structure is not None
+        )
+
+        if pdf_structure_applicable:
+            header_valid = pdf_structure.header_valid
+            eof_valid = pdf_structure.eof_valid
+            multiple_eof = (
+                pdf_structure.eof_count > 1
             )
-            or getattr(
-                magic_numbers,
-                "matches_extension",
-                False,
+            encrypted = pdf_structure.encrypted
+            javascript_detected = (
+                pdf_structure.javascript_detected
             )
-            or getattr(
-                magic_numbers,
-                "is_valid",
-                False,
+            embedded_files = (
+                pdf_structure.embedded_files
             )
-        )
-
-        digital_signature_present = bool(
-            getattr(
-                digital_signature,
-                "has_signature",
-                False,
+            xref_valid = pdf_structure.xref_found
+            trailer_valid = pdf_structure.trailer_found
+            incremental_updates = (
+                pdf_structure.incremental_updates
             )
-            or getattr(
-                digital_signature,
-                "is_signed",
-                False,
+            is_structurally_valid = bool(
+                magic_number_verified
+                and header_valid
+                and eof_valid
+                and xref_valid
+                and trailer_valid
             )
-            or getattr(
-                digital_signature,
-                "signatures_count",
-                0,
-            )
-        )
-
-        header_valid = getattr(
-            pdf_structure,
-            "header_valid",
-            None,
-        )
-
-        eof_valid = getattr(
-            pdf_structure,
-            "eof_valid",
-            None,
-        )
-
-        multiple_eof = (
-            getattr(
-                pdf_structure,
-                "eof_count",
-                0,
-            )
-            > 1
-        )
-
-        encrypted = getattr(
-            pdf_structure,
-            "encrypted",
-            None,
-        )
-
-        javascript_detected = getattr(
-            pdf_structure,
-            "javascript_detected",
-            None,
-        )
-
-        embedded_files = getattr(
-            pdf_structure,
-            "embedded_files",
-            None,
-        )
-
-        xref_valid = getattr(
-            pdf_structure,
-            "xref_found",
-            None,
-        )
-
-        trailer_valid = getattr(
-            pdf_structure,
-            "trailer_found",
-            None,
-        )
-
-        incremental_updates = getattr(
-            pdf_structure,
-            "incremental_updates",
-            None,
-        )
-
-        is_structurally_valid = bool(
-            magic_number_verified
-            and header_valid
-            and eof_valid
-            and xref_valid
-            and trailer_valid
-        )
+        else:
+            header_valid = None
+            eof_valid = None
+            multiple_eof = None
+            encrypted = None
+            javascript_detected = None
+            embedded_files = None
+            xref_valid = None
+            trailer_valid = None
+            incremental_updates = None
+            is_structurally_valid = None
 
         score = 100
 
@@ -271,28 +232,29 @@ class FileAnalyzer:
         if not magic_number_verified:
             score -= 20
 
-        if not header_valid:
-            score -= 15
+        if pdf_structure_applicable:
+            if not header_valid:
+                score -= 15
 
-        if not eof_valid:
-            score -= 15
+            if not eof_valid:
+                score -= 15
 
-        if not xref_valid:
-            score -= 10
+            if not xref_valid:
+                score -= 10
 
-        if not trailer_valid:
-            score -= 10
+            if not trailer_valid:
+                score -= 10
 
-        if javascript_detected:
-            score -= 10
+            if javascript_detected:
+                score -= 10
 
-        if embedded_files:
-            score -= 10
+            if embedded_files:
+                score -= 10
 
-        if encrypted:
-            score -= 5
+            if encrypted:
+                score -= 5
 
-        if not digital_signature_present:
+        if digital_signature_present is False:
             score -= 5
 
         score = max(
@@ -301,9 +263,8 @@ class FileAnalyzer:
         )
 
         technical_status = (
-            "Integridade estrutural básica verificada"
-            if score >= 80
-            else "Integridade estrutural com pontos de atenção"
+            "Verificações técnicas registradas individualmente; "
+            "consulte os estados de cada análise."
         )
 
         return IntegrityResult(
@@ -314,6 +275,12 @@ class FileAnalyzer:
             magic_number_verified=magic_number_verified,
             digital_signature_present=(
                 digital_signature_present
+            ),
+            digital_signature_analysis_status=(
+                digital_signature_analysis_status
+            ),
+            digital_signature_error=(
+                digital_signature_error
             ),
             header_valid=header_valid,
             eof_valid=eof_valid,

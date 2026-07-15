@@ -10,6 +10,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from app.presentation.file_display import FileDisplay, build_file_displays
+
 
 class FileListItemWidget(QWidget):
     """
@@ -19,11 +21,15 @@ class FileListItemWidget(QWidget):
     def __init__(
         self,
         file_path: Path,
+        display: FileDisplay | None = None,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
 
         self.file_path = file_path
+        self.display = display or build_file_displays(
+            [file_path]
+        )[str(file_path)]
 
         self.setObjectName("SidebarFileItemWidget")
         self.setAttribute(
@@ -67,7 +73,7 @@ class FileListItemWidget(QWidget):
         information_layout.setSpacing(3)
 
         self.name_label = QLabel(
-            self.file_path.name
+            self.display.display_name
         )
         self.name_label.setObjectName(
             "SidebarFileName"
@@ -76,7 +82,7 @@ class FileListItemWidget(QWidget):
         self.name_label.setMaximumHeight(38)
 
         self.details_label = QLabel(
-            self._build_details()
+            f"{self.display.display_origin}  •  {self._build_details()}"
         )
         self.details_label.setObjectName(
             "SidebarFileDetails"
@@ -99,8 +105,9 @@ class FileListItemWidget(QWidget):
             stretch=1,
         )
 
-        tooltip = str(
-            self.file_path.resolve()
+        tooltip = (
+            f"{self.display.display_name} — "
+            f"{self.display.display_origin}"
         )
 
         self.setToolTip(tooltip)
@@ -242,6 +249,7 @@ class FileList(QListWidget):
     def add_file(
         self,
         file_path: Path,
+        display: FileDisplay | None = None,
     ) -> None:
         normalized_path = Path(file_path)
 
@@ -252,12 +260,17 @@ class FileList(QListWidget):
             str(normalized_path),
         )
 
+        safe_display = display or build_file_displays(
+            [normalized_path]
+        )[str(normalized_path)]
         item.setToolTip(
-            str(normalized_path.resolve())
+            f"{safe_display.display_name} — "
+            f"{safe_display.display_origin}"
         )
 
         item_widget = FileListItemWidget(
-            normalized_path
+            normalized_path,
+            display=safe_display,
         )
 
         item.setSizeHint(
@@ -282,8 +295,13 @@ class FileList(QListWidget):
     ) -> None:
         self.clear()
 
+        displays = build_file_displays(files)
+
         for file_path in files:
-            self.add_file(file_path)
+            self.add_file(
+                file_path,
+                display=displays[str(Path(file_path))],
+            )
 
         self.file_count_changed.emit(
             self.count()

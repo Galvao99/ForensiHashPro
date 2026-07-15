@@ -118,6 +118,9 @@ class AnalysisTabs(QTabWidget):
         current_result: AnalysisResult | None,
         correlation_result: CorrelationResult,
     ) -> None:
+        self.general_page.update_correlation_count(
+            correlation_result.total_findings
+        )
         self.finding_page.update_combined_results(
             analysis_result=current_result,
             correlation_result=correlation_result,

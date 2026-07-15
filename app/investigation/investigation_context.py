@@ -18,6 +18,10 @@ class InvestigationContext:
         default_factory=list
     )
 
+    display_names: dict[str, str] = field(
+        default_factory=dict
+    )
+
     extracted_texts: dict[str, str] = field(
         default_factory=dict
     )
@@ -77,3 +81,12 @@ class InvestigationContext:
     raw: dict[str, Any] = field(
         default_factory=dict
     )
+
+    def display_name_for(
+        self,
+        evidence_key: str,
+    ) -> str:
+        return self.display_names.get(
+            evidence_key,
+            evidence_key,
+        )

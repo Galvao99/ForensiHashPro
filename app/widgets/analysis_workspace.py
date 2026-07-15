@@ -159,6 +159,9 @@ class AnalysisWorkspace(QStackedWidget):
         current_result: AnalysisResult | None,
         correlation_result: CorrelationResult,
     ) -> None:
+        self.general_page.update_correlation_count(
+            correlation_result.total_findings
+        )
         self.finding_page.update_combined_results(
             analysis_result=current_result,
             correlation_result=correlation_result,
@@ -168,4 +171,7 @@ class AnalysisWorkspace(QStackedWidget):
         self,
         results: list[AnalysisResult],
     ) -> None:
+        self.finding_page.set_display_paths(
+            [result.file_info.path for result in results]
+        )
         self.hash_page.update_results(results)

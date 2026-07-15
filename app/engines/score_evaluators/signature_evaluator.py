@@ -9,7 +9,24 @@ class SignatureEvaluator(BaseScoreEvaluator):
     def evaluate(self, result: AnalysisResult) -> ScoreSection:
         signature = result.digital_signature
 
-        if not signature.has_signature:
+        if signature.has_signature is None:
+            return ScoreSection(
+                name="Assinatura Digital",
+                exists=False,
+                score=0,
+                weight=0,
+                description=signature.technical_status,
+                details=[
+                    detail
+                    for detail in (
+                        signature.error_code,
+                        signature.error_message,
+                    )
+                    if detail
+                ],
+            )
+
+        if signature.has_signature is False:
             return ScoreSection(
                 name="Assinatura Digital",
                 exists=False,

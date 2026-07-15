@@ -31,6 +31,12 @@ class CorrelationFinding:
     source_file: str | None = None
     target_file: str | None = None
 
+    # Identidade interna da evidência. Nesta fase transitória,
+    # contém o caminho absoluto normalizado; futuramente poderá
+    # receber diretamente o identificador da entidade Evidence.
+    source_evidence_key: str | None = None
+    target_evidence_key: str | None = None
+
     # Ordem de exibição na interface
     priority: int = 100
 

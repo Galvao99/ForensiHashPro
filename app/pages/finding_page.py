@@ -55,6 +55,7 @@ class FindingPage(QWidget):
         self.setObjectName("FindingPage")
 
         self.current_result: AnalysisResult | None = None
+        self.display_paths: list[object] = []
         self.correlation_result: CorrelationResult | None = None
 
         self.findings: list[object] = []
@@ -260,7 +261,8 @@ class FindingPage(QWidget):
         self.current_result = result
 
         self.file_panel.update_analysis(
-            result
+            result,
+            peer_paths=self.display_paths,
         )
 
         self._collect_findings()
@@ -286,14 +288,22 @@ class FindingPage(QWidget):
 
         if analysis_result is not None:
             self.file_panel.update_analysis(
-                analysis_result
+                analysis_result,
+                peer_paths=self.display_paths,
             )
-
         else:
             self.file_panel.clear()
 
         self._collect_findings()
         self._render()
+
+    def set_display_paths(self, paths: list[object]) -> None:
+        self.display_paths = list(paths)
+        if self.current_result is not None:
+            self.file_panel.update_analysis(
+                self.current_result,
+                peer_paths=self.display_paths,
+            )
 
     def _collect_findings(self) -> None:
         findings: list[object] = []
@@ -348,6 +358,30 @@ class FindingPage(QWidget):
             )
             or ""
         )
+
+        source_evidence_key = str(
+            getattr(
+                finding,
+                "source_evidence_key",
+                "",
+            )
+            or ""
+        )
+
+        target_evidence_key = str(
+            getattr(
+                finding,
+                "target_evidence_key",
+                "",
+            )
+            or ""
+        )
+
+        if source_evidence_key or target_evidence_key:
+            return current_file in {
+                source_evidence_key,
+                target_evidence_key,
+            }
 
         if not source_file and not target_file:
             return True
@@ -740,7 +774,9 @@ class FindingPage(QWidget):
         if self.current_result is None:
             return ""
 
-        return self.current_result.file_info.name
+        return str(
+            self.current_result.file_info.path.resolve()
+        )
 
     def _empty_state(self) -> QWidget:
         container = QFrame()

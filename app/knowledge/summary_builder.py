@@ -1,74 +1,105 @@
-from app.engines.score_engine import ScoreEngine
 from app.models.analysis_result import AnalysisResult
+from app.models.digital_signature_result import (
+    SignatureAnalysisStatus,
+)
 
 
 class SummaryBuilder:
-    """
-    Monta o Resumo Pericial a partir do ScoreEngine.
+    """Monta um resumo factual sem avaliação agregada."""
 
-    O SummaryBuilder não calcula score.
-    Ele apenas apresenta o resultado consolidado.
-    """
+    def build(
+        self,
+        analysis_result: AnalysisResult,
+        correlation_count: int | None = None,
+    ) -> dict:
+        file_info = analysis_result.file_info
+        magic = analysis_result.magic_numbers
+        integrity = analysis_result.integrity
+        signature = analysis_result.digital_signature
 
-    def __init__(self):
-        self.score_engine = ScoreEngine()
-
-    def build(self, analysis_result: AnalysisResult) -> dict:
-        score_result = self.score_engine.calculate(analysis_result)
-
-        badges = []
-
-        for section in score_result.sections:
-            badges.append(
-                self._badge(
-                    f"{section.name}: {section.score}/100",
-                    self._status_from_score(section.score),
-                )
+        hashes = analysis_result.hashes
+        hash_count = sum(
+            bool(getattr(hashes, attribute, ""))
+            for attribute in (
+                "md5",
+                "sha1",
+                "sha224",
+                "sha256",
+                "sha384",
+                "sha512",
             )
+        )
 
-        findings_text = [
-            section.description
-            for section in score_result.sections
+        facts = [
+            ("Arquivo", file_info.name),
+            (
+                "Tipo técnico",
+                magic.detected_format
+                or magic.detected_type
+                or "Não identificado",
+            ),
+            ("Hashes calculados", str(hash_count)),
+            (
+                "Magic number",
+                "Compatível com a extensão"
+                if magic.extension_matches
+                else "Incompatível ou não identificado",
+            ),
+            (
+                "Estrutura PDF",
+                self._pdf_structure_status(
+                    integrity.is_structurally_valid
+                ),
+            ),
+            (
+                "Assinatura digital",
+                self._signature_status(
+                    signature.analysis_status
+                ),
+            ),
+            (
+                "Vestígios técnicos",
+                str(len(analysis_result.findings or [])),
+            ),
+            (
+                "Texto extraído",
+                "Disponível"
+                if analysis_result.has_extracted_text
+                else "Não disponível",
+            ),
         ]
 
-        return {
-            "title": "Resumo Pericial",
-            "score": score_result.score,
-            "risk_level": score_result.risk_level,
-            "confidence_level": score_result.confidence_level,
-            "badges": badges,
-            "findings": findings_text,
-            "insights": [],
-            "expert_note": self._expert_note(score_result.score),
-        }
-
-    def _badge(self, label: str, status: str) -> dict:
-        return {
-            "label": label,
-            "status": status,
-        }
-
-    def _status_from_score(self, score: int) -> str:
-        if score >= 85:
-            return "ok"
-        if score >= 65:
-            return "warning"
-        return "danger"
-
-    def _expert_note(self, score: int) -> str:
-        if score >= 85:
-            return (
-                "Os elementos técnicos analisados apresentam boa consistência geral. "
-                "O hash foi calculado para identificação do arquivo, mas não integra o score pericial isoladamente."
+        if correlation_count is not None:
+            facts.append(
+                ("Correlações", str(correlation_count))
             )
 
-        if score >= 65:
-            return (
-                "A análise identificou elementos que recomendam cautela interpretativa. "
-                "O score deve ser analisado em conjunto com os vestígios técnicos e o contexto documental."
-            )
+        return {
+            "title": "Resumo técnico factual",
+            "facts": facts,
+            "note": (
+                "Os itens são apresentados separadamente e não constituem "
+                "avaliação agregada ou conclusão de autenticidade."
+            ),
+        }
 
-        return (
-            "A análise identificou limitações ou inconsistências relevantes. "
-            "Recomenda-se revisão manual aprofundada e correlação com documentos originais, logs e demais elementos técnicos."
-        )
+    @staticmethod
+    def _pdf_structure_status(value: bool | None) -> str:
+        if value is True:
+            return "Válida nos critérios verificados"
+        if value is False:
+            return "Inválida nos critérios verificados"
+        return "Não aplicável"
+
+    @staticmethod
+    def _signature_status(
+        status: SignatureAnalysisStatus | None,
+    ) -> str:
+        labels = {
+            SignatureAnalysisStatus.PRESENT: "Presente",
+            SignatureAnalysisStatus.ABSENT: "Ausente",
+            SignatureAnalysisStatus.NOT_APPLICABLE: "Não aplicável",
+            SignatureAnalysisStatus.UNSUPPORTED: "Formato não suportado",
+            SignatureAnalysisStatus.ERROR: "Não foi possível analisar",
+        }
+        return labels.get(status, "Não analisada")

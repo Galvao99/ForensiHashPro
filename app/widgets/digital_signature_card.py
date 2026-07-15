@@ -24,7 +24,18 @@ class DigitalSignatureCard(BaseCard):
         signature: DigitalSignatureResult,
     ) -> None:
 
-        if not signature.has_signature:
+        if signature.has_signature is None:
+
+            self.content.setText(
+                f"""🟡 Não foi possível determinar a presença de assinatura digital.
+
+{signature.technical_status}
+"""
+            )
+
+            return
+
+        if signature.has_signature is False:
 
             self.content.setText(
                 f"""🟡 Nenhuma assinatura digital encontrada.

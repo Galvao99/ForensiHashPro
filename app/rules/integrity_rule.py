@@ -2,6 +2,9 @@ from app.enum.severity import Severity
 from app.knowledge.findings.integrity import INTEGRITY_FINDINGS
 from app.models import Finding
 from app.models.integrity_result import IntegrityResult
+from app.models.digital_signature_result import (
+    SignatureAnalysisStatus,
+)
 
 
 class IntegrityRule:
@@ -35,7 +38,7 @@ class IntegrityRule:
                 )
             )
 
-        if not integrity.digital_signature_present:
+        if integrity.digital_signature_present is False:
             findings.append(
                 Finding(
                     severity=Severity.INFO,
@@ -57,23 +60,29 @@ class IntegrityRule:
                 )
             )
 
-        if integrity.score < 80:
+        if (
+            integrity.digital_signature_analysis_status
+            == SignatureAnalysisStatus.ERROR
+        ):
             findings.append(
                 Finding(
-                    severity=Severity.WARNING,
-                    category="Integridade",
-                    title="Integridade técnica com pontos de atenção",
+                    severity=Severity.INFO,
+                    category="Assinatura Digital",
+                    title=(
+                        "Não foi possível analisar a assinatura digital"
+                    ),
                     description=(
-                        f"O resultado de integridade recebeu score {integrity.score}/100, "
-                        "indicando a presença de pontos que exigem análise complementar."
+                        "A análise de assinatura digital não foi concluída. "
+                        "Não é possível afirmar se há ou não assinatura incorporada. "
+                        "Recomenda-se realizar uma nova análise ou verificar o documento."
                     ),
-                    evidence_source="Integridade",
-                    observed_value=str(integrity.score),
+                    evidence_source="Assinatura Digital",
+                    observed_value="Análise não concluída",
                     recommendation=(
-                        "Correlacionar hash, magic number, assinatura digital, estrutura do arquivo, "
-                        "metadados e cadeia de custódia."
+                        "Repetir a análise e verificar a integridade estrutural "
+                        "e a compatibilidade do documento PDF."
                     ),
-                    score=integrity.score / 100,
+                    score=0.80,
                 )
             )
 

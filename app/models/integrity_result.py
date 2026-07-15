@@ -1,5 +1,9 @@
 from dataclasses import dataclass
 
+from app.models.digital_signature_result import (
+    SignatureAnalysisStatus,
+)
+
 
 @dataclass(frozen=True)
 class IntegrityResult:
@@ -12,10 +16,14 @@ class IntegrityResult:
     score: int
     technical_status: str
 
-    is_structurally_valid: bool
+    is_structurally_valid: bool | None
     hash_verified: bool
     magic_number_verified: bool
-    digital_signature_present: bool
+    digital_signature_present: bool | None
+    digital_signature_analysis_status: (
+        SignatureAnalysisStatus | None
+    ) = None
+    digital_signature_error: str | None = None
 
     header_valid: bool | None = None
     eof_valid: bool | None = None

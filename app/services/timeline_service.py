@@ -87,7 +87,7 @@ class TimelineService:
                     date=contract_date.date,
                     description=(
                         "Data identificada automaticamente no conteúdo textual do documento. "
-                        f"Score de classificação: {contract_date.score}. "
+                        "A classificação considera o contexto textual encontrado. "
                         "O OCR pode cometer erros de leitura e esta data deve ser confirmada pelo usuário."
                     ),
                     source="OCR / Texto",

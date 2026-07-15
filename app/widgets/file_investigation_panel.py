@@ -21,6 +21,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from app.presentation.file_display import file_display
+
 
 class FileInvestigationPanel(QFrame):
     """
@@ -103,10 +105,10 @@ class FileInvestigationPanel(QFrame):
             self._create_separator()
         )
 
-        # Caminho
+        # Origem amigável
         path_field, self.path_value = (
             self._create_multiline_field(
-                title="Caminho",
+                title="Origem",
                 height=68,
             )
         )
@@ -488,6 +490,7 @@ class FileInvestigationPanel(QFrame):
     def update_analysis(
         self,
         result: object | None,
+        peer_paths: list[str | Path] | None = None,
     ) -> None:
         if result is None:
             self.clear()
@@ -556,17 +559,25 @@ class FileInvestigationPanel(QFrame):
             ),
         )
 
-        self.file_name_label.setText(
+        display = file_display(
+            file_path,
+            peer_paths or (),
+        )
+        display_name = (
             str(file_name)
+            if file_name
+            else display.display_name
         )
 
+        self.file_name_label.setText(display_name)
+
         self.file_name_label.setToolTip(
-            str(file_name)
+            display_name
         )
 
         self._set_plain_text(
             self.path_value,
-            file_path,
+            display.display_origin,
         )
 
         self.extension_value.setText(

@@ -52,54 +52,60 @@ class InvestigationContextBuilder:
         )
 
         for result in results:
-            file_name = result.file_info.name
+            evidence_key = str(
+                result.file_info.path.resolve()
+            )
+
+            context.display_names[evidence_key] = (
+                result.file_info.name
+            )
 
             self._populate_extracted_text(
                 context=context,
                 result=result,
-                file_name=file_name,
+                file_name=evidence_key,
             )
 
             self._populate_hashes(
                 context=context,
                 result=result,
-                file_name=file_name,
+                file_name=evidence_key,
             )
 
             self._populate_contract_date(
                 context=context,
                 result=result,
-                file_name=file_name,
+                file_name=evidence_key,
             )
 
             self._populate_metadata(
                 context=context,
                 result=result,
-                file_name=file_name,
+                file_name=evidence_key,
             )
 
             self._populate_signature(
                 context=context,
                 result=result,
-                file_name=file_name,
+                file_name=evidence_key,
             )
 
             self._populate_timeline(
                 context=context,
                 result=result,
-                file_name=file_name,
+                file_name=evidence_key,
             )
 
             self._populate_ip_data(
                 context=context,
                 result=result,
-                file_name=file_name,
+                file_name=evidence_key,
             )
 
             self._populate_json_data(
                 context=context,
                 result=result,
-                file_name=file_name,
+                file_name=evidence_key,
             )
 
         # ESTE RETURN É ESSENCIAL.
