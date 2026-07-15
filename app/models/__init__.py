@@ -17,6 +17,11 @@ from app.models.reference import Reference
 from app.models.comparison_result import ComparisonResult
 from app.models.comparison_section import ComparisonSection
 from app.models.score_result import ScoreResult, ScoreSection
+from app.models.extracted_date import (
+    ContractDateCandidate,
+    DateFormat,
+    ExtractedDate,
+)
 
 __all__ = [
     "AnalysisResult",
@@ -33,4 +38,7 @@ __all__ = [
     "ComparisonSection",
     "ScoreResult",
     "ScoreSection",
+    "DateFormat",
+    "ExtractedDate",
+    "ContractDateCandidate",
 ]
