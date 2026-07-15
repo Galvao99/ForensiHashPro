@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
 )
 
 from app.models import AnalysisResult
+from app.presentation.file_display import file_display
 
 
 class AnalyzedFileCard(QFrame):
@@ -65,7 +66,7 @@ class AnalyzedFileCard(QFrame):
         general_info_layout.setSpacing(10)
 
         path_field, self.path_value = self._create_info_field(
-            "Caminho",
+            "Origem",
             multiline=True,
         )
         general_info_layout.addWidget(path_field)
@@ -223,6 +224,7 @@ class AnalyzedFileCard(QFrame):
     def update_analysis(
         self,
         result: AnalysisResult | None,
+        peer_paths: list[str | Path] | None = None,
     ) -> None:
         """
         Atualiza todas as informações do card.
@@ -263,11 +265,13 @@ class AnalyzedFileCard(QFrame):
             getattr(result, "analysis_date", None),
         )
 
-        self.file_name_label.setText(str(file_name))
-        self.file_name_label.setToolTip(str(file_name))
+        display = file_display(file_path, peer_paths or ())
+        display_name = str(file_name) if file_name else display.display_name
+        self.file_name_label.setText(display_name)
+        self.file_name_label.setToolTip(display_name)
 
-        self.path_value.setText(str(file_path))
-        self.path_value.setToolTip(str(file_path))
+        self.path_value.setText(display.display_origin)
+        self.path_value.setToolTip(display.display_origin)
 
         self.extension_value.setText(
             self._format_extension(extension)

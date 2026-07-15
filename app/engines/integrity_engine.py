@@ -35,8 +35,10 @@ class IntegrityEngine:
                 passed=result.digital_signature.has_signature,
                 description=(
                     "Assinatura digital incorporada."
-                    if result.digital_signature.has_signature
+                    if result.digital_signature.has_signature is True
                     else "Nenhuma assinatura digital encontrada."
+                    if result.digital_signature.has_signature is False
+                    else result.digital_signature.technical_status
                 ),
             )
         )
@@ -50,14 +52,23 @@ class IntegrityEngine:
 
         items = self.evaluate(result)
 
-        approved = sum(
-            item.passed
+        applicable_items = [
+            item
             for item in items
+            if item.passed is not None
+        ]
+
+        if not applicable_items:
+            return 0
+
+        approved = sum(
+            item.passed is True
+            for item in applicable_items
         )
 
         return int(
             approved
-            / len(items)
+            / len(applicable_items)
             * 100
         )
 

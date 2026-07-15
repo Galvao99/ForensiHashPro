@@ -153,7 +153,7 @@ class MetadataCard(QWidget):
 
         if producer_info:
             self.category_label.setText(
-                f"Categoria: {producer_info.category} • Confiança {producer_info.confidence}% • {producer_info.risk_level}"
+                f"Categoria técnica: {producer_info.category}"
             )
             self.insight_label.setText(self._build_database_insight(producer_info))
         else:

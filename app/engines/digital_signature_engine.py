@@ -1,7 +1,10 @@
 from pathlib import Path
 
 from app.digital_signature.parsers.pdf_parser import PdfSignatureParser
-from app.models import DigitalSignatureResult
+from app.models import (
+    DigitalSignatureResult,
+    SignatureAnalysisStatus,
+)
 
 
 class DigitalSignatureEngine:
@@ -15,8 +18,11 @@ class DigitalSignatureEngine:
             return self.pdf_parser.analyze(file_path)
 
         return DigitalSignatureResult(
-            has_signature=False,
+            has_signature=None,
             signature_count=0,
+            analysis_status=(
+                SignatureAnalysisStatus.UNSUPPORTED
+            ),
             technical_status=(
                 "Formato ainda não suportado para análise de assinatura digital."
             ),

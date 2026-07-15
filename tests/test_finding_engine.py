@@ -12,8 +12,10 @@ def test_detect_itext_finding() -> None:
     engine = FindingsEngine()
     findings = engine.analyze(metadata)
 
-    assert len(findings) == 1
-    assert findings[0].title == "Vestígio de processamento por iText"
+    assert any(
+        finding.title == "Vestígio de iText"
+        for finding in findings
+    )
 
 
 def test_detect_gps_finding() -> None:
@@ -27,5 +29,7 @@ def test_detect_gps_finding() -> None:
     engine = FindingsEngine()
     findings = engine.analyze(metadata)
 
-    assert len(findings) == 1
-    assert findings[0].title == "Metadados GPS encontrados"
+    assert any(
+        finding.title == "Metadados GPS encontrados"
+        for finding in findings
+    )

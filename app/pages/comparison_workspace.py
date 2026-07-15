@@ -5,7 +5,6 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QPushButton,
-    QProgressBar,
     QTabWidget,
     QVBoxLayout,
     QWidget,
@@ -47,13 +46,11 @@ class ComparisonWorkspace(QWidget):
         self.select_right_button.clicked.connect(self.select_right_file)
         self.clear_button.clicked.connect(self.clear_comparison)
 
-        self.score_label = QLabel("Score de compatibilidade: 0%")
-        self.score_label.setObjectName("DashboardTitle")
-
-        self.score_bar = QProgressBar()
-        self.score_bar.setRange(0, 100)
-        self.score_bar.setValue(0)
-        self.score_bar.setTextVisible(True)
+        self.summary_label = QLabel(
+            "Selecione dois arquivos para comparar os resultados técnicos."
+        )
+        self.summary_label.setObjectName("DashboardTitle")
+        self.summary_label.setWordWrap(True)
 
         self.tabs = QTabWidget()
         self.tabs.setObjectName("ComparisonInnerTabs")
@@ -93,8 +90,7 @@ class ComparisonWorkspace(QWidget):
 
         root_layout.addWidget(self.title)
         root_layout.addLayout(file_layout)
-        root_layout.addWidget(self.score_label)
-        root_layout.addWidget(self.score_bar)
+        root_layout.addWidget(self.summary_label)
         root_layout.addWidget(self.tabs, stretch=1)
         root_layout.addWidget(self.clear_button)
 
@@ -138,10 +134,9 @@ class ComparisonWorkspace(QWidget):
         self.update_dashboard(self.comparison_result)
 
     def update_dashboard(self, result: ComparisonResult) -> None:
-        score = self.calculate_score(result)
-
-        self.score_bar.setValue(score)
-        self.score_label.setText(f"Score de compatibilidade: {score}%")
+        self.summary_label.setText(
+            self._comparison_summary(result)
+        )
 
         self.general_card.update_text(self._format_general(result))
         self.hash_card.update_text(self._format_section(result, "SHA-256"))
@@ -158,19 +153,27 @@ class ComparisonWorkspace(QWidget):
             "Comparação de vestígios será implementada na próxima etapa."
         )
 
-    def calculate_score(self, result: ComparisonResult) -> int:
-        if not result.sections:
-            return 0
-
-        points = {
-            "success": 100,
-            "warning": 50,
-            "critical": 0,
-            "info": 50,
-        }
-
-        total = sum(points.get(section.status, 50) for section in result.sections)
-        return int(total / len(result.sections))
+    def _comparison_summary(
+        self,
+        result: ComparisonResult,
+    ) -> str:
+        compatible = sum(
+            section.status == "success"
+            for section in result.sections
+        )
+        divergent = sum(
+            section.status in {"warning", "critical"}
+            for section in result.sections
+        )
+        not_applicable = sum(
+            section.status == "info"
+            for section in result.sections
+        )
+        return (
+            f"{compatible} item(ns) compatível(is), "
+            f"{divergent} divergente(s) e "
+            f"{not_applicable} não aplicável(is)."
+        )
 
     def _format_general(self, result: ComparisonResult) -> str:
         lines = [
@@ -213,8 +216,9 @@ class ComparisonWorkspace(QWidget):
         self.left_label.setText("Arquivo A: não selecionado")
         self.right_label.setText("Arquivo B: não selecionado")
 
-        self.score_bar.setValue(0)
-        self.score_label.setText("Score de compatibilidade: 0%")
+        self.summary_label.setText(
+            "Selecione dois arquivos para comparar os resultados técnicos."
+        )
 
         for index in range(self.tabs.count()):
             widget = self.tabs.widget(index)

@@ -3,7 +3,10 @@ from pathlib import Path
 from pyhanko.pdf_utils.reader import PdfFileReader
 
 from app.digital_signature.parsers.base_parser import BaseSignatureParser
-from app.models import DigitalSignatureResult
+from app.models import (
+    DigitalSignatureResult,
+    SignatureAnalysisStatus,
+)
 
 
 class PdfSignatureParser(BaseSignatureParser):
@@ -19,6 +22,9 @@ class PdfSignatureParser(BaseSignatureParser):
                 return DigitalSignatureResult(
                     has_signature=False,
                     signature_count=0,
+                    analysis_status=(
+                        SignatureAnalysisStatus.ABSENT
+                    ),
                     technical_status=(
                         "Nenhuma assinatura digital incorporada foi identificada no PDF analisado."
                     ),
@@ -70,6 +76,9 @@ class PdfSignatureParser(BaseSignatureParser):
             return DigitalSignatureResult(
                 has_signature=True,
                 signature_count=len(signatures),
+                analysis_status=(
+                    SignatureAnalysisStatus.PRESENT
+                ),
                 signer=signer,
                 issuer=issuer,
                 serial_number=serial_number,
@@ -85,9 +94,14 @@ class PdfSignatureParser(BaseSignatureParser):
 
         except Exception as error:
             return DigitalSignatureResult(
-                has_signature=False,
+                has_signature=None,
                 signature_count=0,
+                analysis_status=(
+                    SignatureAnalysisStatus.ERROR
+                ),
+                error_code=type(error).__name__,
+                error_message=str(error),
                 technical_status=(
-                    f"Não foi possível analisar assinaturas digitais neste PDF: {error}"
+                    "Não foi possível concluir a análise da assinatura digital."
                 ),
             )

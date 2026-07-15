@@ -19,3 +19,6 @@ class GeneralPage(QWidget):
 
     def update_analysis(self, result: AnalysisResult) -> None:
         self.dashboard.update_analysis(result)
+
+    def update_correlation_count(self, count: int) -> None:
+        self.dashboard.update_correlation_count(count)

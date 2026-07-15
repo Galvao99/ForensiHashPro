@@ -30,9 +30,6 @@ class FindingsEvaluator(BaseScoreEvaluator):
                 penalty += 35
             elif finding.severity == Severity.WARNING:
                 penalty += 20
-            elif finding.severity == Severity.INFO:
-                penalty += 5
-
             details.append(
                 f"{finding.severity.value.upper()} | {finding.title}: {finding.description}"
             )

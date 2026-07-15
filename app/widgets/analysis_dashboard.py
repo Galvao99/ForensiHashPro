@@ -21,6 +21,8 @@ class AnalysisDashboard(QWidget):
         super().__init__()
 
         self.summary_builder = SummaryBuilder()
+        self.current_result: AnalysisResult | None = None
+        self.correlation_count: int | None = None
 
         self.title_label = QLabel("Nenhum arquivo selecionado.")
         self.title_label.setObjectName("DashboardTitle")
@@ -45,10 +47,25 @@ class AnalysisDashboard(QWidget):
         self.setLayout(layout)
 
     def update_analysis(self, result: AnalysisResult) -> None:
+        self.current_result = result
+        self.correlation_count = None
         self.title_label.setText(f"Arquivo atual: {result.file_info.name}")
 
-        summary = self.summary_builder.build(result)
+        summary = self.summary_builder.build(
+            result,
+            correlation_count=self.correlation_count,
+        )
         self.summary_card.update_summary(summary)
 
         self.file_info_card.update_analysis(result)
         self.findings_preview_card.update_findings(result.findings)
+
+    def update_correlation_count(self, count: int) -> None:
+        self.correlation_count = count
+        if self.current_result is not None:
+            self.summary_card.update_summary(
+                self.summary_builder.build(
+                    self.current_result,
+                    correlation_count=count,
+                )
+            )

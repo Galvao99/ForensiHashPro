@@ -8,6 +8,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from app.presentation.file_display import folder_display_origin
+
 
 class HomePage(QWidget):
     """
@@ -254,7 +256,7 @@ class HomePage(QWidget):
             )
 
             self.workspace_details.setText(
-                folder_path
+                folder_display_origin(folder_path)
             )
 
             return

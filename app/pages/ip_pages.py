@@ -143,6 +143,7 @@ Versão: {result.ip_version or "Não identificada"}
 Tipo de rede: {result.network_type or "Não identificado"}
 Público: {"Sim" if result.is_public else "Não"}
 Consulta externa realizada: {"Sim" if result.lookup_performed else "Não"}
+Provedor da consulta: {result.provider or "Não identificado"}
 
 Localização: {result.location_summary}
 País: {result.country or "Não identificado"}
@@ -155,6 +156,7 @@ ISP: {result.isp or "Não identificado"}
 Organização: {result.organization or "Não identificada"}
 ASN: {result.asn or "Não identificado"}
 Proxy: {"Sim" if result.is_proxy else "Não" if result.is_proxy is False else "Não identificado"}
+Indicador de fraude fornecido pelo provedor: {result.fraud_score if result.fraud_score is not None else "Não informado"}
 
 Observação técnica:
 {result.message or "A geolocalização por IP possui natureza estimativa e não comprova, isoladamente, a localização física exata do usuário ou a posse do dispositivo."}

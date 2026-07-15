@@ -23,10 +23,10 @@ class FindingsTable(QFrame):
         title.setObjectName("CardTitle")
         layout.addWidget(title)
 
-        self.table = QTableWidget(0, 6)
+        self.table = QTableWidget(0, 5)
         self.table.setObjectName("BinaryTable")
         self.table.setHorizontalHeaderLabels(
-            ["#", "Offset", "Hex", "ASCII", "Descrição", "Confiança"]
+            ["#", "Offset", "Hex", "ASCII", "Descrição"]
         )
 
         header = self.table.horizontalHeader()
@@ -35,7 +35,6 @@ class FindingsTable(QFrame):
         header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
         header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(4, QHeaderView.ResizeMode.Stretch)
-        header.setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)
 
         self.table.verticalHeader().setVisible(False)
         self.table.setAlternatingRowColors(True)
@@ -54,7 +53,6 @@ class FindingsTable(QFrame):
                 finding.hex_value,
                 finding.ascii_value,
                 finding.description,
-                f"{finding.confidence}%",
             ]
 
             for col, value in enumerate(values):
