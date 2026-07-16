@@ -31,3 +31,6 @@ output/exports/*
 !output/snapshots/.gitkeep
 !output/exports/.gitkeep
 daycoval_test.json
+
+# Local Codex context
+AGENTS.md

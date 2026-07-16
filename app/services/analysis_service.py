@@ -8,6 +8,9 @@ from app.services.correlation_service import CorrelationService
 from app.services.text_extraction_service import (
     TextExtractionService,
 )
+from app.investigation.investigation_context import (
+    InvestigationContext,
+)
 
 
 class AnalysisService:
@@ -94,6 +97,21 @@ class AnalysisService:
         results: Sequence[AnalysisResult],
     ) -> CorrelationResult:
         return self.correlate(results)
+
+    def build_investigation_context(
+        self,
+        results: Sequence[AnalysisResult],
+    ) -> InvestigationContext:
+        """
+        Consolida os resultados já analisados para uso pelas páginas
+        que precisam acessar os dados investigativos estruturados.
+
+        Não executa novamente OCR nem análise técnica dos arquivos.
+        """
+
+        return self.correlation_service.build_context(
+            list(results)
+        )
 
     def _print_correlation_result(
         self,

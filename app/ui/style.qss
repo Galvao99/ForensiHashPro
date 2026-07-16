@@ -3233,3 +3233,56 @@ QPushButton#HashResetColumnsButton:pressed {
     /* Borda azul clara. */
     border-color: #60A5FA;
 }
+
+QScrollArea#DetectedIpsScroll,
+QWidget#DetectedIpsContainer {
+    background: transparent;
+    border: none;
+}
+
+QFrame#DetectedIpCard {
+    background-color: #101C2C;
+    border: 1px solid #223249;
+    border-radius: 8px;
+}
+
+QFrame#DetectedIpCard:hover {
+    background-color: #142235;
+    border-color: #D9A62E;
+}
+
+QLabel#DetectedIpAddress {
+    background: transparent;
+    color: #F4F7FB;
+    font-weight: 600;
+}
+
+QLabel#DetectedIpFiles {
+    background: transparent;
+    color: #A9B4C3;
+}
+
+QLabel#CompactBadge {
+    background-color: #19283B;
+    color: #AFC0D4;
+    border: 1px solid #2A3B52;
+    border-radius: 5px;
+    padding: 2px 6px;
+    font-size: 10px;
+    font-weight: 600;
+}
+
+QPushButton#AnalyzeDetectedIpButton {
+    background-color: #142235;
+    color: #F4F7FB;
+    border: 1px solid #2A3B52;
+    border-radius: 6px;
+    padding: 7px 10px;
+    font-weight: 600;
+}
+
+QPushButton#AnalyzeDetectedIpButton:hover {
+    color: #F0BE4B;
+    border-color: #D9A62E;
+    background-color: #19283B;
+}

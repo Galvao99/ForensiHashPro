@@ -1,3 +1,5 @@
+import ipaddress
+
 from datetime import datetime
 from typing import Any, Sequence
 
@@ -7,6 +9,13 @@ from app.investigation.investigation_context import (
 from app.models import AnalysisResult
 from app.services.contract_date_extractor import ContractDateExtractor
 from app.services.contract_date_selector import ContractDateSelector
+from app.models.detected_ip import (
+    DetectedIp,
+    IpClassification,
+)
+from app.services.ip_extraction_service import (
+    IpExtractionService,
+)
 
 
 class InvestigationContextBuilder:
@@ -49,12 +58,21 @@ class InvestigationContextBuilder:
         self,
         contract_date_extractor: ContractDateExtractor | None = None,
         contract_date_selector: ContractDateSelector | None = None,
+        ip_extraction_service: IpExtractionService | None = None,
     ) -> None:
         self.contract_date_extractor = (
-            contract_date_extractor or ContractDateExtractor()
+            contract_date_extractor
+            or ContractDateExtractor()
         )
+
         self.contract_date_selector = (
-            contract_date_selector or ContractDateSelector()
+            contract_date_selector
+            or ContractDateSelector()
+        )
+
+        self.ip_extraction_service = (
+            ip_extraction_service
+            or IpExtractionService()
         )
 
     def build(
@@ -483,13 +501,50 @@ class InvestigationContextBuilder:
         result: AnalysisResult,
         file_name: str,
     ) -> None:
-        detected_ips = self._extract_detected_ips(
+        """
+        Consolida IPs estruturados e IPs encontrados no texto/OCR.
+
+        Nenhuma consulta externa é executada nesta etapa.
+        """
+
+        structured_addresses = self._extract_detected_ips(
             result
         )
 
-        if detected_ips:
+        text = self._extract_text(result)
+
+        text_occurrences = (
+            self.ip_extraction_service.extract(text)
+            if text
+            else []
+        )
+
+        structured_occurrences = (
+            self._build_structured_ip_details(
+                structured_addresses
+            )
+        )
+
+        all_occurrences = self._merge_ip_occurrences(
+            structured_occurrences=structured_occurrences,
+            text_occurrences=text_occurrences,
+        )
+
+        unique_addresses = list(
+            dict.fromkeys(
+                occurrence.address
+                for occurrence in all_occurrences
+            )
+        )
+
+        if unique_addresses:
             context.detected_ips[file_name] = (
-                detected_ips
+                unique_addresses
+            )
+
+        if all_occurrences:
+            context.detected_ip_details[file_name] = (
+                all_occurrences
             )
 
         ip_results = self._extract_ip_results(
@@ -501,15 +556,22 @@ class InvestigationContextBuilder:
                 ip_results
             )
 
+
     def _extract_detected_ips(
         self,
         result: AnalysisResult,
     ) -> list[str]:
+        """
+        Obtém IPs já estruturados no AnalysisResult.
+        """
+
         possible_attributes = (
             "detected_ips",
             "ips",
             "ip_addresses",
         )
+
+        collected: list[str] = []
 
         for attribute in possible_attributes:
             value = getattr(
@@ -518,16 +580,154 @@ class InvestigationContextBuilder:
                 None,
             )
 
-            if isinstance(value, list):
-                return list(
-                    dict.fromkeys(
-                        str(item).strip()
-                        for item in value
-                        if str(item).strip()
-                    )
+            if not isinstance(
+                value,
+                (list, tuple, set),
+            ):
+                continue
+
+            for item in value:
+                address = self._extract_ip_address_value(
+                    item
                 )
 
-        return []
+                if address:
+                    collected.append(address)
+
+        return list(
+            dict.fromkeys(collected)
+        )
+
+
+    def _extract_ip_address_value(
+        self,
+        value: Any,
+    ) -> str:
+        """
+        Extrai e normaliza um endereço IP de string ou objeto.
+        """
+
+        if value is None:
+            return ""
+
+        if isinstance(value, str):
+            candidate = value.strip()
+
+        else:
+            candidate = ""
+
+            for attribute in (
+                "address",
+                "ip",
+                "ip_address",
+            ):
+                attribute_value = getattr(
+                    value,
+                    attribute,
+                    None,
+                )
+
+                if attribute_value:
+                    candidate = str(
+                        attribute_value
+                    ).strip()
+                    break
+
+        if not candidate:
+            return ""
+
+        try:
+            parsed = ipaddress.ip_address(
+                candidate
+            )
+        except ValueError:
+            return ""
+
+        return self._normalize_ip_address(
+            parsed
+        )
+
+
+    def _build_structured_ip_details(
+        self,
+        addresses: list[str],
+    ) -> list[DetectedIp]:
+        """
+        Converte IPs estruturados em objetos DetectedIp.
+
+        Como não vieram do texto, start/end recebem -1.
+        """
+
+        details: list[DetectedIp] = []
+
+        for address in addresses:
+            try:
+                parsed = ipaddress.ip_address(
+                    address
+                )
+            except ValueError:
+                continue
+
+            normalized = self._normalize_ip_address(
+                parsed
+            )
+
+            details.append(
+                DetectedIp(
+                    address=normalized,
+                    raw_text=address,
+                    version=parsed.version,
+                    classification=self._classify_ip_address(
+                        parsed
+                    ),
+                    start=-1,
+                    end=-1,
+                    context=(
+                        "Endereço IP previamente estruturado "
+                        "no resultado da análise."
+                    ),
+                )
+            )
+
+        return details
+
+
+    def _merge_ip_occurrences(
+        self,
+        *,
+        structured_occurrences: list[DetectedIp],
+        text_occurrences: list[DetectedIp],
+    ) -> list[DetectedIp]:
+        """
+        Preserva ocorrências distintas do texto, mas não cria uma
+        ocorrência artificial estruturada quando o mesmo endereço
+        já foi encontrado no OCR/texto.
+        """
+
+        text_addresses = {
+            occurrence.address
+            for occurrence in text_occurrences
+        }
+
+        merged = [
+            occurrence
+            for occurrence in structured_occurrences
+            if occurrence.address not in text_addresses
+        ]
+
+        merged.extend(text_occurrences)
+
+        return sorted(
+            merged,
+            key=lambda occurrence: (
+                occurrence.start < 0,
+                occurrence.start
+                if occurrence.start >= 0
+                else 0,
+                occurrence.address,
+            ),
+        )
+
 
     def _extract_ip_results(
         self,
@@ -550,6 +750,327 @@ class InvestigationContextBuilder:
                 return list(value)
 
         return []
+
+
+    @staticmethod
+    def _normalize_ip_address(
+        address: (
+            ipaddress.IPv4Address
+            | ipaddress.IPv6Address
+        ),
+    ) -> str:
+        if isinstance(
+            address,
+            ipaddress.IPv6Address,
+        ):
+            return address.compressed.lower()
+
+        return str(address)
+
+
+    def _classify_ip_address(
+        self,
+        address: (
+            ipaddress.IPv4Address
+            | ipaddress.IPv6Address
+        ),
+    ) -> IpClassification:
+        if address.is_unspecified:
+            return IpClassification.UNSPECIFIED
+
+        if address.is_loopback:
+            return IpClassification.LOOPBACK
+
+        if address.is_link_local:
+            return IpClassification.LINK_LOCAL
+
+        if address.is_multicast:
+            return IpClassification.MULTICAST
+
+        if (
+            isinstance(
+                address,
+                ipaddress.IPv4Address,
+            )
+            and address
+            in self.ip_extraction_service.CGNAT_NETWORK
+        ):
+            return IpClassification.CGNAT
+
+        if address.is_private:
+            return IpClassification.PRIVATE
+
+        if address.is_reserved:
+            return IpClassification.RESERVED
+
+        return IpClassification.PUBLIC
+
+
+    def _extract_detected_ips(
+        self,
+        result: AnalysisResult,
+    ) -> list[str]:
+        """
+        Obtém endereços IP previamente estruturados no resultado.
+
+        Também aceita objetos que possuam atributos como address ou ip.
+        """
+
+        possible_attributes = (
+            "detected_ips",
+            "ips",
+            "ip_addresses",
+        )
+
+        collected: list[str] = []
+
+        for attribute in possible_attributes:
+            value = getattr(
+                result,
+                attribute,
+                None,
+            )
+
+            if not isinstance(
+                value,
+                (list, tuple, set),
+            ):
+                continue
+
+            for item in value:
+                address = self._extract_ip_address_value(
+                    item
+                )
+
+                if address:
+                    collected.append(address)
+
+        return list(
+            dict.fromkeys(collected)
+        )
+
+
+    def _extract_ip_address_value(
+        self,
+        value: Any,
+    ) -> str:
+        """
+        Normaliza uma representação estruturada de endereço IP.
+        """
+
+        if value is None:
+            return ""
+
+        if isinstance(value, str):
+            candidate = value.strip()
+
+        else:
+            candidate = ""
+
+            for attribute in (
+                "address",
+                "ip",
+                "ip_address",
+            ):
+                attribute_value = getattr(
+                    value,
+                    attribute,
+                    None,
+                )
+
+                if attribute_value:
+                    candidate = str(
+                        attribute_value
+                    ).strip()
+                    break
+
+        if not candidate:
+            return ""
+
+        try:
+            parsed = ipaddress.ip_address(
+                candidate
+            )
+        except ValueError:
+            return ""
+
+        if isinstance(
+            parsed,
+            ipaddress.IPv6Address,
+        ):
+            return parsed.compressed.lower()
+
+        return str(parsed)
+
+
+    def _build_structured_ip_details(
+        self,
+        addresses: list[str],
+    ) -> list[DetectedIp]:
+        """
+        Converte IPs previamente estruturados em DetectedIp.
+
+        Como eles não vieram diretamente do OCR, não possuem posição
+        ou trecho textual conhecido.
+        """
+
+        details: list[DetectedIp] = []
+
+        for address in addresses:
+            try:
+                parsed = ipaddress.ip_address(
+                    address
+                )
+            except ValueError:
+                continue
+
+            details.append(
+                DetectedIp(
+                    address=self._normalize_ip_address(
+                        parsed
+                    ),
+                    raw_text=address,
+                    version=parsed.version,
+                    classification=(
+                        self._classify_ip_address(
+                            parsed
+                        )
+                    ),
+                    start=-1,
+                    end=-1,
+                    context=(
+                        "Endereço IP previamente estruturado "
+                        "no resultado da análise."
+                    ),
+                )
+            )
+
+        return details
+
+
+    def _merge_ip_occurrences(
+        self,
+        structured_occurrences: list[DetectedIp],
+        text_occurrences: list[DetectedIp],
+    ) -> list[DetectedIp]:
+        """
+        Combina resultados estruturados e ocorrências do OCR.
+
+        Ocorrências textuais repetidas são preservadas porque indicam
+        posições distintas no documento.
+
+        A ocorrência estruturada é removida quando o mesmo endereço
+        também foi encontrado diretamente no texto, evitando criar uma
+        ocorrência artificial adicional.
+        """
+
+        text_addresses = {
+            occurrence.address
+            for occurrence in text_occurrences
+        }
+
+        merged = [
+            occurrence
+            for occurrence in structured_occurrences
+            if occurrence.address not in text_addresses
+        ]
+
+        merged.extend(
+            text_occurrences
+        )
+
+        return sorted(
+            merged,
+            key=lambda occurrence: (
+                occurrence.start < 0,
+                occurrence.start
+                if occurrence.start >= 0
+                else 0,
+                occurrence.address,
+            ),
+        )
+
+
+    def _extract_ip_results(
+        self,
+        result: AnalysisResult,
+    ) -> list[Any]:
+        possible_attributes = (
+            "ip_results",
+            "ip_lookup_results",
+            "enriched_ips",
+        )
+
+        for attribute in possible_attributes:
+            value = getattr(
+                result,
+                attribute,
+                None,
+            )
+
+            if isinstance(value, list):
+                return list(value)
+
+        return []
+
+
+    def _normalize_ip_address(
+        self,
+        address: (
+            ipaddress.IPv4Address
+            | ipaddress.IPv6Address
+        ),
+    ) -> str:
+        if isinstance(
+            address,
+            ipaddress.IPv6Address,
+        ):
+            return address.compressed.lower()
+
+        return str(address)
+
+
+    def _classify_ip_address(
+        self,
+        address: (
+            ipaddress.IPv4Address
+            | ipaddress.IPv6Address
+        ),
+    ) -> IpClassification:
+        """
+        Mantém a mesma ordem de classificação utilizada pelo
+        IpExtractionService.
+        """
+
+        if address.is_unspecified:
+            return IpClassification.UNSPECIFIED
+
+        if address.is_loopback:
+            return IpClassification.LOOPBACK
+
+        if address.is_link_local:
+            return IpClassification.LINK_LOCAL
+
+        if address.is_multicast:
+            return IpClassification.MULTICAST
+
+        if (
+            isinstance(
+                address,
+                ipaddress.IPv4Address,
+            )
+            and address
+            in self.ip_extraction_service.CGNAT_NETWORK
+        ):
+            return IpClassification.CGNAT
+
+        if address.is_private:
+            return IpClassification.PRIVATE
+
+        if address.is_reserved:
+            return IpClassification.RESERVED
+
+        return IpClassification.PUBLIC
 
     # ==============================================================
     # JSON / RUST

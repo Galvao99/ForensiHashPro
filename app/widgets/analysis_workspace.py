@@ -1,6 +1,10 @@
 from PySide6.QtWidgets import QStackedWidget
 
 from app.investigation.correlation_result import CorrelationResult
+from app.investigation.investigation_context import (
+    InvestigationContext,
+)
+
 from app.models import AnalysisResult
 from app.pages.comparison_workspace import ComparisonWorkspace
 from app.pages.digital_signature_pages import DigitalSignaturePage
@@ -56,6 +60,7 @@ class AnalysisWorkspace(QStackedWidget):
         self.magic_number_page = MagicNumberPage()
         self.digital_signature_page = DigitalSignaturePage()
         self.integrity_page = IntegrityPage()
+        # self.binary_structure_page = BinaryStructurePage()
 
         self.comparison_page = ComparisonWorkspace(
             analysis_service
@@ -77,6 +82,7 @@ class AnalysisWorkspace(QStackedWidget):
             "comparison": self.comparison_page,
             "ocr": self.ocr_page,
             "ip": self.ip_page,
+            # "binary_structure": self.binary_structure_page,
         }
 
         for page in self.pages.values():
@@ -162,9 +168,26 @@ class AnalysisWorkspace(QStackedWidget):
         self.general_page.update_correlation_count(
             correlation_result.total_findings
         )
+
         self.finding_page.update_combined_results(
             analysis_result=current_result,
             correlation_result=correlation_result,
+        )
+
+    def update_investigation_context(
+        self,
+        context: InvestigationContext | None,
+    ) -> None:
+        """
+        Encaminha o contexto investigativo completo para páginas
+        que consomem dados estruturados da análise.
+
+        Atualmente, a aba IP utiliza esse contexto para apresentar
+        os endereços IPv4 e IPv6 detectados nos arquivos.
+        """
+
+        self.ip_page.set_investigation_context(
+            context
         )
 
     def update_hashes(
@@ -172,6 +195,12 @@ class AnalysisWorkspace(QStackedWidget):
         results: list[AnalysisResult],
     ) -> None:
         self.finding_page.set_display_paths(
-            [result.file_info.path for result in results]
+            [
+                result.file_info.path
+                for result in results
+            ]
         )
-        self.hash_page.update_results(results)
+
+        self.hash_page.update_results(
+            results
+        )

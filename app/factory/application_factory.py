@@ -6,6 +6,7 @@ from app.engines.magic_number_engine import MagicNumberEngine
 from app.engines.metadata_engine import MetadataEngine
 from app.engines.pdf_structure_engine import PDFStructureEngine
 from app.services.analysis_service import AnalysisService
+from app.engines.binary_structure_engine import BinaryStructureEngine
 
 
 class ApplicationFactory:
@@ -19,6 +20,7 @@ class ApplicationFactory:
         magic_number_engine = MagicNumberEngine()
         digital_signature_engine = DigitalSignatureEngine()
         pdf_structure_engine = PDFStructureEngine()
+        binary_structure_engine = BinaryStructureEngine()
 
         analyzer = FileAnalyzer(
             hash_engine=hash_engine,
@@ -27,6 +29,7 @@ class ApplicationFactory:
             magic_number_engine=magic_number_engine,
             digital_signature_engine=digital_signature_engine,
             pdf_structure_engine=pdf_structure_engine,
+            binary_structure_engine=binary_structure_engine,
         )
 
         return AnalysisService(analyzer)
