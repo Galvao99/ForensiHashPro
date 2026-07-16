@@ -11,6 +11,7 @@ from app.models import AnalysisResult, FileInfo
 from app.models.integrity_result import IntegrityResult
 from app.models.json_analysis_result import JsonAnalysisResult
 from app.services.json_parser_service import JsonParserService
+from app.engines.binary_structure_engine import BinaryStructureEngine
 
 
 class FileAnalyzer:
@@ -36,6 +37,7 @@ class FileAnalyzer:
         digital_signature_engine: DigitalSignatureEngine,
         pdf_structure_engine: PDFStructureEngine,
         json_parser_service: JsonParserService | None = None,
+        binary_structure_engine: BinaryStructureEngine | None = None,
     ) -> None:
         self.hash_engine = hash_engine
         self.metadata_engine = metadata_engine
@@ -43,6 +45,7 @@ class FileAnalyzer:
         self.magic_number_engine = magic_number_engine
         self.digital_signature_engine = digital_signature_engine
         self.pdf_structure_engine = pdf_structure_engine
+        self.binary_structure_engine = binary_structure_engine
 
         self.json_parser_service = (
             json_parser_service
@@ -118,6 +121,16 @@ class FileAnalyzer:
             file_path
         )
 
+        binary_analysis = None
+        if self.binary_structure_engine is not None:
+            try:
+                binary_analysis = self.binary_structure_engine.analyze(file_path)
+            except Exception as error:
+                print(
+                    "Falha durante a análise binária de "
+                    f"{file_path.name}: {error}"
+                )
+
         return AnalysisResult(
             file_info=file_info,
             hashes=hashes,
@@ -127,6 +140,7 @@ class FileAnalyzer:
             digital_signature=digital_signature,
             integrity=integrity,
             json_analysis=json_analysis,
+            binary_analysis=binary_analysis,
         )
 
     def _analyze_json(

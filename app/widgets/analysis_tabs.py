@@ -14,6 +14,9 @@ from app.pages.metadata_page import MetadataPage
 from app.pages.ocr_page import OcrPage
 from app.pages.timeline_page import TimelinePage
 from app.services.analysis_service import AnalysisService
+from app.investigation.investigation_context import (
+    InvestigationContext,
+)
 
 
 class AnalysisTabs(QTabWidget):
@@ -124,6 +127,19 @@ class AnalysisTabs(QTabWidget):
         self.finding_page.update_combined_results(
             analysis_result=current_result,
             correlation_result=correlation_result,
+        )
+
+    def update_investigation_context(
+        self,
+        context: InvestigationContext | None,
+    ) -> None:
+        """
+        Encaminha o contexto investigativo completo às páginas que
+        precisam de dados estruturados além dos findings.
+        """
+
+        self.ip_page.set_investigation_context(
+            context
         )
 
     def update_hashes(

@@ -22,6 +22,15 @@ from app.models.extracted_date import (
     DateFormat,
     ExtractedDate,
 )
+from app.models.detected_ip import (
+    DetectedIp,
+    IpClassification,
+)
+from app.models.binary_analysis_result import BinaryAnalysisResult
+from app.models.binary_finding import BinaryFinding
+from app.models.binary_region import BinaryRegion
+from app.models.binary_string import BinaryString
+from app.models.entropy_region import EntropyRegion
 
 __all__ = [
     "AnalysisResult",
@@ -41,4 +50,11 @@ __all__ = [
     "DateFormat",
     "ExtractedDate",
     "ContractDateCandidate",
+    "DetectedIp",
+    "IpClassification",
+    "BinaryAnalysisResult",
+    "BinaryFinding",
+    "BinaryRegion",
+    "BinaryString",
+    "EntropyRegion",
 ]

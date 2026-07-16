@@ -9,6 +9,7 @@ from app.models.integrity_result import IntegrityResult
 from app.models.json_analysis_result import JsonAnalysisResult
 from app.models.magic_number_result import MagicNumberResult
 from app.models.reference import Reference
+from app.models.binary_analysis_result import BinaryAnalysisResult
 
 
 @dataclass(frozen=True)
@@ -99,6 +100,8 @@ class AnalysisResult:
     extracted_text: str = ""
 
     json_analysis: JsonAnalysisResult | None = None
+
+    binary_analysis: BinaryAnalysisResult | None = None
 
     @property
     def has_extracted_text(self) -> bool:

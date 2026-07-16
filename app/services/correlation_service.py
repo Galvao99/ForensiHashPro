@@ -31,6 +31,9 @@ from app.investigation.rules.producer_context_rule import (
     ProducerContextRule,
 )
 from app.models import AnalysisResult
+from app.investigation.investigation_context import (
+    InvestigationContext,
+)
 
 
 class CorrelationService:
@@ -56,11 +59,24 @@ class CorrelationService:
             ]
         )
 
+    def build_context(
+        self,
+        results: Sequence[AnalysisResult],
+    ) -> InvestigationContext:
+        """
+        Constrói o contexto investigativo sem executar novamente
+        OCR, análise de arquivos ou consultas externas.
+        """
+
+        return self.context_builder.build(
+            results
+        )
+
     def analyze(
         self,
         results: Sequence[AnalysisResult],
     ) -> CorrelationResult:
-        context = self.context_builder.build(
+        context = self.build_context(
             results
         )
 

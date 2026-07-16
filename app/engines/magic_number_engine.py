@@ -4,6 +4,7 @@ from pathlib import Path
 from zipfile import ZipFile, BadZipFile
 
 from app.models import MagicNumberFinding, MagicNumberResult
+from app.binary.signatures import BINARY_SIGNATURES
 
 
 class MagicNumberEngine:
@@ -18,7 +19,7 @@ class MagicNumberEngine:
             "format": "PDF",
             "mime": "application/pdf",
             "extensions": {".pdf"},
-            "magic": b"%PDF-",
+            "magic": BINARY_SIGNATURES["pdf"] + b"-",
             "offset": 0,
             "confidence": 100,
             "description": "PDF Header",
@@ -28,7 +29,7 @@ class MagicNumberEngine:
             "format": "PNG",
             "mime": "image/png",
             "extensions": {".png"},
-            "magic": bytes.fromhex("89504E470D0A1A0A"),
+            "magic": BINARY_SIGNATURES["png"],
             "offset": 0,
             "confidence": 100,
             "description": "PNG Header",
@@ -38,7 +39,7 @@ class MagicNumberEngine:
             "format": "JPEG",
             "mime": "image/jpeg",
             "extensions": {".jpg", ".jpeg"},
-            "magic": bytes.fromhex("FFD8FF"),
+            "magic": BINARY_SIGNATURES["jpeg"],
             "offset": 0,
             "confidence": 95,
             "description": "JPEG Header",
@@ -78,7 +79,7 @@ class MagicNumberEngine:
             "format": "ZIP",
             "mime": "application/zip",
             "extensions": {".zip", ".docx", ".xlsx", ".pptx", ".apk", ".jar", ".odt", ".ods", ".odp"},
-            "magic": bytes.fromhex("504B0304"),
+            "magic": BINARY_SIGNATURES["zip"],
             "offset": 0,
             "confidence": 90,
             "description": "ZIP Local File Header",
@@ -88,7 +89,7 @@ class MagicNumberEngine:
             "format": "RAR",
             "mime": "application/vnd.rar",
             "extensions": {".rar"},
-            "magic": bytes.fromhex("526172211A0700"),
+            "magic": BINARY_SIGNATURES["rar"] + b"\x1A\x07\x00",
             "offset": 0,
             "confidence": 95,
             "description": "RAR Header",
@@ -98,7 +99,7 @@ class MagicNumberEngine:
             "format": "7Z",
             "mime": "application/x-7z-compressed",
             "extensions": {".7z"},
-            "magic": bytes.fromhex("377ABCAF271C"),
+            "magic": BINARY_SIGNATURES["7z"],
             "offset": 0,
             "confidence": 95,
             "description": "7Z Header",
@@ -118,7 +119,7 @@ class MagicNumberEngine:
             "format": "SQLITE",
             "mime": "application/vnd.sqlite3",
             "extensions": {".sqlite", ".sqlite3", ".db"},
-            "magic": b"SQLite format 3\x00",
+            "magic": BINARY_SIGNATURES["sqlite"],
             "offset": 0,
             "confidence": 100,
             "description": "SQLite Header",

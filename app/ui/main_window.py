@@ -45,9 +45,7 @@ class MainWindow(QWidget):
         self.analysis_thread: QThread | None = None
         self.analysis_worker: AnalysisWorker | None = None
 
-        self.progress_animation = (
-            QPropertyAnimation()
-        )
+        self.progress_animation = QPropertyAnimation()
 
         self.setWindowTitle(
             "ForensiHash Pro"
@@ -75,7 +73,7 @@ class MainWindow(QWidget):
             "ClockLabel"
         )
         self.clock_label.setAlignment(
-            Qt.AlignRight
+            Qt.AlignmentFlag.AlignRight
         )
 
         self.page_title = QLabel(
@@ -134,12 +132,16 @@ class MainWindow(QWidget):
             None
         )
 
+    # ==========================================================
+    # CONSTRUÇÃO DA INTERFACE
+    # ==========================================================
+
     def _build_ui(self) -> None:
         """
         Constrói a janela utilizando um divisor horizontal.
 
-        O usuário pode alterar manualmente a largura
-        da sidebar e da área principal.
+        O usuário pode alterar manualmente a largura da sidebar
+        e da área principal.
         """
 
         main_layout = QHBoxLayout(self)
@@ -152,7 +154,7 @@ class MainWindow(QWidget):
         main_layout.setSpacing(0)
 
         self.main_splitter = QSplitter(
-            Qt.Horizontal
+            Qt.Orientation.Horizontal
         )
         self.main_splitter.setObjectName(
             "MainWindowSplitter"
@@ -237,7 +239,7 @@ class MainWindow(QWidget):
 
         header.addWidget(
             self.clock_label,
-            alignment=Qt.AlignTop,
+            alignment=Qt.AlignmentFlag.AlignTop,
         )
 
         layout.addLayout(header)
@@ -287,6 +289,10 @@ class MainWindow(QWidget):
 
         return container
 
+    # ==========================================================
+    # SINAIS
+    # ==========================================================
+
     def _connect_signals(self) -> None:
         """
         Conecta os eventos da interface.
@@ -315,6 +321,10 @@ class MainWindow(QWidget):
         self.workspace.home_page.open_folder_requested.connect(
             self.select_folder
         )
+
+    # ==========================================================
+    # NAVEGAÇÃO
+    # ==========================================================
 
     def show_workspace_page(
         self,
@@ -360,6 +370,10 @@ class MainWindow(QWidget):
             None
         )
 
+    # ==========================================================
+    # RELÓGIO
+    # ==========================================================
+
     def update_clock(self) -> None:
         """
         Atualiza o relógio.
@@ -370,6 +384,10 @@ class MainWindow(QWidget):
                 "%d/%m/%Y %H:%M:%S"
             )
         )
+
+    # ==========================================================
+    # SELEÇÃO DE ARQUIVOS
+    # ==========================================================
 
     def select_folder(self) -> None:
         """
@@ -389,14 +407,10 @@ class MainWindow(QWidget):
         files = sorted(
             (
                 path
-                for path in folder_path.rglob(
-                    "*"
-                )
+                for path in folder_path.rglob("*")
                 if path.is_file()
             ),
-            key=lambda path: str(
-                path
-            ).lower(),
+            key=lambda path: str(path).lower(),
         )
 
         self.current_folder_path = (
@@ -451,6 +465,10 @@ class MainWindow(QWidget):
             files=[file_path]
         )
 
+    # ==========================================================
+    # EXECUÇÃO DA ANÁLISE
+    # ==========================================================
+
     def _start_analysis(
         self,
         *,
@@ -477,6 +495,11 @@ class MainWindow(QWidget):
         self.current_result = None
         self.correlation_result = None
 
+        # Limpa IPs e dados investigativos da análise anterior.
+        self.workspace.update_investigation_context(
+            None
+        )
+
         self._set_interface_busy(
             True
         )
@@ -490,13 +513,9 @@ class MainWindow(QWidget):
             self
         )
 
-        self.analysis_worker = (
-            AnalysisWorker(
-                analysis_service=(
-                    self.analysis_service
-                ),
-                files=files,
-            )
+        self.analysis_worker = AnalysisWorker(
+            analysis_service=self.analysis_service,
+            files=files,
         )
 
         self.analysis_worker.moveToThread(
@@ -609,7 +628,7 @@ class MainWindow(QWidget):
 
     def _on_analysis_completed(
         self,
-        results: list,
+        results: list[AnalysisResult],
     ) -> None:
         """
         Finaliza a análise completa.
@@ -638,6 +657,21 @@ class MainWindow(QWidget):
             self.current_result
         )
 
+        # Monta o contexto completo com OCR, IPs, hashes,
+        # metadados, datas e demais dados estruturados.
+        investigation_context = (
+            self.analysis_service
+            .build_investigation_context(
+                self.analysis_results
+            )
+        )
+
+        # Encaminha o contexto às páginas que precisam
+        # dos dados estruturados, especialmente a aba IP.
+        self.workspace.update_investigation_context(
+            investigation_context
+        )
+
         if self.correlation_result is not None:
             self.workspace.update_investigation(
                 current_result=(
@@ -648,10 +682,7 @@ class MainWindow(QWidget):
                 ),
             )
 
-        if (
-            self.current_folder_path
-            is not None
-        ):
+        if self.current_folder_path is not None:
             self.context_label.setText(
                 (
                     f"{self.current_folder_path.name} • "
@@ -715,17 +746,20 @@ class MainWindow(QWidget):
         self.analysis_thread = None
         self.analysis_worker = None
 
+    # ==========================================================
+    # SELEÇÃO DE RESULTADO JÁ ANALISADO
+    # ==========================================================
+
     def analyze_selected_file(
         self,
         item,
     ) -> None:
         """
-        Exibe o resultado correspondente
-        ao arquivo selecionado.
+        Exibe o resultado correspondente ao arquivo selecionado.
         """
 
         raw_file_path = item.data(
-            Qt.UserRole
+            Qt.ItemDataRole.UserRole
         )
 
         if raw_file_path is None:
@@ -736,12 +770,11 @@ class MainWindow(QWidget):
         )
 
         for result in self.analysis_results:
-            if (
-                Path(
-                    result.file_info.path
-                )
-                == file_path
-            ):
+            result_path = Path(
+                result.file_info.path
+            )
+
+            if result_path == file_path:
                 self.current_result = result
 
                 self.workspace.update_analysis(
@@ -752,10 +785,7 @@ class MainWindow(QWidget):
                     self.analysis_results
                 )
 
-                if (
-                    self.correlation_result
-                    is not None
-                ):
+                if self.correlation_result is not None:
                     self.workspace.update_investigation(
                         current_result=result,
                         correlation_result=(
@@ -778,6 +808,10 @@ class MainWindow(QWidget):
         self._start_analysis(
             files=[file_path]
         )
+
+    # ==========================================================
+    # PROGRESSO
+    # ==========================================================
 
     def _update_progress(
         self,
@@ -829,7 +863,7 @@ class MainWindow(QWidget):
         )
 
         self.progress_animation.setEasingCurve(
-            QEasingCurve.OutCubic
+            QEasingCurve.Type.OutCubic
         )
 
         self.progress_animation.start()
@@ -895,15 +929,21 @@ class MainWindow(QWidget):
             enabled
         )
 
-    def closeEvent(self, event) -> None:
+    # ==========================================================
+    # ENCERRAMENTO
+    # ==========================================================
+
+    def closeEvent(
+        self,
+        event,
+    ) -> None:
         """
         Encerra a thread antes de fechar a aplicação.
         """
 
         if (
             self.analysis_worker is not None
-            and self.analysis_thread
-            is not None
+            and self.analysis_thread is not None
             and self.analysis_thread.isRunning()
         ):
             self.analysis_worker.cancel()

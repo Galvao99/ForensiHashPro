@@ -3,6 +3,7 @@ from datetime import datetime
 from typing import Any
 
 from app.models import AnalysisResult
+from app.models.detected_ip import DetectedIp
 from app.models.json_analysis_result import (
     JsonAnalysisResult,
 )
@@ -56,6 +57,11 @@ class InvestigationContext:
     detected_ips: dict[
         str,
         list[str],
+    ] = field(default_factory=dict)
+
+    detected_ip_details: dict[
+        str,
+        list[DetectedIp]
     ] = field(default_factory=dict)
 
     ip_results: dict[
