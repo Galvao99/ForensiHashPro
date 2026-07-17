@@ -7,6 +7,8 @@ from app.binary import (
     EntropyAnalyzer,
     SignatureScanner,
 )
+from app.binary.parsers import PdfRawParser
+from app.binary.signatures import BINARY_SIGNATURES
 from app.models.binary_analysis_result import BinaryAnalysisResult
 from app.models.binary_finding import BinaryFinding
 
@@ -25,6 +27,10 @@ class _EntropyAnalyzer(Protocol):
     def weighted_average(self, regions): ...
 
 
+class _PdfRawParser(Protocol):
+    def analyze(self, reader: BinaryReader): ...
+
+
 class BinaryStructureEngine:
     """Coordinates bounded binary analyses without format interpretation."""
 
@@ -41,6 +47,7 @@ class BinaryStructureEngine:
         signature_scanner: _Scanner | None = None,
         string_extractor: _StringExtractor | None = None,
         entropy_analyzer: _EntropyAnalyzer | None = None,
+        pdf_raw_parser: _PdfRawParser | None = None,
     ) -> None:
         if header_size < 0 or footer_size < 0:
             raise ValueError("header and footer sizes must not be negative")
@@ -58,6 +65,7 @@ class BinaryStructureEngine:
         self.entropy_analyzer = entropy_analyzer or EntropyAnalyzer(
             block_size=entropy_block_size
         )
+        self.pdf_raw_parser = pdf_raw_parser or PdfRawParser()
 
     def analyze(self, file_path: Path) -> BinaryAnalysisResult:
         reader = BinaryReader(Path(file_path))
@@ -92,7 +100,33 @@ class BinaryStructureEngine:
             "Falha na análise de entropia",
             lambda: self._set_entropy(result, reader),
         )
+        if self._is_pdf(reader):
+            self._run_component(
+                result,
+                "pdf_raw_parser_failed",
+                "Falha no parser estrutural de PDF",
+                lambda: self._set_pdf_raw_analysis(result, reader),
+            )
         return result
+
+    @staticmethod
+    def _is_pdf(reader: BinaryReader) -> bool:
+        signature = BINARY_SIGNATURES["pdf"] + b"-"
+        return bool(
+            reader.find_bytes(
+                signature,
+                end=min(reader.size, PdfRawParser.HEADER_LIMIT),
+                max_results=1,
+            )
+        )
+
+    def _set_pdf_raw_analysis(
+        self, result: BinaryAnalysisResult, reader: BinaryReader
+    ) -> None:
+        analysis = self.pdf_raw_parser.analyze(reader)
+        result.pdf_raw_analysis = analysis
+        result.parser_name = "pdf_raw"
+        result.findings.extend(analysis.findings)
 
     def _set_entropy(
         self, result: BinaryAnalysisResult, reader: BinaryReader
