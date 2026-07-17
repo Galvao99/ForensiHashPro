@@ -59,3 +59,18 @@ def test_partial_failure_is_recorded(tmp_path: Path) -> None:
     assert result.entropy_regions
     assert result.findings[0].code == "signature_scan_failed"
     assert result.findings[0].evidence["error_type"] == "RuntimeError"
+
+
+def test_pdf_raw_parser_runs_only_for_technical_pdf(tmp_path: Path) -> None:
+    pdf_path = tmp_path / "renamed.bin"
+    pdf_path.write_bytes(b"prefix\n%PDF-1.7\n%%EOF")
+    pdf_result = BinaryStructureEngine().analyze(pdf_path)
+    assert pdf_result.parser_name == "pdf_raw"
+    assert pdf_result.pdf_raw_analysis is not None
+    assert pdf_result.pdf_raw_analysis.header_offset == 7
+
+    non_pdf_path = tmp_path / "misleading.pdf"
+    non_pdf_path.write_bytes(b"ordinary content")
+    non_pdf_result = BinaryStructureEngine().analyze(non_pdf_path)
+    assert non_pdf_result.parser_name is None
+    assert non_pdf_result.pdf_raw_analysis is None
