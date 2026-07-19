@@ -3,6 +3,7 @@ from datetime import datetime
 from pathlib import Path
 
 import pytest
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QApplication,
     QLabel,
@@ -26,6 +27,7 @@ from app.models.comparison_section import ComparisonSection
 from app.models.integrity_result import IntegrityResult
 from app.enum.severity import Severity
 from app.pages.comparison_workspace import ComparisonWorkspace
+from app.pages.finding_page import FindingPage
 from app.ui.main_window import MainWindow
 from app.widgets.binary_analyzer.finding_table import FindingsTable
 from app.widgets.binary_analyzer.summary_card import (
@@ -37,6 +39,8 @@ from app.widgets.file_investigation_panel import FileInvestigationPanel
 from app.widgets.integrity_card import IntegrityCard
 from app.widgets.metadata_card import MetadataCard
 from app.widgets.summary_card import SummaryCard
+from app.widgets.analysis_dashboard import AnalysisDashboard
+from app.widgets.flow_layout import FlowLayout
 
 
 @pytest.fixture(scope="module")
@@ -290,3 +294,58 @@ def test_main_window_can_be_constructed(qt_app) -> None:
     window = MainWindow(analysis_service=object())
     assert window.windowTitle() == "ForensiHash Pro"
     window.close()
+
+
+def test_findings_page_distinguishes_empty_states(qt_app) -> None:
+    page = FindingPage()
+    page._render()
+    assert "Selecione um arquivo analisado" in _visible_text(page)
+
+    page.current_result = object()
+    page.findings = []
+    page._render()
+    assert "Nenhum vestígio técnico identificado" in _visible_text(page)
+
+    page.findings = [object()]
+    page.current_filter = page.FILTER_CRITICAL
+    page._render()
+    assert "Nenhum vestígio corresponde ao filtro" in _visible_text(page)
+
+
+def test_findings_page_reflows_filters_and_details_panel(qt_app) -> None:
+    page = FindingPage()
+    assert isinstance(
+        page.summary_buttons[page.FILTER_ALL].parentWidget().layout(),
+        FlowLayout,
+    )
+
+    page.resize(800, 900)
+    page.show()
+    qt_app.processEvents()
+    assert page.body_splitter.orientation() == Qt.Vertical
+    assert page.file_panel.minimumWidth() < 350
+
+    page.resize(1280, 900)
+    qt_app.processEvents()
+    assert page.body_splitter.orientation() == Qt.Horizontal
+    assert page.file_panel.minimumWidth() == 350
+    page.close()
+
+
+def test_general_dashboard_stacks_cards_at_compact_width(qt_app) -> None:
+    dashboard = AnalysisDashboard()
+    dashboard.resize(700, 800)
+    dashboard.show()
+    qt_app.processEvents()
+    compact_position = dashboard.cards_grid.getItemPosition(
+        dashboard.cards_grid.indexOf(dashboard.findings_preview_card)
+    )
+    assert compact_position[:2] == (1, 0)
+
+    dashboard.resize(1100, 800)
+    qt_app.processEvents()
+    wide_position = dashboard.cards_grid.getItemPosition(
+        dashboard.cards_grid.indexOf(dashboard.findings_preview_card)
+    )
+    assert wide_position[:2] == (0, 1)
+    dashboard.close()

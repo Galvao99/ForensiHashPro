@@ -1,4 +1,12 @@
-from PySide6.QtWidgets import QGridLayout, QLabel, QVBoxLayout, QWidget
+from PySide6.QtCore import QEvent, Qt
+from PySide6.QtWidgets import (
+    QFrame,
+    QGridLayout,
+    QLabel,
+    QScrollArea,
+    QVBoxLayout,
+    QWidget,
+)
 
 from app.knowledge.summary_builder import SummaryBuilder
 from app.models import AnalysisResult
@@ -17,6 +25,8 @@ class AnalysisDashboard(QWidget):
     - sem excesso de dados brutos.
     """
 
+    RESPONSIVE_BREAKPOINT = 900
+
     def __init__(self) -> None:
         super().__init__()
 
@@ -26,25 +36,63 @@ class AnalysisDashboard(QWidget):
 
         self.title_label = QLabel("Nenhum arquivo selecionado.")
         self.title_label.setObjectName("DashboardTitle")
+        self.subtitle_label = QLabel(
+            "Síntese factual da análise do arquivo atualmente selecionado."
+        )
+        self.subtitle_label.setObjectName("DashboardSubtitle")
+        self.subtitle_label.setWordWrap(True)
 
         self.summary_card = SummaryCard()
         self.file_info_card = FileInfoCard()
         self.findings_preview_card = FindingsPreviewCard()
 
-        grid = QGridLayout()
-        grid.setSpacing(16)
+        self.cards_grid = QGridLayout()
+        self.cards_grid.setSpacing(16)
 
-        grid.addWidget(self.file_info_card, 0, 0)
-        grid.addWidget(self.findings_preview_card, 0, 1)
+        self.cards_grid.addWidget(self.file_info_card, 0, 0)
+        self.cards_grid.addWidget(self.findings_preview_card, 0, 1)
+        self.cards_grid.setColumnStretch(0, 1)
+        self.cards_grid.setColumnStretch(1, 1)
 
-        layout = QVBoxLayout()
-        layout.setSpacing(16)
-        layout.addWidget(self.title_label)
-        layout.addWidget(self.summary_card)
-        layout.addLayout(grid)
-        layout.addStretch()
+        content = QWidget()
+        content.setObjectName("DashboardContent")
+        content_layout = QVBoxLayout(content)
+        content_layout.setContentsMargins(4, 4, 8, 12)
+        content_layout.setSpacing(16)
 
-        self.setLayout(layout)
+        header = QFrame()
+        header.setObjectName("DashboardHeader")
+        header_layout = QVBoxLayout(header)
+        header_layout.setContentsMargins(18, 15, 18, 15)
+        header_layout.setSpacing(4)
+        header_layout.addWidget(self.title_label)
+        header_layout.addWidget(self.subtitle_label)
+
+        content_layout.addWidget(header)
+        content_layout.addWidget(self.summary_card)
+        content_layout.addLayout(self.cards_grid)
+        content_layout.addStretch()
+
+        scroll = QScrollArea()
+        scroll.setObjectName("DashboardScroll")
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll.setWidget(content)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(scroll)
+
+    def resizeEvent(self, event: QEvent) -> None:
+        compact = event.size().width() < self.RESPONSIVE_BREAKPOINT
+        target = (1, 0) if compact else (0, 1)
+        index = self.cards_grid.indexOf(self.findings_preview_card)
+        current = self.cards_grid.getItemPosition(index)[:2]
+        if current != target:
+            self.cards_grid.removeWidget(self.findings_preview_card)
+            self.cards_grid.addWidget(self.findings_preview_card, *target)
+        super().resizeEvent(event)
 
     def update_analysis(self, result: AnalysisResult) -> None:
         self.current_result = result
