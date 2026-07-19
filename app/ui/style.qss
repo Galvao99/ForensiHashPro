@@ -3325,3 +3325,95 @@ QLabel#StructureMutedText {
     color: #71819C;
     font-size: 12px;
 }
+
+QPushButton#TechnicalMetricBadge {
+    padding: 0;
+    margin: 0;
+    min-height: 0;
+    max-height: 34px;
+    border: 1px solid #2A3B52;
+    border-radius: 7px;
+    background: #152337;
+    text-align: left;
+}
+
+QPushButton#TechnicalMetricBadge:hover {
+    padding: 0;
+    border-color: #4B6382;
+    border-radius: 7px;
+    background: #192A40;
+    text-align: left;
+}
+
+QPushButton#TechnicalMetricBadge:checked {
+    padding: 0;
+    border-color: #6686AE;
+    border-radius: 7px;
+    background: #1C3049;
+    text-align: left;
+}
+
+QPushButton#TechnicalMetricBadge[detected="false"] {
+    background: #111D2C;
+    border-color: #24344A;
+}
+
+QLabel#TechnicalMetricValue {
+    color: #E5EDF7;
+    font-size: 11px;
+    font-weight: 700;
+    background: transparent;
+}
+
+QLabel#TechnicalMetricLabel {
+    color: #98A8BD;
+    font-size: 11px;
+    background: transparent;
+}
+
+QLabel#TechnicalMetricInfoIcon {
+    color: #7890AE;
+    font-size: 11px;
+    background: transparent;
+}
+
+QFrame#ConceptExplanationPanel {
+    background: #111E2F;
+    border: 1px solid #293B52;
+    border-radius: 7px;
+}
+
+QLabel#ConceptExplanationTitle {
+    color: #DCE6F2;
+    font-size: 12px;
+    font-weight: 700;
+    background: transparent;
+    border: none;
+}
+
+QLabel#ConceptExplanationText {
+    color: #9EADC0;
+    font-size: 12px;
+    background: transparent;
+    border: none;
+}
+
+QPushButton#ConceptExplanationClose {
+    padding: 3px 7px;
+    min-height: 0;
+    max-height: 24px;
+    border: none;
+    border-radius: 5px;
+    background: transparent;
+    color: #8FA2BA;
+    text-align: center;
+}
+
+QPushButton#ConceptExplanationClose:hover {
+    padding: 3px 7px;
+    border: none;
+    border-radius: 5px;
+    background: #1C2B3F;
+    color: #DCE6F2;
+    text-align: center;
+}
