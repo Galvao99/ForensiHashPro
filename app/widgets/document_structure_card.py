@@ -1,12 +1,15 @@
-from PySide6.QtWidgets import QLabel, QVBoxLayout, QWidget
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QLabel, QPushButton, QVBoxLayout, QWidget
 
 from app.knowledge.pdf_structure_concepts import get_pdf_structure_concept
 from app.models.pdf_raw_analysis_result import PdfRawAnalysisResult
+from app.presentation.pdf_raw_technical_formatter import PdfRawTechnicalFormatter
 from app.widgets.base_card import BaseCard
 from app.widgets.concept_explanation_panel import ConceptExplanationPanel
 from app.widgets.finding_card import FindingCard
 from app.widgets.flow_layout import FlowLayout
 from app.widgets.technical_metric_badge import TechnicalMetricBadge
+from app.widgets.raw_technical_data_panel import RawTechnicalDataPanel
 
 
 class DocumentStructureCard(BaseCard):
@@ -14,8 +17,8 @@ class DocumentStructureCard(BaseCard):
 
     FEATURES = (
         ("JavaScript", "has_javascript", "javascript"),
-        ("Criptografia", "encrypted", "encryption"),
-        ("Arquivos incorporados", "has_embedded_files", "embedded_files"),
+        ("Encrypt", "encrypted", "encryption"),
+        ("EmbeddedFile", "has_embedded_files", "embedded_files"),
         ("OpenAction", "has_open_action", "open_action"),
         ("Additional Actions", "has_additional_actions", "additional_actions"),
         ("AcroForm", "has_acroform", "acroform"),
@@ -39,20 +42,42 @@ class DocumentStructureCard(BaseCard):
         content_layout.setContentsMargins(0, 0, 0, 0)
         content_layout.setSpacing(14)
 
+        self.raw_formatter = PdfRawTechnicalFormatter()
+        self._raw_technical_text = ""
+
         self.summary_layout = FlowLayout()
         self.features_layout = FlowLayout()
         self.explanation_panel = ConceptExplanationPanel()
         self.explanation_panel.close_requested.connect(self._close_explanation)
+        self.interaction_hint = QLabel(
+            "Selecione um item para visualizar sua definição técnica."
+        )
+        self.interaction_hint.setObjectName("StructureInteractionHint")
+        self.interaction_hint.setWordWrap(True)
         self.findings_layout = QVBoxLayout()
         self.findings_layout.setSpacing(9)
+
+        self.raw_toggle_button = QPushButton("Examinar estrutura técnica")
+        self.raw_toggle_button.setObjectName("RawTechnicalToggleButton")
+        self.raw_toggle_button.setCheckable(True)
+        self.raw_toggle_button.setCursor(Qt.PointingHandCursor)
+        self.raw_toggle_button.clicked.connect(self._toggle_raw_panel)
+        self.raw_panel = RawTechnicalDataPanel()
+        self.raw_panel.close_requested.connect(self._close_raw_panel)
 
         content_layout.addWidget(self._section_title("Resumo estrutural"))
         content_layout.addLayout(self.summary_layout)
         content_layout.addWidget(self._section_title("Recursos analisados"))
         content_layout.addLayout(self.features_layout)
+        content_layout.addWidget(self.interaction_hint)
         content_layout.addWidget(self.explanation_panel)
         content_layout.addWidget(self._section_title("Findings estruturais"))
         content_layout.addLayout(self.findings_layout)
+        content_layout.addWidget(
+            self.raw_toggle_button,
+            alignment=Qt.AlignLeft,
+        )
+        content_layout.addWidget(self.raw_panel)
 
         self.body_layout.addWidget(self.empty_label)
         self.body_layout.addWidget(self.content)
@@ -68,6 +93,7 @@ class DocumentStructureCard(BaseCard):
 
     def update_result(self, result: PdfRawAnalysisResult | None) -> None:
         self._close_explanation()
+        self._reset_raw_panel()
         self._clear_layout(self.summary_layout)
         self._clear_layout(self.features_layout)
         self._clear_layout(self.findings_layout)
@@ -78,22 +104,29 @@ class DocumentStructureCard(BaseCard):
         if result is None:
             return
 
+        self._raw_technical_text = self.raw_formatter.format(result)
+        self.raw_panel.set_text(self._raw_technical_text)
+
         summary = (
-            (result.version or "Não identificada", "PDF", "pdf_version"),
+            (
+                f"PDF {result.version}" if result.version else "Não identificada",
+                "Versão",
+                "pdf_version",
+            ),
             (
                 str(len(result.objects)),
-                self._plural(len(result.objects), "objeto", "objetos"),
+                self._plural(len(result.objects), "Objeto", "Objetos"),
                 "objects",
             ),
             (
                 str(result.stream_count),
-                self._plural(result.stream_count, "stream", "streams"),
+                self._plural(result.stream_count, "Stream", "Streams"),
                 "streams",
             ),
             (
                 str(len(result.trailer_offsets)),
                 self._plural(
-                    len(result.trailer_offsets), "trailer", "trailers"
+                    len(result.trailer_offsets), "Trailer", "Trailers"
                 ),
                 "trailer",
             ),
@@ -106,18 +139,16 @@ class DocumentStructureCard(BaseCard):
                 value,
                 label,
                 key,
-                label_first=key == "pdf_version",
             )
 
         for label, attribute, key in self.FEATURES:
             detected = bool(getattr(result, attribute))
             self._add_badge(
                 self.features_layout,
-                "detectado" if detected else "não detectado",
+                "Detectado" if detected else "Não detectado",
                 label,
                 key,
                 detected,
-                label_first=True,
             )
 
         if result.findings:
@@ -167,6 +198,25 @@ class DocumentStructureCard(BaseCard):
             self._selected_badge.setChecked(False)
         self._selected_badge = None
         self.explanation_panel.clear()
+
+    def _toggle_raw_panel(self, checked: bool) -> None:
+        if checked:
+            self.raw_panel.open_panel()
+            self.raw_toggle_button.setText("Ocultar estrutura técnica")
+        else:
+            self.raw_panel.close_panel()
+            self.raw_toggle_button.setText("Examinar estrutura técnica")
+
+    def _close_raw_panel(self) -> None:
+        self.raw_toggle_button.setChecked(False)
+        self.raw_toggle_button.setText("Examinar estrutura técnica")
+        self.raw_panel.close_panel()
+
+    def _reset_raw_panel(self) -> None:
+        self._raw_technical_text = ""
+        self.raw_toggle_button.setChecked(False)
+        self.raw_toggle_button.setText("Examinar estrutura técnica")
+        self.raw_panel.clear()
 
     @staticmethod
     def _plural(count: int, singular: str, plural: str) -> str:

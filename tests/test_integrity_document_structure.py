@@ -86,9 +86,25 @@ def test_document_structure_card_creates_summary_badges(qt_app) -> None:
     }
 
     assert summary_keys <= {item.concept_key for item in card.badges}
-    assert badge(card, "pdf_version").value_label.text() == "1.7"
-    assert badge(card, "objects").label_label.text() == "objeto"
+    assert badge(card, "pdf_version").value_label.text() == "PDF 1.7"
+    assert badge(card, "pdf_version").label_label.text() == "Versão"
+    assert badge(card, "objects").label_label.text() == "Objeto"
     assert badge(card, "eof").value_label.text() == "2"
+
+
+def test_badge_preserves_complete_text_and_usable_size(qt_app) -> None:
+    item = TechnicalMetricBadge(
+        "Não detectado",
+        "Additional Actions",
+        "additional_actions",
+        detected=False,
+    )
+
+    assert item.value_label.text() == "Não detectado"
+    assert item.label_label.text() == "Additional Actions"
+    assert item.minimumSizeHint().width() >= 118
+    assert item.minimumSizeHint().height() >= 58
+    assert item.sizeHint().width() >= item.minimumSizeHint().width()
 
 
 def test_document_structure_card_creates_present_and_absent_feature_badges(
@@ -96,10 +112,13 @@ def test_document_structure_card_creates_present_and_absent_feature_badges(
 ) -> None:
     card = shown_card(qt_app)
 
-    assert badge(card, "javascript").value_label.text() == "detectado"
+    assert badge(card, "javascript").value_label.text() == "Detectado"
     assert badge(card, "javascript").property("detected") is True
-    assert badge(card, "xfa").value_label.text() == "não detectado"
+    assert badge(card, "xfa").value_label.text() == "Não detectado"
     assert badge(card, "xfa").property("detected") is False
+    assert badge(card, "javascript").property("detected") is not badge(
+        card, "xfa"
+    ).property("detected")
     assert len(card.badges) == 13
 
 
@@ -153,9 +172,9 @@ def test_updating_result_clears_selection_and_previous_badges(qt_app) -> None:
     assert card.selected_concept_key is None
     assert not card.explanation_panel.isVisible()
     assert previous not in card.badges
-    assert badge(card, "pdf_version").value_label.text() == "2.0"
-    assert badge(card, "javascript").value_label.text() == "não detectado"
-    assert badge(card, "xfa").value_label.text() == "detectado"
+    assert badge(card, "pdf_version").value_label.text() == "PDF 2.0"
+    assert badge(card, "javascript").value_label.text() == "Não detectado"
+    assert badge(card, "xfa").value_label.text() == "Detectado"
 
 
 def test_update_none_closes_panel_and_shows_neutral_state(qt_app) -> None:
@@ -176,6 +195,56 @@ def test_findings_continue_to_be_displayed(qt_app) -> None:
 
     assert "Múltiplos marcadores EOF" in visible_text(card)
     assert "Foram observados dois marcadores EOF." in visible_text(card)
+
+
+def test_interaction_hint_is_always_present_with_result(qt_app) -> None:
+    card = shown_card(qt_app)
+
+    assert card.interaction_hint.isVisibleTo(card)
+    assert card.interaction_hint.objectName() == "StructureInteractionHint"
+    assert "Selecione um item" in card.interaction_hint.text()
+
+
+def test_raw_technical_toggle_opens_and_closes_panel(qt_app) -> None:
+    card = shown_card(qt_app)
+
+    assert card.raw_toggle_button.isVisibleTo(card)
+    assert not card.raw_panel.isVisible()
+    card.raw_toggle_button.click()
+    assert card.raw_panel.isVisibleTo(card)
+    assert card.raw_toggle_button.text() == "Ocultar estrutura técnica"
+    assert card.raw_panel.technical_text() == card._raw_technical_text
+
+    card.raw_toggle_button.click()
+    assert not card.raw_panel.isVisible()
+    assert card.raw_toggle_button.text() == "Examinar estrutura técnica"
+
+
+def test_raw_panel_close_and_result_change_synchronize_toggle(qt_app) -> None:
+    card = shown_card(qt_app)
+    card.raw_toggle_button.click()
+    card.raw_panel.close_button.click()
+
+    assert not card.raw_toggle_button.isChecked()
+    assert not card.raw_panel.isVisible()
+
+    card.raw_toggle_button.click()
+    previous_text = card.raw_panel.technical_text()
+    card.update_result(pdf_result(version="2.0"))
+    assert not card.raw_toggle_button.isChecked()
+    assert not card.raw_panel.isVisible()
+    assert card.raw_panel.technical_text() != previous_text
+
+
+def test_update_none_hides_toggle_and_clears_raw_panel(qt_app) -> None:
+    card = shown_card(qt_app)
+    card.raw_toggle_button.click()
+    card.update_result(None)
+
+    assert not card.raw_toggle_button.isVisibleTo(card)
+    assert not card.raw_panel.isVisible()
+    assert card.raw_panel.technical_text() == ""
+    assert not card.raw_panel.copy_button.isEnabled()
 
 
 def test_integrity_page_uses_embedded_analysis_and_selected_file(qt_app) -> None:
@@ -207,7 +276,7 @@ def test_integrity_page_uses_embedded_analysis_and_selected_file(qt_app) -> None
     page.update_analysis(result)
 
     assert page.structure_card.content.isVisibleTo(page.structure_card)
-    assert badge(page.structure_card, "pdf_version").value_label.text() == "1.7"
+    assert badge(page.structure_card, "pdf_version").value_label.text() == "PDF 1.7"
     assert page.current_file_badge.file_name == result.file_info.name
     assert page.current_file_badge.toolTip() == result.file_info.name
 

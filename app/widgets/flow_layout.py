@@ -37,7 +37,7 @@ class FlowLayout(QLayout):
         return True
 
     def heightForWidth(self, width: int) -> int:
-        return self._arrange(QRect(0, 0, width, 0), test_only=True)
+        return self._arrange(QRect(0, 0, max(0, width), 0), test_only=True)
 
     def setGeometry(self, rect: QRect) -> None:
         super().setGeometry(rect)
@@ -61,13 +61,17 @@ class FlowLayout(QLayout):
         effective = rect.adjusted(
             margins.left(), margins.top(), -margins.right(), -margins.bottom()
         )
+        available_width = max(0, effective.width())
         x = effective.x()
         y = effective.y()
         line_height = 0
         for item in self._items:
-            hint = item.sizeHint()
+            hint = item.sizeHint().expandedTo(item.minimumSize())
+            hint.setWidth(max(0, hint.width()))
+            hint.setHeight(max(0, hint.height()))
             next_x = x + hint.width() + self._horizontal_spacing
-            if next_x - self._horizontal_spacing > effective.right() and line_height:
+            used_width = next_x - self._horizontal_spacing - effective.x()
+            if used_width > available_width and line_height:
                 x = effective.x()
                 y += line_height + self._vertical_spacing
                 next_x = x + hint.width() + self._horizontal_spacing
@@ -76,4 +80,6 @@ class FlowLayout(QLayout):
                 item.setGeometry(QRect(QPoint(x, y), hint))
             x = next_x
             line_height = max(line_height, hint.height())
-        return y + line_height - rect.y() + margins.bottom()
+        if not self._items:
+            return margins.top() + margins.bottom()
+        return max(0, y + line_height - rect.y() + margins.bottom())

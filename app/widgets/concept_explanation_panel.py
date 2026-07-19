@@ -4,6 +4,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QPushButton,
+    QSizePolicy,
     QVBoxLayout,
     QWidget,
 )
@@ -17,6 +18,7 @@ class ConceptExplanationPanel(QFrame):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setObjectName("ConceptExplanationPanel")
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Minimum)
         self.setVisible(False)
 
         header = QHBoxLayout()
@@ -35,8 +37,8 @@ class ConceptExplanationPanel(QFrame):
         self.description_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(12, 10, 12, 10)
-        layout.setSpacing(6)
+        layout.setContentsMargins(14, 12, 14, 12)
+        layout.setSpacing(8)
         layout.addLayout(header)
         layout.addWidget(self.description_label)
 

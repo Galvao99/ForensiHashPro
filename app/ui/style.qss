@@ -3329,28 +3329,26 @@ QLabel#StructureMutedText {
 QPushButton#TechnicalMetricBadge {
     padding: 0;
     margin: 0;
-    min-height: 0;
-    max-height: 34px;
-    border: 1px solid #2A3B52;
-    border-radius: 7px;
+    min-width: 118px;
+    min-height: 58px;
+    border: 1px solid #304159;
+    border-radius: 9px;
     background: #152337;
     text-align: left;
 }
 
 QPushButton#TechnicalMetricBadge:hover {
-    padding: 0;
     border-color: #4B6382;
-    border-radius: 7px;
     background: #192A40;
-    text-align: left;
 }
 
-QPushButton#TechnicalMetricBadge:checked {
-    padding: 0;
-    border-color: #6686AE;
-    border-radius: 7px;
-    background: #1C3049;
-    text-align: left;
+QPushButton#TechnicalMetricBadge:focus {
+    border-color: #7895B8;
+}
+
+QPushButton#TechnicalMetricBadge[detected="true"] {
+    background: #17283D;
+    border-color: #38516E;
 }
 
 QPushButton#TechnicalMetricBadge[detected="false"] {
@@ -3358,15 +3356,20 @@ QPushButton#TechnicalMetricBadge[detected="false"] {
     border-color: #24344A;
 }
 
+QPushButton#TechnicalMetricBadge:checked {
+    border-color: #6686AE;
+    background: #1C3049;
+}
+
 QLabel#TechnicalMetricValue {
     color: #E5EDF7;
-    font-size: 11px;
-    font-weight: 700;
+    font-size: 14px;
+    font-weight: 800;
     background: transparent;
 }
 
 QLabel#TechnicalMetricLabel {
-    color: #98A8BD;
+    color: #9DADC1;
     font-size: 11px;
     background: transparent;
 }
@@ -3379,14 +3382,14 @@ QLabel#TechnicalMetricInfoIcon {
 
 QFrame#ConceptExplanationPanel {
     background: #111E2F;
-    border: 1px solid #293B52;
-    border-radius: 7px;
+    border: 1px solid #30435C;
+    border-radius: 9px;
 }
 
 QLabel#ConceptExplanationTitle {
     color: #DCE6F2;
-    font-size: 12px;
-    font-weight: 700;
+    font-size: 13px;
+    font-weight: 800;
     background: transparent;
     border: none;
 }
@@ -3399,9 +3402,9 @@ QLabel#ConceptExplanationText {
 }
 
 QPushButton#ConceptExplanationClose {
-    padding: 3px 7px;
-    min-height: 0;
-    max-height: 24px;
+    padding: 3px 8px;
+    min-height: 22px;
+    max-height: 26px;
     border: none;
     border-radius: 5px;
     background: transparent;
@@ -3410,10 +3413,203 @@ QPushButton#ConceptExplanationClose {
 }
 
 QPushButton#ConceptExplanationClose:hover {
-    padding: 3px 7px;
     border: none;
     border-radius: 5px;
     background: #1C2B3F;
     color: #DCE6F2;
     text-align: center;
+}
+
+/* =========================================================
+   ESTRUTURA TÉCNICA BRUTA DO PDF
+   ========================================================= */
+
+QPushButton#RawTechnicalToggleButton {
+    min-height: 36px;
+    max-height: 36px;
+
+    padding: 0 12px;
+
+    text-align: center;
+
+    background-color: transparent;
+
+    color: #93C5FD;
+
+    border: 1px solid #315A86;
+    border-radius: 8px;
+
+    font-size: 12px;
+    font-weight: 700;
+}
+
+QPushButton#RawTechnicalToggleButton:hover {
+    background-color: rgba(59, 130, 246, 0.08);
+
+    color: #FFFFFF;
+
+    border-color: #4F8FD8;
+}
+
+QPushButton#RawTechnicalToggleButton:checked {
+    background-color: rgba(37, 99, 235, 0.12);
+
+    color: #DBEAFE;
+
+    border-color: #3B82F6;
+}
+
+QPushButton#RawTechnicalToggleButton:focus {
+    outline: none;
+}
+
+
+QFrame#RawTechnicalDataPanel {
+    background-color: #0B1220;
+
+    border: 1px solid #26354B;
+    border-radius: 10px;
+}
+
+
+QLabel#RawTechnicalTitle {
+    background: transparent;
+
+    color: #E8EEF8;
+
+    border: none;
+
+    font-size: 13px;
+    font-weight: 700;
+}
+
+
+QPlainTextEdit#RawTechnicalText {
+    background-color: #080E19;
+
+    color: #C9D6E8;
+
+    border: 1px solid #202E43;
+    border-radius: 8px;
+
+    padding: 10px;
+
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 11px;
+
+    selection-background-color: #2563EB;
+    selection-color: #FFFFFF;
+}
+
+
+QPushButton#RawTechnicalCopyButton,
+QPushButton#RawTechnicalCloseButton {
+    min-height: 30px;
+    max-height: 30px;
+
+    padding: 0 10px;
+
+    text-align: center;
+
+    background-color: transparent;
+
+    color: #9FB3CE;
+
+    border: 1px solid #33445D;
+    border-radius: 7px;
+
+    font-size: 11px;
+    font-weight: 700;
+}
+
+
+QPushButton#RawTechnicalCopyButton:hover,
+QPushButton#RawTechnicalCloseButton:hover {
+    background-color: #172235;
+
+    color: #FFFFFF;
+
+    border-color: #4A607D;
+}
+
+
+QPushButton#RawTechnicalCopyButton:disabled {
+    background-color: transparent;
+
+    color: #526176;
+
+    border-color: #263347;
+}
+
+
+QPushButton#RawTechnicalCopyButton:focus,
+QPushButton#RawTechnicalCloseButton:focus {
+    outline: none;
+}
+
+
+QPlainTextEdit#RawTechnicalText QScrollBar:vertical {
+    width: 9px;
+
+    background: transparent;
+
+    margin: 2px;
+}
+
+
+QPlainTextEdit#RawTechnicalText QScrollBar::handle:vertical {
+    min-height: 28px;
+
+    background-color: #334155;
+
+    border-radius: 4px;
+}
+
+
+QPlainTextEdit#RawTechnicalText QScrollBar::handle:vertical:hover {
+    background-color: #475569;
+}
+
+
+QPlainTextEdit#RawTechnicalText QScrollBar::add-line:vertical,
+QPlainTextEdit#RawTechnicalText QScrollBar::sub-line:vertical {
+    height: 0;
+    background: transparent;
+}
+
+
+QPlainTextEdit#RawTechnicalText QScrollBar:horizontal {
+    height: 9px;
+
+    background: transparent;
+
+    margin: 2px;
+}
+
+
+QPlainTextEdit#RawTechnicalText QScrollBar::handle:horizontal {
+    min-width: 28px;
+
+    background-color: #334155;
+
+    border-radius: 4px;
+}
+
+
+QPlainTextEdit#RawTechnicalText QScrollBar::handle:horizontal:hover {
+    background-color: #475569;
+}
+
+
+QPlainTextEdit#RawTechnicalText QScrollBar::add-line:horizontal,
+QPlainTextEdit#RawTechnicalText QScrollBar::sub-line:horizontal {
+    width: 0;
+    background: transparent;
+}
+
+QLabel#StructureInteractionHint {
+    color: #7F90A8;
+    font-size: 11px;
+    background: transparent;
+    border: none;
 }
