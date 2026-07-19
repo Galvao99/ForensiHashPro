@@ -1,4 +1,4 @@
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QEvent, Qt
 from PySide6.QtWidgets import (
     QButtonGroup,
     QFrame,
@@ -6,6 +6,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QPushButton,
     QScrollArea,
+    QSplitter,
     QVBoxLayout,
     QWidget,
 )
@@ -16,6 +17,7 @@ from app.widgets.file_investigation_panel import (
     FileInvestigationPanel,
 )
 from app.widgets.finding_card import FindingCard
+from app.widgets.flow_layout import FlowLayout
 
 
 class FindingPage(QWidget):
@@ -28,6 +30,7 @@ class FindingPage(QWidget):
     FILTER_ALERTS = "alerts"
     FILTER_SUCCESS = "success"
     FILTER_INFO = "info"
+    RESPONSIVE_BREAKPOINT = 1040
 
     CATEGORY_ORDER = (
         "ocr",
@@ -77,8 +80,10 @@ class FindingPage(QWidget):
             self._build_header()
         )
 
-        body = QHBoxLayout()
-        body.setSpacing(16)
+        self.body_splitter = QSplitter(Qt.Horizontal)
+        self.body_splitter.setObjectName("FindingBodySplitter")
+        self.body_splitter.setChildrenCollapsible(False)
+        self.body_splitter.setHandleWidth(8)
 
         self.left_scroll = QScrollArea()
         self.left_scroll.setObjectName(
@@ -116,20 +121,20 @@ class FindingPage(QWidget):
         )
 
         self.file_panel = FileInvestigationPanel()
+        self.details_scroll = QScrollArea()
+        self.details_scroll.setObjectName("FindingRightScroll")
+        self.details_scroll.setWidgetResizable(True)
+        self.details_scroll.setFrameShape(QFrame.NoFrame)
+        self.details_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.details_scroll.setWidget(self.file_panel)
 
-        body.addWidget(
-            self.left_scroll,
-            stretch=1,
-        )
-        body.addWidget(
-            self.file_panel,
-            stretch=0,
-        )
+        self.body_splitter.addWidget(self.left_scroll)
+        self.body_splitter.addWidget(self.details_scroll)
+        self.body_splitter.setStretchFactor(0, 1)
+        self.body_splitter.setStretchFactor(1, 0)
+        self.body_splitter.setSizes([760, 390])
 
-        root.addLayout(
-            body,
-            stretch=1,
-        )
+        root.addWidget(self.body_splitter, stretch=1)
 
     def _build_header(self) -> QWidget:
         container = QFrame()
@@ -165,8 +170,13 @@ class FindingPage(QWidget):
         layout.addWidget(title)
         layout.addWidget(subtitle)
 
-        summary_layout = QHBoxLayout()
-        summary_layout.setSpacing(8)
+        summary_container = QWidget()
+        summary_container.setObjectName("FindingTransparentContainer")
+        summary_layout = FlowLayout(
+            summary_container,
+            horizontal_spacing=8,
+            vertical_spacing=8,
+        )
 
         self.summary_group = QButtonGroup(self)
         self.summary_group.setExclusive(True)
@@ -208,8 +218,7 @@ class FindingPage(QWidget):
 
             summary_layout.addWidget(button)
 
-        summary_layout.addStretch()
-        layout.addLayout(summary_layout)
+        layout.addWidget(summary_container)
 
         return container
 
@@ -296,6 +305,24 @@ class FindingPage(QWidget):
 
         self._collect_findings()
         self._render()
+
+    def resizeEvent(self, event: QEvent) -> None:
+        self._apply_responsive_layout(event.size().width())
+        super().resizeEvent(event)
+
+    def _apply_responsive_layout(self, width: int) -> None:
+        compact = width < self.RESPONSIVE_BREAKPOINT
+        orientation = Qt.Vertical if compact else Qt.Horizontal
+
+        if self.body_splitter.orientation() == orientation:
+            return
+
+        self.body_splitter.setOrientation(orientation)
+        self.file_panel.setMinimumWidth(0 if compact else 350)
+        self.file_panel.setMaximumWidth(16777215 if compact else 440)
+        self.details_scroll.setMinimumWidth(0 if compact else 350)
+        self.details_scroll.setMaximumWidth(16777215 if compact else 440)
+        self.body_splitter.setSizes([620, 330] if compact else [760, 390])
 
     def set_display_paths(self, paths: list[object]) -> None:
         self.display_paths = list(paths)
@@ -793,18 +820,32 @@ class FindingPage(QWidget):
         )
         layout.setSpacing(8)
 
-        title = QLabel(
-            "Nenhuma informação neste filtro"
-        )
+        if self.current_result is None:
+            title_text = "Selecione um arquivo analisado"
+            description_text = (
+                "Os vestígios técnicos e as correlações do arquivo "
+                "selecionado serão apresentados aqui."
+            )
+        elif self.findings:
+            title_text = "Nenhum vestígio corresponde ao filtro"
+            description_text = (
+                "Selecione outro indicador para consultar os demais "
+                "resultados técnicos."
+            )
+        else:
+            title_text = "Nenhum vestígio técnico identificado"
+            description_text = (
+                "A análise foi concluída sem observações técnicas "
+                "disponíveis para este arquivo."
+            )
+
+        title = QLabel(title_text)
         title.setObjectName(
             "FindingEmptyTitle"
         )
         title.setAlignment(Qt.AlignCenter)
 
-        description = QLabel(
-            "Selecione outro indicador para visualizar "
-            "os demais resultados."
-        )
+        description = QLabel(description_text)
         description.setObjectName(
             "FindingEmptyDescription"
         )

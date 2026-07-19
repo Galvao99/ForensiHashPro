@@ -3,10 +3,10 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import QEvent, Qt, Signal
 from PySide6.QtWidgets import (
+    QBoxLayout,
     QFrame,
-    QGridLayout,
     QHBoxLayout,
     QLabel,
     QPushButton,
@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
 )
 
 from app.widgets.badge_widget import BadgeWidget
+from app.widgets.flow_layout import FlowLayout
 
 
 class FindingCard(QFrame):
@@ -58,6 +59,8 @@ class FindingCard(QFrame):
             QSizePolicy.Minimum,
         )
 
+        self._relation_layout: QBoxLayout | None = None
+        self._relation_arrow: QLabel | None = None
         self._build_ui()
 
     def _build_ui(self) -> None:
@@ -161,34 +164,16 @@ class FindingCard(QFrame):
             "FindingTransparentContainer"
         )
 
-        grid = QGridLayout(container)
-        grid.setContentsMargins(0, 0, 0, 0)
-        grid.setHorizontalSpacing(7)
-        grid.setVerticalSpacing(7)
-
-        columns = 4
+        flow = FlowLayout(container)
 
         for index, badge in enumerate(badges):
-            row = index // columns
-            column = index % columns
-
             widget = BadgeWidget(badge)
             widget.setSizePolicy(
                 QSizePolicy.Maximum,
                 QSizePolicy.Fixed,
             )
 
-            grid.addWidget(
-                widget,
-                row,
-                column,
-                alignment=Qt.AlignLeft | Qt.AlignTop,
-            )
-
-        for column in range(columns):
-            grid.setColumnStretch(column, 0)
-
-        grid.setColumnStretch(columns, 1)
+            flow.addWidget(widget)
 
         return container
 
@@ -214,9 +199,10 @@ class FindingCard(QFrame):
             QSizePolicy.Minimum,
         )
 
-        layout = QHBoxLayout(container)
+        layout = QBoxLayout(QBoxLayout.LeftToRight, container)
         layout.setContentsMargins(12, 9, 12, 9)
         layout.setSpacing(8)
+        self._relation_layout = layout
 
         if source_file:
             source = QLabel(str(source_file))
@@ -236,6 +222,7 @@ class FindingCard(QFrame):
             arrow.setObjectName("FindingRelationArrow")
             arrow.setAlignment(Qt.AlignCenter)
             layout.addWidget(arrow)
+            self._relation_arrow = arrow
 
         if target_file:
             target = QLabel(str(target_file))
@@ -251,6 +238,16 @@ class FindingCard(QFrame):
             layout.addWidget(target, stretch=1)
 
         return container
+
+    def resizeEvent(self, event: QEvent) -> None:
+        if self._relation_layout is not None:
+            compact = event.size().width() < 520
+            self._relation_layout.setDirection(
+                QBoxLayout.TopToBottom if compact else QBoxLayout.LeftToRight
+            )
+            if self._relation_arrow is not None:
+                self._relation_arrow.setText("↓" if compact else "→")
+        super().resizeEvent(event)
 
     def _build_details_section(
         self,

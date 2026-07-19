@@ -2655,6 +2655,20 @@ QScrollArea#FindingRightScroll > QWidget > QWidget {
     background: transparent;
 }
 
+QSplitter#FindingBodySplitter {
+    background: transparent;
+    border: none;
+}
+
+QSplitter#FindingBodySplitter::handle {
+    background: transparent;
+}
+
+QSplitter#FindingBodySplitter::handle:hover {
+    background-color: rgba(78, 143, 216, 0.24);
+    border-radius: 3px;
+}
+
 /* Seções */
 
 QFrame#InvestigationSection {
@@ -2862,6 +2876,26 @@ QLabel#FindingEmptyTitle {
 
 QLabel#FindingEmptyDescription {
     color: #8F9AAF;
+    font-size: 12px;
+}
+
+/* Visão geral: refinamento moderado e conteúdo adaptável */
+
+QScrollArea#DashboardScroll,
+QScrollArea#DashboardScroll > QWidget > QWidget,
+QWidget#DashboardContent {
+    background: transparent;
+    border: none;
+}
+
+QFrame#DashboardHeader {
+    background-color: #141C2B;
+    border: 1px solid #273247;
+    border-radius: 12px;
+}
+
+QLabel#DashboardSubtitle {
+    color: #94A3B8;
     font-size: 12px;
 }
 
