@@ -1,0 +1,25 @@
+{
+  "transaction": {
+    "provider": "Aware",
+    "product": "Knomi",
+    "version": "1.0",
+    "workflow": "passive-liveness",
+    "analysisDate": "2026-07-20T12:30:00Z",
+    "completedAt": "invalid-date"
+  },
+  "decisions": [
+    {"type": "liveness", "value": "LIVE"}
+  ],
+  "algorithms": [
+    {"name": "VendorLiveness", "version": "1", "result": "LIVE", "score": 0.98}
+  ],
+  "metrics": {
+    "imageWidth": {"value": 640, "unit": "pixels"},
+    "yaw": {"value": 1.5, "unit": "degrees"},
+    "vendorSpecificMetric": {"value": 7, "unit": "level"}
+  },
+  "evidence": [
+    {"type": "face_image", "reference": "frames/face-001.jpg", "mimeType": "image/jpeg"}
+  ],
+  "profileXml": "&lt;profile&gt;&lt;metric name=\"imageWidth\" min=\"600\" preferred=\"640\" max=\"800\" unit=\"pixels\" /&gt;&lt;metric name=\"yaw\" min=\"-10\" max=\"10\" unit=\"degrees\" /&gt;&lt;/profile&gt;"
+}

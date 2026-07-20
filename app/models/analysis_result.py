@@ -10,6 +10,7 @@ from app.models.json_analysis_result import JsonAnalysisResult
 from app.models.magic_number_result import MagicNumberResult
 from app.models.reference import Reference
 from app.models.binary_analysis_result import BinaryAnalysisResult
+from app.models.biometric_report import BiometricReport
 
 
 @dataclass(frozen=True)
@@ -102,6 +103,8 @@ class AnalysisResult:
     json_analysis: JsonAnalysisResult | None = None
 
     binary_analysis: BinaryAnalysisResult | None = None
+
+    biometric_report: BiometricReport | None = None
 
     @property
     def has_extracted_text(self) -> bool:

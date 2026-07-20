@@ -1,5 +1,7 @@
 from PySide6.QtCore import QPoint, QRect, QSize, Qt
 from PySide6.QtWidgets import QLayout, QLayoutItem, QWidget
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QLayout
 
 
 class FlowLayout(QLayout):
@@ -31,7 +33,7 @@ class FlowLayout(QLayout):
         return self._items.pop(index) if 0 <= index < len(self._items) else None
 
     def expandingDirections(self) -> Qt.Orientations:
-        return Qt.Orientations()
+        return Qt.Orientation(0)
 
     def hasHeightForWidth(self) -> bool:
         return True

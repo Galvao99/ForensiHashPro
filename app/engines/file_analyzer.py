@@ -10,7 +10,14 @@ from app.engines.pdf_structure_engine import PDFStructureEngine
 from app.models import AnalysisResult, FileInfo
 from app.models.integrity_result import IntegrityResult
 from app.models.json_analysis_result import JsonAnalysisResult
+from app.models.biometric_report import BiometricReport
 from app.services.json_parser_service import JsonParserService
+from app.services.biometric_report_exceptions import (
+    BiometricReportError,
+    InvalidBiometricJsonError,
+    UnrecognizedBiometricReportError,
+)
+from app.services.biometric_report_service import BiometricReportService
 from app.engines.binary_structure_engine import BinaryStructureEngine
 
 
@@ -38,6 +45,7 @@ class FileAnalyzer:
         pdf_structure_engine: PDFStructureEngine,
         json_parser_service: JsonParserService | None = None,
         binary_structure_engine: BinaryStructureEngine | None = None,
+        biometric_report_service: BiometricReportService | None = None,
     ) -> None:
         self.hash_engine = hash_engine
         self.metadata_engine = metadata_engine
@@ -46,6 +54,7 @@ class FileAnalyzer:
         self.digital_signature_engine = digital_signature_engine
         self.pdf_structure_engine = pdf_structure_engine
         self.binary_structure_engine = binary_structure_engine
+        self.biometric_report_service = biometric_report_service
 
         self.json_parser_service = (
             json_parser_service
@@ -112,13 +121,16 @@ class FileAnalyzer:
             pdf_structure=pdf_structure,
         )
 
+        json_analysis = self._analyze_json(
+            file_path
+        )
+
+        biometric_report = self._analyze_biometric_report(file_path)
+
         findings = self.findings_engine.analyze(
             metadata=metadata,
             integrity=integrity,
-        )
-
-        json_analysis = self._analyze_json(
-            file_path
+            biometric_report=biometric_report,
         )
 
         binary_analysis = None
@@ -141,7 +153,31 @@ class FileAnalyzer:
             integrity=integrity,
             json_analysis=json_analysis,
             binary_analysis=binary_analysis,
+            biometric_report=biometric_report,
         )
+
+    def _analyze_biometric_report(
+        self,
+        file_path: Path,
+    ) -> BiometricReport | None:
+        if (
+            self.biometric_report_service is None
+            or file_path.suffix.lower() != ".json"
+        ):
+            return None
+        try:
+            return self.biometric_report_service.parse(file_path)
+        except (
+            InvalidBiometricJsonError,
+            UnrecognizedBiometricReportError,
+        ):
+            return None
+        except BiometricReportError as error:
+            print(
+                "Falha controlada durante a análise biométrica de "
+                f"{file_path.name}: {error}"
+            )
+            return None
 
     def _analyze_json(
         self,
