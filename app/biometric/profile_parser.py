@@ -12,7 +12,9 @@ class ProfileParseError(ValueError):
 
 
 class ProfileParser:
-    _LIMIT_KEYS = {"minimum", "min", "preferred", "maximum", "max"}
+    _LIMIT_KEYS = {
+        "minimum", "min", "preferred", "pref", "maximum", "max"
+    }
 
     def __init__(
         self,
@@ -58,7 +60,10 @@ class ProfileParser:
             minimum = self._number(
                 lowered.get("minimum", lowered.get("min")), name
             )
-            preferred = self._number(lowered.get("preferred"), name)
+            preferred = self._number(
+                lowered.get("preferred", lowered.get("pref")),
+                name,
+            )
             maximum = self._number(
                 lowered.get("maximum", lowered.get("max")), name
             )

@@ -58,10 +58,11 @@ class BiometricReportService:
         evaluations: list[BiometricConstraintEvaluation] = []
         for metric in report.metrics:
             for constraint in report.constraints:
-                names_match = (
-                    metric.canonical_name
-                    and metric.canonical_name == constraint.canonical_name
-                ) or metric.original_name == constraint.original_name
+                metric_name = metric.canonical_name or metric.original_name
+                constraint_name = (
+                    constraint.canonical_name or constraint.original_name
+                )
+                names_match = metric_name == constraint_name
                 if names_match:
                     evaluations.append(self.evaluator.evaluate(metric, constraint))
         return evaluations

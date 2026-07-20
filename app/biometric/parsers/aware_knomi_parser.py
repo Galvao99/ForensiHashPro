@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import PurePath
 from typing import Any
 
-from app.biometric.metric_normalization import normalize_aware_metric
+from app.biometric.metric_normalization import (
+    normalize_aware_metric,
+    normalize_aware_profile_metric,
+)
 from app.biometric.parsers.base_parser import BaseBiometricReportParser
 from app.biometric.profile_parser import ProfileParseError, ProfileParser
 from app.models.biometric_report import (
@@ -18,151 +22,260 @@ from app.models.biometric_report import (
 
 
 class AwareKnomiReportParser(BaseBiometricReportParser):
-    """Adaptador conservador para a estrutura Knomi suportada nesta versão."""
+    """Adaptador para a estrutura observada no relatório Knomi real."""
+
+    _VERSION = re.compile(
+        r"^Aware (?P<product>.+?), version "
+        r"(?P<version>\S+) (?P<revision>r\d+)$"
+    )
 
     def __init__(self, profile_parser: ProfileParser | None = None) -> None:
-        self.profile_parser = profile_parser or ProfileParser(normalize_aware_metric)
+        self.profile_parser = profile_parser or ProfileParser(
+            normalize_aware_profile_metric
+        )
 
     def recognizes(self, payload: Mapping[str, Any]) -> bool:
-        transaction = payload.get("transaction")
-        if not isinstance(transaction, Mapping):
-            return False
-        provider = str(transaction.get("provider", "")).strip().casefold()
-        product = str(transaction.get("product", "")).strip().casefold()
-        has_report_structure = any(
-            key in payload for key in ("decisions", "algorithms", "profileXml")
+        input_data = self._mapping(payload.get("input"))
+        workflow_data = self._mapping(input_data.get("workflow_data"))
+        result = self._mapping(payload.get("result"))
+        signals = (
+            "KnomiFaceLiveness" in str(payload.get("faceliveness_version", "")),
+            payload.get("server") == "face_liveness",
+            payload.get("task") == "analyze_video",
+            bool(workflow_data),
+            isinstance(result.get("algorithm_results"), list),
+            isinstance(result.get("liveness_result"), Mapping),
+            isinstance(result.get("captured_frame_metrics_result"), list),
         )
-        return provider == "aware" and "knomi" in product and has_report_structure
+        return sum(signals) >= 5 and all(signals[1:4])
 
     def parse(self, payload: Mapping[str, Any]) -> BiometricReport:
-        transaction = self._mapping(payload.get("transaction"))
+        input_data = self._mapping(payload.get("input"))
+        workflow_data = self._mapping(input_data.get("workflow_data"))
+        result = self._mapping(payload.get("result"))
+        face_version = self._version(payload.get("faceliveness_version"))
+        video_version = self._version(
+            payload.get("video_version"),
+            include_provider=True,
+        )
+        configured = self._configured_algorithms(workflow_data.get("algorithms"))
+        thresholds = {
+            algorithm.original_name: algorithm.threshold
+            for algorithm in configured
+        }
+        returned = self._algorithm_results(
+            result.get("algorithm_results"), thresholds
+        )
         report = BiometricReport(
-            provider=self._text(transaction.get("provider")),
-            product=self._text(transaction.get("product")),
-            version=self._text(transaction.get("version")),
-            workflow=self._text(transaction.get("workflow")),
+            provider="Aware",
+            product=face_version.get("product"),
+            version=face_version.get("version"),
+            workflow=self._text(workflow_data.get("workflow")),
+            algorithms=[*configured, *returned],
+            metrics=self._metrics(result.get("captured_frame_metrics_result")),
             raw_payload=payload,
         )
-        self._timestamps(transaction, report)
-        report.decisions = self._decisions(payload.get("decisions"))
-        report.algorithms = self._algorithms(payload.get("algorithms"))
-        report.metrics = self._metrics(payload.get("metrics"), "$.metrics")
-        report.metrics.extend(
-            metric
-            for algorithm in report.algorithms
-            for metric in algorithm.metrics
+        report.metadata = self._metadata(
+            payload, workflow_data, result, face_version, video_version
         )
-        report.evidences = self._evidences(payload.get("evidence"))
-
-        profile_xml = payload.get("profileXml")
-        report.has_profile = isinstance(profile_xml, str) and bool(profile_xml.strip())
-        if report.has_profile:
-            report.evidences.append(
-                BiometricEvidence(
-                    evidence_type="profile_xml",
-                    original_reference="embedded:profileXml",
-                    source_path="$.profileXml",
-                    raw_data=profile_xml,
-                )
-            )
-            try:
-                report.constraints = self.profile_parser.parse(profile_xml)
-            except ProfileParseError as error:
-                report.warnings.append(str(error))
+        self._timestamps(payload, workflow_data, report)
+        report.decisions = self._liveness(result.get("liveness_result"))
+        report.evidences = self._evidences(
+            payload.get("images"), workflow_data.get("frames")
+        )
+        self._profile(workflow_data.get("profile"), report)
         return report
 
-    def _timestamps(self, transaction: Mapping[str, Any], report: BiometricReport) -> None:
-        for key, value in transaction.items():
-            if key not in {"analysisDate", "createdAt", "completedAt"} or not isinstance(value, str):
-                continue
-            parsed = self._datetime(value)
-            if parsed is None:
-                report.timestamps[key] = value
-                report.warnings.append(f"Timestamp inválido preservado em $.transaction.{key}.")
-                continue
-            report.timestamps[key] = parsed
-            if key == "analysisDate":
-                report.analysis_date = parsed
+    def _metadata(
+        self,
+        payload: Mapping[str, Any],
+        workflow: Mapping[str, Any],
+        result: Mapping[str, Any],
+        face_version: dict[str, str | None],
+        video_version: dict[str, str | None],
+    ) -> dict[str, Any]:
+        excluded = {"algorithms", "frames", "profile"}
+        return {
+            "faceliveness_library": face_version,
+            "video_library": video_version,
+            "faceliveness_version_raw": payload.get("faceliveness_version"),
+            "video_version_raw": payload.get("video_version"),
+            "profile_name": self._mapping(workflow.get("profile")).get("name"),
+            "workflow_parameters": {
+                key: value for key, value in workflow.items() if key not in excluded
+            },
+            "images_count": self._mapping(payload.get("images")).get("count"),
+            "autocapture": dict(self._mapping(result.get("autocapture_result"))),
+        }
 
-    def _decisions(self, value: Any) -> list[BiometricDecision]:
-        decisions: list[BiometricDecision] = []
-        for index, item in enumerate(self._list(value)):
-            if not isinstance(item, Mapping):
-                continue
-            name = self._text(item.get("type") or item.get("name"))
-            if not name:
-                continue
-            decisions.append(BiometricDecision(
-                original_name=name,
-                value=item.get("value", item.get("result")),
-                category=self._text(item.get("category")),
-                source_path=f"$.decisions[{index}]",
-                raw_data=item,
-            ))
-        return decisions
-
-    def _algorithms(self, value: Any) -> list[BiometricAlgorithmResult]:
+    def _configured_algorithms(self, value: Any) -> list[BiometricAlgorithmResult]:
         algorithms: list[BiometricAlgorithmResult] = []
         for index, item in enumerate(self._list(value)):
-            if not isinstance(item, Mapping):
+            if not isinstance(item, Mapping) or not self._text(item.get("name")):
                 continue
-            name = self._text(item.get("name"))
-            if not name:
-                continue
-            result = item.get("result", item.get("score"))
-            algorithms.append(BiometricAlgorithmResult(
-                original_name=name,
-                value=result,
-                version=self._text(item.get("version")),
-                source_path=f"$.algorithms[{index}]",
-                metrics=self._metrics(item.get("metrics"), f"$.algorithms[{index}].metrics"),
-                raw_data=item,
-            ))
+            algorithms.append(
+                BiometricAlgorithmResult(
+                    original_name=str(item["name"]),
+                    category="configured",
+                    threshold=self._number(item.get("threshold")),
+                    source_path=f"$.input.workflow_data.algorithms[{index}]",
+                    raw_data=item,
+                )
+            )
         return algorithms
 
-    def _metrics(self, value: Any, base_path: str) -> list[BiometricMetric]:
-        if not isinstance(value, Mapping):
+    def _algorithm_results(
+        self,
+        value: Any,
+        thresholds: Mapping[str, float | None],
+    ) -> list[BiometricAlgorithmResult]:
+        algorithms: list[BiometricAlgorithmResult] = []
+        for index, item in enumerate(self._list(value)):
+            if not isinstance(item, Mapping) or not self._text(item.get("name")):
+                continue
+            name = str(item["name"])
+            score = self._number(item.get("score"))
+            algorithms.append(
+                BiometricAlgorithmResult(
+                    original_name=name,
+                    value=item.get("score"),
+                    score=score,
+                    threshold=thresholds.get(name),
+                    feedback=self._list(item.get("feedback")),
+                    category="result",
+                    source_path=f"$.result.algorithm_results[{index}]",
+                    raw_data=item,
+                )
+            )
+        return algorithms
+
+    def _liveness(self, value: Any) -> list[BiometricDecision]:
+        item = self._mapping(value)
+        if not item or "decision" not in item:
             return []
+        return [
+            BiometricDecision(
+                original_name="liveness_result",
+                value=item.get("decision"),
+                source_path="$.result.liveness_result",
+                metadata={
+                    "score": item.get("score"),
+                    "score_frr": item.get("score_frr"),
+                    "feedback": item.get("feedback"),
+                },
+                raw_data=item,
+            )
+        ]
+
+    def _metrics(self, value: Any) -> list[BiometricMetric]:
         metrics: list[BiometricMetric] = []
-        for name, raw in value.items():
-            details = raw if isinstance(raw, Mapping) else {"value": raw}
-            canonical, default_unit = normalize_aware_metric(str(name))
-            original_unit = self._text(details.get("unit"))
-            metrics.append(BiometricMetric(
-                original_name=str(name),
-                canonical_name=canonical,
-                value=details.get("value"),
-                original_unit=original_unit,
-                canonical_unit=default_unit if not original_unit or original_unit == default_unit else None,
-                source_path=f"{base_path}.{name}",
-                raw_data=raw,
-            ))
+        for index, item in enumerate(self._list(value)):
+            if not isinstance(item, Mapping) or not self._text(item.get("name")):
+                continue
+            name = str(item["name"])
+            canonical, unit = normalize_aware_metric(name)
+            metrics.append(
+                BiometricMetric(
+                    original_name=name,
+                    canonical_name=canonical,
+                    value=item.get("score"),
+                    canonical_unit=unit,
+                    category=self._text(item.get("category")),
+                    original_category=self._text(item.get("category")),
+                    source_path=f"$.result.captured_frame_metrics_result[{index}]",
+                    raw_data=item,
+                )
+            )
         return metrics
 
-    def _evidences(self, value: Any) -> list[BiometricEvidence]:
-        evidences: list[BiometricEvidence] = []
-        for index, item in enumerate(self._list(value)):
-            if not isinstance(item, Mapping):
-                continue
-            reference = self._text(item.get("reference"))
-            if not reference:
-                continue
-            evidences.append(BiometricEvidence(
-                evidence_type=self._text(item.get("type")) or "unknown",
+    def _evidences(self, images: Any, frames: Any) -> list[BiometricEvidence]:
+        image_data = self._mapping(images)
+        reference = self._text(image_data.get("path"))
+        if reference is None:
+            return []
+        return [
+            BiometricEvidence(
+                evidence_type="face_image",
                 original_reference=reference,
                 file_name=PurePath(reference).name or None,
-                mime_type=self._text(item.get("mimeType")),
-                size_bytes=item.get("sizeBytes") if isinstance(item.get("sizeBytes"), int) else None,
-                source_path=f"$.evidence[{index}]",
-                raw_data=item,
-            ))
-        return evidences
+                metadata={
+                    "count": image_data.get("count"),
+                    "frames": self._list(frames),
+                },
+                source_path="$.images.path",
+                raw_data=images,
+            )
+        ]
+
+    def _profile(self, value: Any, report: BiometricReport) -> None:
+        profile = self._mapping(value)
+        xml = profile.get("xml")
+        report.has_profile = isinstance(xml, str) and bool(xml.strip())
+        if not report.has_profile:
+            return
+        report.evidences.append(
+            BiometricEvidence(
+                evidence_type="profile_xml",
+                original_reference="embedded:input.workflow_data.profile.xml",
+                source_path="$.input.workflow_data.profile.xml",
+                raw_data=xml,
+            )
+        )
+        try:
+            report.constraints = self.profile_parser.parse(xml)
+        except ProfileParseError as error:
+            report.warnings.append(str(error))
+
+    def _timestamps(
+        self,
+        payload: Mapping[str, Any],
+        workflow: Mapping[str, Any],
+        report: BiometricReport,
+    ) -> None:
+        analysis_date = self._timestamp(payload.get("date"), milliseconds=True)
+        if analysis_date:
+            report.analysis_date = analysis_date
+            report.timestamps["date"] = analysis_date
+        workflow_time = self._timestamp(workflow.get("timestamp"), milliseconds=True)
+        if workflow_time:
+            report.timestamps["workflow.timestamp"] = workflow_time
+        for index, frame in enumerate(self._list(workflow.get("frames"))):
+            if not isinstance(frame, Mapping):
+                continue
+            timestamp = self._timestamp(frame.get("timestamp"), milliseconds=False)
+            if timestamp:
+                report.timestamps[f"workflow.frames[{index}].timestamp"] = timestamp
+
+    @classmethod
+    def _version(
+        cls,
+        value: Any,
+        *,
+        include_provider: bool = False,
+    ) -> dict[str, str | None]:
+        raw = cls._text(value)
+        match = cls._VERSION.fullmatch(raw or "")
+        if match is None:
+            return {"product": None, "version": None, "revision": None, "raw": raw}
+        parts = match.groupdict()
+        if include_provider:
+            parts["product"] = f"Aware {parts['product']}"
+        return {**parts, "raw": raw}
 
     @staticmethod
-    def _datetime(value: str) -> datetime | None:
+    def _timestamp(value: Any, *, milliseconds: bool) -> datetime | None:
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            return None
+        divisor = 1000 if milliseconds else 1
+        return datetime.fromtimestamp(value / divisor, tz=timezone.utc)
+
+    @staticmethod
+    def _number(value: Any) -> float | None:
+        if isinstance(value, bool):
+            return None
         try:
-            return datetime.fromisoformat(value.replace("Z", "+00:00"))
-        except ValueError:
+            return float(value)
+        except (TypeError, ValueError):
             return None
 
     @staticmethod
