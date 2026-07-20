@@ -7,6 +7,11 @@ from app.engines.metadata_engine import MetadataEngine
 from app.engines.pdf_structure_engine import PDFStructureEngine
 from app.services.analysis_service import AnalysisService
 from app.engines.binary_structure_engine import BinaryStructureEngine
+from app.biometric.parsers import (
+    AwareKnomiReportParser,
+    BiometricParserRegistry,
+)
+from app.services.biometric_report_service import BiometricReportService
 
 
 class ApplicationFactory:
@@ -21,6 +26,12 @@ class ApplicationFactory:
         digital_signature_engine = DigitalSignatureEngine()
         pdf_structure_engine = PDFStructureEngine()
         binary_structure_engine = BinaryStructureEngine()
+        biometric_registry = BiometricParserRegistry(
+            [AwareKnomiReportParser()]
+        )
+        biometric_report_service = BiometricReportService(
+            biometric_registry
+        )
 
         analyzer = FileAnalyzer(
             hash_engine=hash_engine,
@@ -30,6 +41,7 @@ class ApplicationFactory:
             digital_signature_engine=digital_signature_engine,
             pdf_structure_engine=pdf_structure_engine,
             binary_structure_engine=binary_structure_engine,
+            biometric_report_service=biometric_report_service,
         )
 
         return AnalysisService(analyzer)

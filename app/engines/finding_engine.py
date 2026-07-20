@@ -1,5 +1,7 @@
 from app.models import Finding, MetadataResult
 from app.models.integrity_result import IntegrityResult
+from app.models.biometric_report import BiometricReport
+from app.rules.biometric_report_rule import BiometricReportRule
 from app.rules.gps_rule import GpsRule
 from app.rules.integrity_rule import IntegrityRule
 from app.rules.producer_rule import ProducerRule
@@ -20,10 +22,15 @@ class FindingsEngine:
             IntegrityRule(),
         ]
 
+        self.biometric_rules = [
+            BiometricReportRule(),
+        ]
+
     def analyze(
         self,
         metadata: MetadataResult,
         integrity: IntegrityResult | None = None,
+        biometric_report: BiometricReport | None = None,
     ) -> list[Finding]:
         findings: list[Finding] = []
 
@@ -31,6 +38,11 @@ class FindingsEngine:
 
         if integrity:
             findings.extend(self._analyze_integrity(integrity))
+
+        if biometric_report:
+            findings.extend(
+                self._analyze_biometric(biometric_report)
+            )
 
         return findings
 
@@ -47,5 +59,16 @@ class FindingsEngine:
 
         for rule in self.integrity_rules:
             findings.extend(rule.apply(integrity))
+
+        return findings
+
+    def _analyze_biometric(
+        self,
+        report: BiometricReport,
+    ) -> list[Finding]:
+        findings: list[Finding] = []
+
+        for rule in self.biometric_rules:
+            findings.extend(rule.apply(report))
 
         return findings

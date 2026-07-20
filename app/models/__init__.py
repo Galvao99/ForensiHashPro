@@ -36,6 +36,16 @@ from app.models.pdf_raw_analysis_result import (
     PdfRawObject,
     PdfStartXref,
 )
+from app.models.biometric_report import (
+    BiometricAlgorithmResult,
+    BiometricConstraint,
+    BiometricConstraintEvaluation,
+    BiometricDecision,
+    BiometricEvidence,
+    BiometricMetric,
+    BiometricReport,
+    ConstraintEvaluationStatus,
+)
 
 __all__ = [
     "AnalysisResult",
@@ -65,4 +75,12 @@ __all__ = [
     "PdfRawAnalysisResult",
     "PdfRawObject",
     "PdfStartXref",
+    "BiometricAlgorithmResult",
+    "BiometricConstraint",
+    "BiometricConstraintEvaluation",
+    "BiometricDecision",
+    "BiometricEvidence",
+    "BiometricMetric",
+    "BiometricReport",
+    "ConstraintEvaluationStatus",
 ]
