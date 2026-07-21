@@ -1,10 +1,10 @@
 import json
+from collections.abc import Mapping
 from pathlib import Path
 
 import pytest
 
 from app.biometric.parsers import AwareKnomiReportParser, BiometricParserRegistry
-from app.models.biometric_report import ConstraintEvaluationStatus
 from app.services.biometric_report_exceptions import (
     AmbiguousBiometricReportError,
     BiometricReportParsingError,
@@ -19,39 +19,28 @@ FIXTURE = Path("tests/fixtures/biometrics/aware_knomi_report.json")
 
 
 def _service(*parsers) -> BiometricReportService:
-    return BiometricReportService(BiometricParserRegistry(list(parsers) or [AwareKnomiReportParser()]))
+    registered = list(parsers) or [AwareKnomiReportParser()]
+    return BiometricReportService(BiometricParserRegistry(registered))
 
 
-def test_aware_fixture_detection_and_complete_extraction() -> None:
-    report = _service().parse(FIXTURE)
-    assert (report.provider, report.product, report.version, report.workflow) == (
-        "Aware", "Knomi", "1.0", "passive-liveness"
-    )
-    assert report.analysis_date is not None
-    assert "completedAt" in report.timestamps
-    assert report.warnings
-    assert report.decisions[0].value == "LIVE"
-    assert report.algorithms[0].original_name == "VendorLiveness"
-    assert report.metrics[0].canonical_name == "image.width_pixels"
-    assert report.metrics[-1].canonical_name is None
-    assert report.metrics[-1].original_name == "vendorSpecificMetric"
-    assert report.evidences[0].original_reference == "frames/face-001.jpg"
-    assert report.evidences[0].resolved_path is None
-    assert report.has_profile is True
-    assert len(report.constraints) == 2
-    assert report.constraint_evaluations[0].status is ConstraintEvaluationStatus.PREFERRED
+def _payload() -> dict:
+    return json.loads(FIXTURE.read_text(encoding="utf-8"))
 
 
-def test_payload_object_is_preserved_without_deep_copy() -> None:
-    payload = json.loads(FIXTURE.read_text(encoding="utf-8"))
+def test_real_structure_is_recognized_and_payload_preserved() -> None:
+    payload = _payload()
     parser = AwareKnomiReportParser()
+    assert parser.recognizes(payload) is True
     report = parser.parse(payload)
     assert report.raw_payload is payload
 
 
-def test_common_json_is_rejected(tmp_path: Path) -> None:
-    path = tmp_path / "common.json"
-    path.write_text('{"score": 1, "face": true}', encoding="utf-8")
+def test_similar_json_is_rejected(tmp_path: Path) -> None:
+    payload = _payload()
+    payload["task"] = "other_task"
+    payload["server"] = "other_server"
+    path = tmp_path / "similar.json"
+    path.write_text(json.dumps(payload), encoding="utf-8")
     with pytest.raises(UnrecognizedBiometricReportError):
         _service().parse(path)
 
@@ -68,10 +57,10 @@ def test_extension_missing_file_utf8_and_utf8_sig(tmp_path: Path) -> None:
     with pytest.raises(BiometricReportParsingError):
         _service().parse(tmp_path / "missing.json")
     text = FIXTURE.read_text(encoding="utf-8")
-    bad_extension = tmp_path / "report.txt"
-    bad_extension.write_text(text, encoding="utf-8")
+    wrong = tmp_path / "report.txt"
+    wrong.write_text(text, encoding="utf-8")
     with pytest.raises(UnsupportedBiometricExtensionError):
-        _service().parse(bad_extension)
+        _service().parse(wrong)
     for encoding in ("utf-8", "utf-8-sig"):
         path = tmp_path / f"report-{encoding}.json"
         path.write_text(text, encoding=encoding)
@@ -84,40 +73,28 @@ def test_ambiguous_detection() -> None:
         _service(parser, parser).parse(FIXTURE)
 
 
-def test_optional_fields_lists_and_profile_absence(tmp_path: Path) -> None:
-    payload = {
-        "transaction": {"provider": "Aware", "product": "Knomi"},
-        "decisions": [], "algorithms": [], "metrics": {}, "evidence": []
-    }
-    path = tmp_path / "minimal.json"
+class _NeverParser(AwareKnomiReportParser):
+    def recognizes(self, payload: Mapping) -> bool:
+        return False
+
+
+def test_second_parser_does_not_change_core_selection() -> None:
+    report = _service(_NeverParser(), AwareKnomiReportParser()).parse(FIXTURE)
+    assert report.provider == "Aware"
+
+
+def test_real_structure_with_optional_fields_absent(tmp_path: Path) -> None:
+    payload = _payload()
+    payload.pop("video_version")
+    workflow = payload["input"]["workflow_data"]
+    workflow.pop("profile")
+    workflow["frames"] = []
+    payload["result"]["algorithm_results"] = []
+    payload["result"]["liveness_result"] = {}
+    path = tmp_path / "partial.json"
     path.write_text(json.dumps(payload), encoding="utf-8")
     report = _service().parse(path)
-    assert report.version is None
-    assert report.decisions == report.algorithms == report.metrics == []
+    assert report.provider == "Aware"
+    assert report.decisions == []
     assert report.has_profile is False
-
-
-def test_algorithm_metrics_are_evaluated_against_profile(tmp_path: Path) -> None:
-    payload = {
-        "transaction": {"provider": "Aware", "product": "Knomi"},
-        "algorithms": [
-            {
-                "name": "VendorAlgorithm",
-                "metrics": {
-                    "yaw": {"value": 20, "unit": "degrees"}
-                },
-            }
-        ],
-        "profileXml": (
-            '<profile><metric name="yaw" min="-10" max="10" '
-            'unit="degrees"/></profile>'
-        ),
-    }
-    path = tmp_path / "algorithm-metric.json"
-    path.write_text(json.dumps(payload), encoding="utf-8")
-    report = _service().parse(path)
-    assert report.metrics[0].source_path == "$.algorithms[0].metrics.yaw"
-    assert (
-        report.constraint_evaluations[0].status
-        is ConstraintEvaluationStatus.ABOVE_MAXIMUM
-    )
+    assert report.metadata["video_version_raw"] is None

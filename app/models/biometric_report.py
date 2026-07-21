@@ -41,6 +41,7 @@ class BiometricDecision:
     original_value: Any = None
     category: str | None = None
     source_path: str = ""
+    metadata: dict[str, Any] = field(default_factory=dict)
     raw_data: Any = None
 
     def __post_init__(self) -> None:
@@ -57,6 +58,9 @@ class BiometricAlgorithmResult:
     version: str | None = None
     unit: str | None = None
     category: str | None = None
+    score: float | None = None
+    threshold: float | None = None
+    feedback: list[Any] = field(default_factory=list)
     source_path: str = ""
     metrics: list[BiometricMetric] = field(default_factory=list)
     raw_data: Any = None
@@ -122,6 +126,6 @@ class BiometricReport:
     )
     evidences: list[BiometricEvidence] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
     has_profile: bool = False
     raw_payload: Any = None
-

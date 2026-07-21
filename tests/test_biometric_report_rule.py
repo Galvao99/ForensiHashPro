@@ -124,7 +124,12 @@ def test_within_range_does_not_generate_out_of_limit_finding() -> None:
 def test_algorithm_limitations_are_explicit_and_non_conclusive() -> None:
     findings = BiometricReportRule().apply(
         BiometricReport(
-            algorithms=[BiometricAlgorithmResult("VendorAlgorithm")]
+            algorithms=[
+                BiometricAlgorithmResult(
+                    "VendorAlgorithm",
+                    category="result",
+                )
+            ]
         )
     )
     titles = {finding.title for finding in findings}
@@ -155,4 +160,3 @@ def test_findings_engine_keeps_old_contract_and_accepts_report() -> None:
         finding.title == "Fornecedor declarado"
         for finding in findings
     )
-

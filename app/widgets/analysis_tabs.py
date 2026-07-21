@@ -13,6 +13,7 @@ from app.pages.magic_number_page import MagicNumberPage
 from app.pages.metadata_page import MetadataPage
 from app.pages.ocr_page import OcrPage
 from app.pages.timeline_page import TimelinePage
+from app.pages.biometric_page import BiometricPage
 from app.services.analysis_service import AnalysisService
 from app.investigation.investigation_context import (
     InvestigationContext,
@@ -45,6 +46,7 @@ class AnalysisTabs(QTabWidget):
         )
         self.ocr_page = OcrPage()
         self.ip_page = IpPage()
+        self.biometric_page = BiometricPage()
 
         self.addTab(self.general_page, "Geral")
         self.addTab(self.hash_page, "Hashes")
@@ -80,6 +82,10 @@ class AnalysisTabs(QTabWidget):
         self,
         result: AnalysisResult,
     ) -> None:
+        self.biometric_page.update_analysis(result)
+        self._set_biometric_tab_visible(
+            result.biometric_report is not None
+        )
         pages = (
             ("Geral", self.general_page),
             ("Metadados", self.metadata_page),
@@ -114,6 +120,13 @@ class AnalysisTabs(QTabWidget):
                 )
 
         self.finding_page.update_analysis(result)
+
+    def _set_biometric_tab_visible(self, visible: bool) -> None:
+        index = self.indexOf(self.biometric_page)
+        if visible and index == -1:
+            self.addTab(self.biometric_page, "Biometria")
+        elif not visible and index != -1:
+            self.removeTab(index)
 
     def update_investigation(
         self,
