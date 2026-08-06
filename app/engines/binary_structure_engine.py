@@ -11,6 +11,12 @@ from app.binary.parsers import PdfRawParser
 from app.binary.signatures import BINARY_SIGNATURES
 from app.models.binary_analysis_result import BinaryAnalysisResult
 from app.models.binary_finding import BinaryFinding
+from app.processing import (
+    ProcessingIssue,
+    ProcessingLimitExceededError,
+    ProcessingStatus,
+    StepResult,
+)
 
 
 class _Scanner(Protocol):
@@ -85,6 +91,7 @@ class BinaryStructureEngine:
                     reader, self.signature_max_results
                 ),
             ),
+            output=lambda: result.regions,
         )
         self._run_component(
             result,
@@ -93,12 +100,15 @@ class BinaryStructureEngine:
             lambda: setattr(
                 result, "strings", self.string_extractor.extract(reader)
             ),
+            output=lambda: result.strings,
+            limit=getattr(self.string_extractor, "maximum_results", None),
         )
         self._run_component(
             result,
             "entropy_analysis_failed",
             "Falha na análise de entropia",
             lambda: self._set_entropy(result, reader),
+            output=lambda: result.entropy_regions,
         )
         if self._is_pdf(reader):
             self._run_component(
@@ -106,6 +116,17 @@ class BinaryStructureEngine:
                 "pdf_raw_parser_failed",
                 "Falha no parser estrutural de PDF",
                 lambda: self._set_pdf_raw_analysis(result, reader),
+                output=lambda: result.pdf_raw_analysis,
+            )
+        else:
+            result.processing_steps.append(
+                StepResult(
+                    code="binary_pdf_parser",
+                    component="binary.pdf_raw",
+                    status=ProcessingStatus.SKIPPED,
+                    technical_message="O parser PDF bruto não se aplica ao formato.",
+                    user_message="A etapa estrutural PDF não se aplica a este arquivo.",
+                )
             )
         return result
 
@@ -141,10 +162,69 @@ class BinaryStructureEngine:
         code: str,
         title: str,
         operation,
+        output,
+        limit: int | None = None,
     ) -> None:
         try:
             operation()
+            value = output()
+            status = ProcessingStatus.SUCCESS
+            message = "Componente concluído com sucesso."
+            if value is None or (hasattr(value, "__len__") and len(value) == 0):
+                status = ProcessingStatus.NO_FINDINGS
+                message = "Componente concluído sem resultados."
+            issues: list[ProcessingIssue] = []
+            if limit is not None and hasattr(value, "__len__") and len(value) >= limit:
+                status = ProcessingStatus.PARTIAL
+                message = "O limite de resultados foi atingido; dados parciais preservados."
+                issues.append(
+                    ProcessingIssue(
+                        code=f"{code.removesuffix('_failed')}_limit",
+                        status=ProcessingStatus.PARTIAL,
+                        technical_message=message,
+                        user_message=message,
+                        component=f"binary.{code.removesuffix('_failed')}",
+                        details={"limit": limit, "preserved": len(value)},
+                    )
+                )
+            result.processing_steps.append(
+                StepResult(
+                    code=code.removesuffix("_failed"),
+                    component=f"binary.{code.removesuffix('_failed')}",
+                    status=status,
+                    technical_message=message,
+                    user_message=message,
+                    issues=issues,
+                )
+            )
         except Exception as error:
+            failure_status = (
+                ProcessingStatus.LIMIT_EXCEEDED
+                if isinstance(error, ProcessingLimitExceededError)
+                else ProcessingStatus.FAILED
+            )
+            issue = ProcessingIssue(
+                code=code,
+                status=failure_status,
+                technical_message=f"{title}: {type(error).__name__}",
+                user_message=(
+                    "O componente binário falhou; resultados de outros componentes "
+                    "foram preservados."
+                ),
+                component=f"binary.{code.removesuffix('_failed')}",
+                details={"error_type": type(error).__name__},
+                original_exception=error,
+            )
+            result.processing_steps.append(
+                StepResult(
+                    code=code.removesuffix("_failed"),
+                    component=issue.component,
+                    status=failure_status,
+                    technical_message=issue.technical_message,
+                    user_message=issue.user_message,
+                    issues=[issue],
+                )
+            )
             result.findings.append(
                 BinaryFinding(
                     code=code,
@@ -153,6 +233,6 @@ class BinaryStructureEngine:
                         "O componente não pôde concluir sua etapa; "
                         "os demais resultados binários foram preservados."
                     ),
-                    evidence={"error_type": type(error).__name__, "message": str(error)},
+                    evidence={"error_type": type(error).__name__},
                 )
             )

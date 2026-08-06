@@ -30,32 +30,10 @@ class PdfSignatureParser(BaseSignatureParser):
                     ),
                 )
 
-            first_signature = signatures[0] 
-            
-            # verificação de assinatura digital incorporada no PDF
-            # Diferente de signing_time, que representa a data declarada da assinatura.
+            first_signature = signatures[0]
 
-            print("\n========= DADOS DIRETOS =========")
-            print("md_algorithm:", getattr(first_signature, "md_algorithm", None))
-            print(
-                "self_reported_timestamp:",
-                getattr(first_signature, "self_reported_timestamp", None),
-            )
-
-            print("\n========= signer_info =========")
-            signer_info = getattr(first_signature, "signer_info", None)
-            print(type(signer_info))
-            print(dir(signer_info))
-
-            print("\n========= signed_data =========")
-            signed_data = getattr(first_signature, "signed_data", None)
-            print(type(signed_data))
-            print(dir(signed_data))
-
-            print("\n========= sig_object =========")
-            sig_object = getattr(first_signature, "sig_object", None)
-            print(type(sig_object))
-            print(dir(sig_object))
+            # A presença do objeto de assinatura é distinta de validação
+            # criptográfica, confiança da cadeia e identificação do operador.
 
             signer_cert = getattr(first_signature, "signer_cert", None)
 

@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PDFStructureResult:
 
     pdf_version: str | None
@@ -19,3 +19,6 @@ class PDFStructureResult:
     object_count: int
     stream_count: int
     linearized: bool
+    traditional_xref_found: bool = False
+    xref_stream_found: bool = False
+    parser_limitations: tuple[str, ...] = ()

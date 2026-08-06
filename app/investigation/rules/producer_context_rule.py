@@ -5,7 +5,6 @@ from app.investigation.rules.base_correlation_rule import BaseCorrelationRule
 from app.models.badge import (
     info_badge,
     neutral_badge,
-    warning_badge,
 )
 
 
@@ -70,7 +69,7 @@ class ProducerContextRule(BaseCorrelationRule):
 
         if "ghostscript" in producer_lower:
 
-            self.add_warning(
+            self.add_info(
 
                 findings,
 
@@ -85,7 +84,7 @@ class ProducerContextRule(BaseCorrelationRule):
                 source_file=file_name,
 
                 badges=[
-                    warning_badge("Ghostscript"),
+                    info_badge("Ghostscript"),
                     info_badge("Producer"),
                     neutral_badge(file_name),
                 ],
@@ -100,7 +99,7 @@ class ProducerContextRule(BaseCorrelationRule):
 
         if "aspose" in producer_lower:
 
-            self.add_warning(
+            self.add_info(
 
                 findings,
 
@@ -115,7 +114,7 @@ class ProducerContextRule(BaseCorrelationRule):
                 source_file=file_name,
 
                 badges=[
-                    warning_badge("Aspose"),
+                    info_badge("Aspose"),
                     info_badge("Producer"),
                     neutral_badge(file_name),
                 ],

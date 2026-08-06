@@ -1,5 +1,8 @@
 from app.integrations.ip.ip_client import BaseIpClient, Ip2LocationClient
-from app.integrations.ip.ip_exceptions import UnsupportedIpProviderError
+from app.integrations.ip.ip_exceptions import (
+    MissingIpApiKeyError,
+    UnsupportedIpProviderError,
+)
 from app.settings.settings_model import AppSettings
 
 
@@ -8,6 +11,13 @@ class IpProvider:
         self.settings = settings
 
     def get_client(self) -> BaseIpClient:
+        if not self.settings.ip_lookup_enabled:
+            raise MissingIpApiKeyError(
+                "Consulta IP2Location está desabilitada. Defina "
+                "IP2LOCATION_ENABLED=true e IP2LOCATION_API_KEY para habilitar."
+            )
+
+        self.settings.validate()
         provider = self.settings.ip_provider.lower().strip()
 
         if provider == "ip2location":

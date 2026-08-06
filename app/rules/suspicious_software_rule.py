@@ -94,7 +94,7 @@ class SuspiciousSoftwareRule(MetadataRule):
             for key, value in raw.items()
         ).lower()
 
-        for term, (name, category, severity) in self.TERMS.items():
+        for term, (name, category, _configured_severity) in self.TERMS.items():
             if term in metadata_text:
                 source_value = self._find_source_value(raw, term)
                 version = self._extract_version(source_value or metadata_text)
@@ -105,17 +105,19 @@ class SuspiciousSoftwareRule(MetadataRule):
 
                 findings.append(
                     Finding(
-                        severity=severity,
+                        severity=Severity.INFO,
                         category=category,
                         title=f"Vestígio técnico de {name}",
-                        description=self._build_description(name, category, version, severity),
+                        description=self._build_description(
+                            name, category, version, Severity.INFO
+                        ),
                         evidence_source="Metadados",
                         observed_value=observed,
                         recommendation=(
                             "Correlacionar este vestígio com datas de criação/modificação, assinatura digital, "
                             "estrutura interna do arquivo, magic number e eventual documento originário."
                         ),
-                        score=0.85 if severity == Severity.WARNING else 0.70,
+                        score=0.70,
                     )
                 )
 

@@ -12,6 +12,11 @@ from app.biometric.parsers import (
     BiometricParserRegistry,
 )
 from app.services.biometric_report_service import BiometricReportService
+from app.settings import ApplicationPaths, SettingsService, ToolDetector
+from app.services.text_extraction_service import TextExtractionService
+from app.evidence import EvidenceManager
+from app.binary.parsers import PdfRawParser
+from app.application import AnalysisCoordinator
 
 
 class ApplicationFactory:
@@ -19,13 +24,25 @@ class ApplicationFactory:
 
     @staticmethod
     def create_analysis_service() -> AnalysisService:
+        paths = ApplicationPaths.discover()
+        settings = SettingsService(paths=paths).load()
+        tools = ToolDetector(paths)
         hash_engine = HashEngine()
-        metadata_engine = MetadataEngine()
+        metadata_engine = MetadataEngine(
+            tool_status=tools.exiftool(enabled=settings.metadata_enabled),
+            timeout_seconds=settings.limits.external_tool_timeout_seconds,
+            max_output_bytes=settings.limits.max_external_output_bytes,
+        )
         findings_engine = FindingsEngine()
         magic_number_engine = MagicNumberEngine()
         digital_signature_engine = DigitalSignatureEngine()
         pdf_structure_engine = PDFStructureEngine()
-        binary_structure_engine = BinaryStructureEngine()
+        binary_structure_engine = BinaryStructureEngine(
+            string_maximum_results=settings.limits.max_binary_strings,
+            pdf_raw_parser=PdfRawParser(
+                max_objects=settings.limits.max_pdf_objects
+            ),
+        )
         biometric_registry = BiometricParserRegistry(
             [AwareKnomiReportParser()]
         )
@@ -44,4 +61,22 @@ class ApplicationFactory:
             biometric_report_service=biometric_report_service,
         )
 
-        return AnalysisService(analyzer)
+        text_extraction_service = TextExtractionService(
+            tesseract_status=tools.tesseract(enabled=settings.ocr_enabled),
+            poppler_status=tools.poppler(enabled=settings.ocr_enabled),
+            limits=settings.limits,
+        )
+
+        return AnalysisService(
+            analyzer,
+            text_extraction_service=text_extraction_service,
+            evidence_manager=EvidenceManager(
+                paths.temp_dir / "evidence",
+                max_file_size_bytes=settings.limits.max_file_size_bytes,
+            ),
+        )
+
+    @staticmethod
+    def create_analysis_coordinator() -> AnalysisCoordinator:
+        """Composição reutilizável sem criar QObject, janela ou widget."""
+        return AnalysisCoordinator(ApplicationFactory.create_analysis_service())

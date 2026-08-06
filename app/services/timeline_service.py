@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from app.models import AnalysisResult
@@ -79,7 +79,9 @@ class TimelineService:
                 )
             )
 
-        text = self.text_service.extract_text(file_info.path)
+        # O texto já foi extraído da cópia controlada durante a análise.
+        # Reabrir o original aqui poderia misturar outro estado à timeline.
+        text = result.extracted_text
         contract_date = self.date_selector.select(
             self.date_extractor.extract(text)
         )
@@ -117,7 +119,7 @@ class TimelineService:
                 )
             )
 
-        opening_date = result.analyzed_at or datetime.now()
+        opening_date = result.analyzed_at or datetime.now(timezone.utc)
 
         events.append(
             TimelineEvent(
@@ -129,7 +131,10 @@ class TimelineService:
             )
         )
 
-        events.sort(key=lambda event: event.date)
+        # Instantes com timezone e valores declarados sem timezone não são
+        # colocados na mesma escala cronológica. Cada grupo mantém ordenação
+        # interna sem presumir um fuso para metadados ambíguos.
+        events.sort(key=self._timeline_sort_key)
 
         result_text = self._analyze_timeline(
             metadata_creation_date=metadata_creation_date,
@@ -159,42 +164,42 @@ class TimelineService:
     ) -> str:
         alerts: list[str] = []
 
-        if metadata_creation_date and contract_date and metadata_creation_date > contract_date:
+        if self._comparable(metadata_creation_date, contract_date) and metadata_creation_date > contract_date:
             alerts.append(
                 "a criação interna do documento é posterior à data contratual identificada"
             )
 
-        if metadata_modification_date and contract_date and metadata_modification_date > contract_date:
+        if self._comparable(metadata_modification_date, contract_date) and metadata_modification_date > contract_date:
             alerts.append(
                 "a modificação interna do documento é posterior à data contratual identificada"
             )
 
-        if metadata_creation_date and digital_signature_date and metadata_creation_date > digital_signature_date:
+        if self._comparable(metadata_creation_date, digital_signature_date) and metadata_creation_date > digital_signature_date:
             alerts.append(
                 "a criação interna do documento é posterior à assinatura digital identificada"
             )
 
-        if metadata_modification_date and digital_signature_date and metadata_modification_date > digital_signature_date:
+        if self._comparable(metadata_modification_date, digital_signature_date) and metadata_modification_date > digital_signature_date:
             alerts.append(
                 "a modificação interna do documento é posterior à assinatura digital identificada"
             )
 
-        if contract_date and digital_signature_date and contract_date > digital_signature_date:
+        if self._comparable(contract_date, digital_signature_date) and contract_date > digital_signature_date:
             alerts.append(
                 "a data contratual identificada é posterior à assinatura digital"
             )
 
-        if system_created_at and metadata_creation_date and system_created_at < metadata_creation_date:
+        if self._comparable(system_created_at, metadata_creation_date) and system_created_at < metadata_creation_date:
             alerts.append(
                 "a data de criação no sistema de arquivos é anterior à data de criação interna do documento"
             )
 
-        if system_modified_at and metadata_modification_date and system_modified_at < metadata_modification_date:
+        if self._comparable(system_modified_at, metadata_modification_date) and system_modified_at < metadata_modification_date:
             alerts.append(
                 "a data de modificação no sistema de arquivos é anterior à modificação interna do documento"
             )
 
-        if digital_signature_date and digital_signature_date > opening_date:
+        if self._comparable(digital_signature_date, opening_date) and digital_signature_date > opening_date:
             alerts.append(
                 "a assinatura digital é posterior à data de abertura/análise pelo ForensiHash"
             )
@@ -211,6 +216,18 @@ class TimelineService:
             + "; ".join(alerts)
             + "."
         )
+
+    @staticmethod
+    def _comparable(left: datetime | None, right: datetime | None) -> bool:
+        if left is None or right is None:
+            return False
+        return (left.tzinfo is None) == (right.tzinfo is None)
+
+    @staticmethod
+    def _timeline_sort_key(event: TimelineEvent) -> tuple[int, datetime]:
+        assert event.date is not None
+        aware = event.date.tzinfo is not None
+        return (1 if aware else 0, event.date.replace(tzinfo=None))
 
     def _extract_digital_signature_date(self, digital_signature: Any) -> datetime | None:
         if not digital_signature:

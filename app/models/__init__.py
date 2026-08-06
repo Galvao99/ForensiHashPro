@@ -8,6 +8,7 @@ from app.models.analysis_result import (
 from app.models.digital_signature_result import (
     DigitalSignatureResult,
     SignatureAnalysisStatus,
+    SignatureValidationStatus,
 )
 from app.models.magic_number_result import (
     MagicNumberResult,
@@ -58,6 +59,7 @@ __all__ = [
     "MagicNumberFinding",
     "DigitalSignatureResult",
     "SignatureAnalysisStatus",
+    "SignatureValidationStatus",
     "ComparisonResult",
     "ComparisonSection",
     "ScoreResult",

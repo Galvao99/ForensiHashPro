@@ -9,7 +9,15 @@ class SignatureAnalysisStatus(str, Enum):
     UNSUPPORTED = "unsupported"
     ERROR = "error"
 
-@dataclass(frozen=True)
+
+class SignatureValidationStatus(str, Enum):
+    NOT_PERFORMED = "not_performed"
+    VALID = "valid"
+    INVALID = "invalid"
+    UNVERIFIABLE = "unverifiable"
+
+
+@dataclass(frozen=True, slots=True)
 class DigitalSignatureResult:
     """Resultado da análise de assinatura digital."""
 
@@ -27,6 +35,9 @@ class DigitalSignatureResult:
     analysis_status: SignatureAnalysisStatus | None = None
     error_code: str | None = None
     error_message: str | None = None
+    validation_status: SignatureValidationStatus = (
+        SignatureValidationStatus.NOT_PERFORMED
+    )
 
     def __post_init__(self) -> None:
         if self.analysis_status is not None:

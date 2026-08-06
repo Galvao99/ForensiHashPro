@@ -758,7 +758,9 @@ ISP: {result.isp or "Não identificado"}
 Organização: {result.organization or "Não identificada"}
 ASN: {result.asn or "Não identificado"}
 Proxy: {"Sim" if result.is_proxy else "Não" if result.is_proxy is False else "Não identificado"}
-Indicador de fraude fornecido pelo provedor: {result.fraud_score if result.fraud_score is not None else "Não informado"}
+Métrica fraud_score declarada pelo provedor: {result.fraud_score if result.fraud_score is not None else "Não informada"}
+
+Limitação: geolocalização e reputação por IP são aproximadas, dependem da base consultada e não individualizam pessoa ou dispositivo.
 
 Observação técnica:
 {result.message or "A geolocalização por IP possui natureza estimativa e não comprova, isoladamente, a localização física exata do usuário ou a posse do dispositivo."}

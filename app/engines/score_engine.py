@@ -1,3 +1,5 @@
+import warnings
+
 from app.engines.score_evaluators.magic_number_evaluator import MagicNumberEvaluator
 from app.engines.score_evaluators.metadata_evaluator import MetadataEvaluator
 from app.engines.score_evaluators.signature_evaluator import SignatureEvaluator
@@ -22,17 +24,21 @@ class ScoreEngine:
         ]
 
     def calculate(self, result: AnalysisResult) -> ScoreResult:
+        warnings.warn(
+            "ScoreEngine está desativado: dimensões forenses independentes não "
+            "devem ser consolidadas em um score agregado.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         sections = [
             evaluator.evaluate(result)
             for evaluator in self.evaluators
         ]
 
-        final_score = self._calculate_weighted_score(sections)
-
         return ScoreResult(
-            score=final_score,
-            risk_level=self._risk_level(final_score),
-            confidence_level=self._confidence_level(final_score),
+            score=None,
+            risk_level="Não aplicável",
+            confidence_level="Não aplicável",
             sections=sections,
         )
 

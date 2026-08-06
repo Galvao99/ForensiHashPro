@@ -1087,12 +1087,12 @@ class IpContextRule(BaseCorrelationRule):
 
         if fraud_score is not None:
             risk_badges.append(
-                warning_badge(
-                    f"Score: {fraud_score}"
+                neutral_badge(
+                    f"Métrica do provedor: {fraud_score}"
                 )
             )
 
-            risk_metadata["score_fraude"] = fraud_score
+            risk_metadata["metrica_provedor_fraud_score"] = fraud_score
 
         if severity in {
             "warning",
@@ -1115,7 +1115,8 @@ class IpContextRule(BaseCorrelationRule):
                 title="Sem indicadores adicionais de risco",
                 description=(
                     "A consulta não apresentou indicadores de proxy, "
-                    "VPN, Tor, data center ou fraude."
+                    "VPN, Tor ou data center na resposta consultada. "
+                    "Isso não comprova ausência de mascaramento."
                 ),
                 icon="network-check",
                 source_file=file_name,
@@ -1129,29 +1130,6 @@ class IpContextRule(BaseCorrelationRule):
                     "severidade_api": severity or "ok",
                     "mensagem_api": message,
                 },
-            )
-
-            return
-
-        if (
-            is_tor
-            or severity == "critical"
-            or self._is_high_fraud_score(fraud_score)
-        ):
-            self.add_critical(
-                findings,
-                title="Indicador crítico associado ao IP",
-                description=(
-                    message
-                    or (
-                        "O endereço apresentou indicador técnico "
-                        "relevante de anonimização ou risco."
-                    )
-                ),
-                icon="network-critical",
-                source_file=file_name,
-                badges=risk_badges,
-                metadata=risk_metadata,
             )
 
             return
@@ -1266,13 +1244,3 @@ class IpContextRule(BaseCorrelationRule):
             return isoformat()
 
         return value
-
-    def _is_high_fraud_score(
-        self,
-        value: Any,
-    ) -> bool:
-        try:
-            return int(value) >= 80
-
-        except (TypeError, ValueError):
-            return False

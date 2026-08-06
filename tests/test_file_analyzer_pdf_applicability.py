@@ -68,19 +68,18 @@ def _analyze(
 
 
 @pytest.mark.parametrize(
-    ("file_name", "content", "expected_score"),
+    ("file_name", "content"),
     [
-        ("image.jpg", b"\xff\xd8\xffimage", 95),
-        ("data.json", b'{"key": "value"}', 75),
-        ("archive.zip", b"PK\x03\x04archive", 95),
-        ("renamed.pdf", b"\xff\xd8\xffimage", 75),
+        ("image.jpg", b"\xff\xd8\xffimage"),
+        ("data.json", b'{"key": "value"}'),
+        ("archive.zip", b"PK\x03\x04archive"),
+        ("renamed.pdf", b"\xff\xd8\xffimage"),
     ],
 )
 def test_non_pdf_skips_pdf_structure_as_not_applicable(
     tmp_path: Path,
     file_name: str,
     content: bytes,
-    expected_score: int,
 ) -> None:
     result, calls = _analyze(
         tmp_path,
@@ -89,10 +88,10 @@ def test_non_pdf_skips_pdf_structure_as_not_applicable(
     )
 
     assert calls == []
-    assert result.integrity.score == expected_score
+    assert result.integrity.score is None
     assert result.integrity.technical_status == (
-        "Verificações técnicas registradas individualmente; "
-        "consulte os estados de cada análise."
+        "Score agregado desativado; consulte separadamente hash, tipo real, "
+        "estrutura observada, assinatura, metadados e limitações."
     )
     assert result.integrity.is_structurally_valid is None
     assert result.integrity.header_valid is None
@@ -107,17 +106,15 @@ def test_non_pdf_skips_pdf_structure_as_not_applicable(
 
 
 @pytest.mark.parametrize(
-    ("file_name", "expected_score", "expected_structural_validity"),
+    "file_name",
     [
-        ("document.pdf", 95, True),
-        ("document.bin", 75, False),
+        "document.pdf",
+        "document.bin",
     ],
 )
 def test_technical_pdf_runs_pdf_structure_regardless_of_extension(
     tmp_path: Path,
     file_name: str,
-    expected_score: int,
-    expected_structural_validity: bool,
 ) -> None:
     result, calls = _analyze(
         tmp_path,
@@ -127,15 +124,12 @@ def test_technical_pdf_runs_pdf_structure_regardless_of_extension(
 
     assert len(calls) == 1
     assert result.magic_numbers.detected_format == "PDF"
-    assert result.integrity.score == expected_score
+    assert result.integrity.score is None
     assert result.integrity.technical_status == (
-        "Verificações técnicas registradas individualmente; "
-        "consulte os estados de cada análise."
+        "Score agregado desativado; consulte separadamente hash, tipo real, "
+        "estrutura observada, assinatura, metadados e limitações."
     )
-    assert (
-        result.integrity.is_structurally_valid
-        is expected_structural_validity
-    )
+    assert result.integrity.is_structurally_valid is None
     assert result.integrity.header_valid is True
     assert result.integrity.eof_valid is True
     assert result.integrity.xref_valid is True

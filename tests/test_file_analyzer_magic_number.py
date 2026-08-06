@@ -34,11 +34,11 @@ def _valid_structure() -> SimpleNamespace:
 
 
 @pytest.mark.parametrize(
-    ("file_name", "content", "expected_verified", "expected_score"),
+    ("file_name", "content", "expected_verified"),
     [
-        ("image.png", b"\x89PNG\r\n\x1a\n", True, 100),
-        ("image.jpg", b"\x89PNG\r\n\x1a\n", False, 80),
-        ("unknown.bin", b"not-a-known-signature", False, 80),
+        ("image.png", b"\x89PNG\r\n\x1a\n", True),
+        ("image.jpg", b"\x89PNG\r\n\x1a\n", False),
+        ("unknown.bin", b"not-a-known-signature", False),
     ],
 )
 def test_magic_number_verification_uses_extension_matches(
@@ -46,7 +46,6 @@ def test_magic_number_verification_uses_extension_matches(
     file_name: str,
     content: bytes,
     expected_verified: bool,
-    expected_score: int,
 ) -> None:
     file_path = tmp_path / file_name
     file_path.write_bytes(content)
@@ -61,8 +60,8 @@ def test_magic_number_verification_uses_extension_matches(
 
     assert magic_numbers.extension_matches is expected_verified
     assert integrity.magic_number_verified is expected_verified
-    assert integrity.score == expected_score
-    assert integrity.is_structurally_valid is expected_verified
+    assert integrity.score is None
+    assert integrity.is_structurally_valid is None
 
 
 def test_valid_pdf_confirms_magic_number_and_structural_validity(
@@ -91,5 +90,5 @@ def test_valid_pdf_confirms_magic_number_and_structural_validity(
     assert magic_numbers.detected_format == "PDF"
     assert magic_numbers.extension_matches is True
     assert integrity.magic_number_verified is True
-    assert integrity.score == 95
-    assert integrity.is_structurally_valid is True
+    assert integrity.score is None
+    assert integrity.is_structurally_valid is None

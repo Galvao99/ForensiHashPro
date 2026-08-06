@@ -10,6 +10,7 @@ from app.models.pdf_raw_analysis_result import (
     PdfRawObject,
     PdfStartXref,
 )
+from app.processing import ProcessingLimitExceededError
 
 
 class PdfRawParser:
@@ -26,6 +27,11 @@ class PdfRawParser:
     _EOF = re.compile(rb"%%EOF")
     _INTEGER_AFTER = re.compile(rb"[\x00\x09\x0a\x0c\x0d\x20]+(\d+)")
     _PREV = re.compile(rb"/Prev[\x00\x09\x0a\x0c\x0d\x20]+(\d+)\b")
+
+    def __init__(self, *, max_objects: int = 1_000_000) -> None:
+        if max_objects <= 0:
+            raise ValueError("max_objects deve ser maior que zero")
+        self.max_objects = max_objects
 
     def analyze(self, reader: BinaryReader) -> PdfRawAnalysisResult:
         result = PdfRawAnalysisResult()
@@ -53,10 +59,15 @@ class PdfRawParser:
                 self._add(result, "pdf_header_displaced", "Header PDF deslocado", f"A assinatura %PDF- foi localizada no offset {header}.", header)
 
         provisional_ranges = self._provisional_stream_ranges(data)
-        object_matches = [
-            match for match in self._OBJECT.finditer(data)
-            if not self._inside(match.start(), provisional_ranges)
-        ]
+        object_matches = []
+        for match in self._OBJECT.finditer(data):
+            if self._inside(match.start(), provisional_ranges):
+                continue
+            if len(object_matches) >= self.max_objects:
+                raise ProcessingLimitExceededError(
+                    "O PDF excede a quantidade máxima de objetos configurada."
+                )
+            object_matches.append(match)
         stream_ranges: list[tuple[int, int]] = []
         for index, match in enumerate(object_matches):
             boundary = object_matches[index + 1].start() if index + 1 < len(object_matches) else size
@@ -76,7 +87,8 @@ class PdfRawParser:
                 self._add(result, "pdf_object_without_endobj", "Objeto sem endobj", f"O objeto {match.group(1).decode()} {match.group(2).decode()} não possui marcador endobj antes da próxima estrutura de objeto ou do fim do arquivo.", match.start())
             result.objects.append(PdfRawObject(int(match.group(1)), int(match.group(2)), match.start(), object_end, has_stream))
 
-        outside = lambda offset: not self._inside(offset, stream_ranges)
+        def outside(offset: int) -> bool:
+            return not self._inside(offset, stream_ranges)
         result.stream_count = sum(item.has_stream for item in result.objects)
         result.xref_offsets = [m.start() for m in self._XREF.finditer(data) if outside(m.start())]
         result.trailer_offsets = [m.start() for m in self._TRAILER.finditer(data) if outside(m.start())]

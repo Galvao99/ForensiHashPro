@@ -5,7 +5,7 @@ from app.models.digital_signature_result import (
 )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class IntegrityResult:
     """
     Resultado da avaliação de integridade estrutural do arquivo.
@@ -13,7 +13,10 @@ class IntegrityResult:
     Alguns campos ficam como None porque serão preenchidos na V2.
     """
 
-    score: int
+    # Campo legado mantido para compatibilidade de serialização. O score
+    # agregado foi desativado porque combinava dimensões independentes e
+    # penalizava ausências que não demonstram perda de integridade.
+    score: int | None
     technical_status: str
 
     is_structurally_valid: bool | None
