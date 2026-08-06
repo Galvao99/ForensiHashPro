@@ -23,7 +23,7 @@ ForensiHashPro/
 │   ├── repositories/          histórico em memória
 │   └── settings/              configuração JSON local
 ├── rust/forensihash_core/     parser JSON via PyO3/maturin
-├── tests/                     30 arquivos Python, 249 testes
+├── tests/                     suíte Python automatizada (305 testes)
 ├── tools/                     ExifTool e instalador Tesseract
 └── config/                    configuração local versionada
 ```

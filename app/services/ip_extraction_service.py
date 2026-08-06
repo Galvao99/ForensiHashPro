@@ -89,13 +89,6 @@ class IpExtractionService:
         *,
         context_radius: int = 80,
     ) -> None:
-        ...
-
-    def __init__(
-        self,
-        *,
-        context_radius: int = 80,
-    ) -> None:
         if context_radius < 0:
             raise ValueError(
                 "context_radius não pode ser negativo."

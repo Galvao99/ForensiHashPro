@@ -165,8 +165,8 @@ app/
 ├── ui/
 │
 ├── widgets/
-│
-└── tests/
+
+tests/
 ```
 
 ---
@@ -184,6 +184,12 @@ Atualmente estão disponíveis:
 - 🕒 Timeline
 - 🧬 Magic Number
 - 🔏 Assinatura Digital
+- 📄 OCR
+- 📊 Comparação Forense
+- 📍 Contexto técnico de IP
+- 📱 Análise de relatórios biométricos JSON
+- 🧱 Estrutura Binária
+- 🤖 Correlação de Evidências
 
 ---
 
@@ -263,15 +269,10 @@ Ferramentas externas:
 
 ## Próximas Sprints
 
-- 📄 OCR
 - 🔍 Hex Viewer
-- 📊 Comparação Forense entre Arquivos
-- 📱 Análise de JSONs de biometria
-- 📍 Geolocalização
 - 🗺 Timeline Inteligente
 - 📑 Snapshot para Laudos
 - 📄 Exportação PDF
-- 🤖 Motor de Correlação de Evidências
 - 🧠 Temporal Consistency Engine
 
 ---
