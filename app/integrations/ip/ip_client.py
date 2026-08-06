@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 import requests
@@ -274,6 +274,13 @@ class Ip2LocationClient(BaseIpClient):
             proxy_last_seen=proxy_last_seen,
             proxy_threat=proxy_threat or None,
             fraud_score=fraud_score,
+            provider_metric_name="fraud_score",
+            provider_classification=proxy_threat or None,
+            limitations=(
+                "Geolocalização por IP é aproximada e não identifica pessoa ou dispositivo.",
+                "A resposta representa a base do provedor no instante da consulta.",
+                "IP dinâmico, móvel, compartilhado ou CGNAT exige correlação adicional.",
+            ),
 
             is_vpn=(
                 normalized_proxy_type == "VPN"
@@ -288,7 +295,7 @@ class Ip2LocationClient(BaseIpClient):
                 normalized_proxy_type == "RES"
             ),
 
-            lookup_timestamp=datetime.now(),
+            lookup_timestamp=datetime.now(timezone.utc),
             lookup_performed=True,
             severity=self._calculate_severity(
                 is_proxy=is_proxy,
@@ -312,23 +319,6 @@ class Ip2LocationClient(BaseIpClient):
         fraud_score: int | None,
         proxy_threat: str,
     ) -> str:
-        threat = proxy_threat.lower().strip()
-
-        if (
-            proxy_type == "TOR"
-            or threat in {
-                "malware",
-                "botnet",
-                "spam",
-                "attack",
-            }
-            or (
-                fraud_score is not None
-                and fraud_score >= 80
-            )
-        ):
-            return "critical"
-
         if (
             is_proxy is True
             or proxy_type in {
@@ -338,14 +328,11 @@ class Ip2LocationClient(BaseIpClient):
                 "WEB",
                 "RES",
             }
-            or (
-                fraud_score is not None
-                and fraud_score >= 50
-            )
         ):
             return "warning"
-
-        return "ok"
+        # Métricas e classificações do provedor são preservadas como dados de
+        # origem, mas não determinam automaticamente a severidade interna.
+        return "info"
 
     def _build_message(
         self,
@@ -377,7 +364,7 @@ class Ip2LocationClient(BaseIpClient):
 
         if fraud_score is not None:
             messages.append(
-                f"Score de fraude: {fraud_score}"
+                f"Métrica fraud_score do provedor: {fraud_score}"
             )
 
         if not messages:

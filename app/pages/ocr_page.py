@@ -35,6 +35,11 @@ class OcrPage(QWidget):
         )
         subtitle.setWordWrap(True)
 
+        self.status_label = QLabel("")
+        self.status_label.setObjectName("SectionSubtitle")
+        self.status_label.setWordWrap(True)
+        self.status_label.hide()
+
         content_layout = QHBoxLayout()
         content_layout.setSpacing(14)
         content_layout.addWidget(
@@ -57,6 +62,7 @@ class OcrPage(QWidget):
 
         layout.addWidget(title)
         layout.addWidget(subtitle)
+        layout.addWidget(self.status_label)
         layout.addLayout(content_layout)
 
     def update_analysis(
@@ -75,7 +81,22 @@ class OcrPage(QWidget):
             "",
         )
 
+        step = next(
+            (
+                item
+                for item in getattr(result, "processing_steps", [])
+                if item.component == "text_extraction"
+            ),
+            None,
+        )
+        if step is not None and step.status.value not in {"success", "no_findings"}:
+            self.status_label.setText(step.user_message)
+            self.status_label.show()
+        else:
+            self.status_label.clear()
+            self.status_label.hide()
+
         self.ocr_viewer.set_text(
             text
-            or "Nenhum conteúdo textual foi extraído."
+            or (step.user_message if step is not None else "Nenhum conteúdo textual foi extraído.")
         )

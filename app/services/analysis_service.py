@@ -1,5 +1,9 @@
+from dataclasses import replace
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Sequence
+import logging
+from uuid import uuid4
 
 from app.engines.file_analyzer import FileAnalyzer
 from app.investigation.correlation_result import CorrelationResult
@@ -11,6 +15,17 @@ from app.services.text_extraction_service import (
 from app.investigation.investigation_context import (
     InvestigationContext,
 )
+from app.evidence import CaptureState, EvidenceIntegrityError, EvidenceManager
+from app.processing import (
+    ProcessingImpact,
+    ProcessingIssue,
+    ProcessingStatus,
+    StepResult,
+)
+from app.processing.logging import log_step
+
+
+LOGGER = logging.getLogger("forensihash.processing")
 
 
 class AnalysisService:
@@ -24,6 +39,7 @@ class AnalysisService:
         analyzer: FileAnalyzer,
         correlation_service: CorrelationService | None = None,
         text_extraction_service: TextExtractionService | None = None,
+        evidence_manager: EvidenceManager | None = None,
     ) -> None:
         self.analyzer = analyzer
 
@@ -39,33 +55,125 @@ class AnalysisService:
             else TextExtractionService()
         )
 
+        self.evidence_manager = evidence_manager or EvidenceManager()
+
     def analyze(
         self,
         file_path: Path,
+        *,
+        analysis_id: str | None = None,
     ) -> AnalysisResult:
         """
         Executa a análise técnica e armazena o texto extraído
         no próprio AnalysisResult.
         """
 
-        result = self.analyzer.analyze(file_path)
+        started_at = datetime.now(timezone.utc)
+        analysis_id = analysis_id or str(uuid4())
+        with self.evidence_manager.acquire(file_path) as lease:
+            evidence = lease.source
+            working_path = evidence.working_path
+            result = self.analyzer.analyze(working_path)
+            result.analysis_id = analysis_id
+            result.analyzed_at = started_at
 
-        try:
-            result.extracted_text = (
-                self.text_extraction_service.extract_text(
-                    file_path
+            extract_step = getattr(self.text_extraction_service, "extract", None)
+            if callable(extract_step):
+                text_step = extract_step(working_path)
+                result.processing_steps.append(text_step)
+                result.extracted_text = (
+                    text_step.value.text if text_step.value is not None else ""
                 )
+            else:
+                try:
+                    result.extracted_text = (
+                        self.text_extraction_service.extract_text(working_path)
+                    )
+                    text_step = StepResult(
+                        code="text_extraction",
+                        component="text_extraction",
+                        status=(
+                            ProcessingStatus.SUCCESS
+                            if result.extracted_text
+                            else ProcessingStatus.NO_FINDINGS
+                        ),
+                        technical_message="Extração textual legada concluída.",
+                        user_message="Extração textual concluída.",
+                    )
+                except Exception as error:
+                    issue = ProcessingIssue(
+                        code="text_extraction_failed",
+                        status=ProcessingStatus.FAILED,
+                        technical_message="Extração textual legada falhou.",
+                        user_message="A extração textual não pôde ser concluída.",
+                        component="text_extraction",
+                        details={"error_type": type(error).__name__},
+                        impact=ProcessingImpact.ANALYSIS_PARTIAL,
+                        original_exception=error,
+                    )
+                    text_step = StepResult(
+                        code="text_extraction",
+                        component="text_extraction",
+                        status=ProcessingStatus.FAILED,
+                        technical_message=issue.technical_message,
+                        user_message=issue.user_message,
+                        issues=[issue],
+                    )
+                    result.extracted_text = ""
+                result.processing_steps.append(text_step)
+
+            evidence = evidence.with_detected_type(
+                getattr(result.magic_numbers, "detected_format", None)
+            )
+            lease.source = evidence
+            evidence = lease.verify()
+
+            if result.hashes.sha256 != evidence.initial_sha256:
+                evidence = evidence.compromised(
+                    "O SHA-256 calculado pelo motor diverge da aquisição.",
+                    final_sha256=evidence.final_sha256,
+                )
+                lease.source = evidence
+
+            result.evidence_source = evidence
+            result.file_info = replace(
+                result.file_info,
+                name=evidence.original_name,
+                path=evidence.original_path,
+                extension=evidence.original_path.suffix.lower(),
+                size_bytes=evidence.size_bytes,
+                created_at=datetime.fromtimestamp(
+                    evidence.original_identity.changed_ns / 1_000_000_000,
+                    tz=timezone.utc,
+                ),
+                modified_at=datetime.fromtimestamp(
+                    evidence.original_identity.modified_ns / 1_000_000_000,
+                    tz=timezone.utc,
+                ),
+                accessed_at=datetime.fromtimestamp(
+                    evidence.original_identity.accessed_ns / 1_000_000_000,
+                    tz=timezone.utc,
+                ),
             )
 
-        except Exception as error:
-            print(
-                "Falha durante a extração textual de "
-                f"{file_path.name}: {error}"
-            )
+            if evidence.capture_state is CaptureState.COMPROMISED:
+                raise EvidenceIntegrityError(
+                    "A evidência mudou durante a análise; resultados parciais "
+                    "não podem ser correlacionados.",
+                    evidence=evidence,
+                    partial_result=result,
+                )
 
-            result.extracted_text = ""
+            for step in result.processing_steps:
+                log_step(
+                    LOGGER,
+                    step,
+                    analysis_id=analysis_id,
+                    evidence_id=evidence.evidence_id,
+                )
 
-        return result
+            result.completed_at = datetime.now(timezone.utc)
+            return result
 
     def correlate(
         self,
@@ -76,6 +184,22 @@ class AnalysisService:
         """
 
         result_list = list(results)
+
+        compromised = next(
+            (
+                item
+                for item in result_list
+                if item.evidence_source is not None
+                and item.evidence_source.capture_state is CaptureState.COMPROMISED
+            ),
+            None,
+        )
+        if compromised is not None:
+            raise EvidenceIntegrityError(
+                "Resultado comprometido não pode participar da correlação.",
+                evidence=compromised.evidence_source,
+                partial_result=compromised,
+            )
 
         if not result_list:
             return CorrelationResult()

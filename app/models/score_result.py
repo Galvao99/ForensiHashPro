@@ -13,7 +13,7 @@ class ScoreSection:
 
 @dataclass(frozen=True)
 class ScoreResult:
-    score: int
+    score: int | None
     risk_level: str
     confidence_level: str
     sections: list[ScoreSection] = field(default_factory=list)

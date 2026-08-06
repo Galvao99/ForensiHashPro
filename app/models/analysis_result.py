@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -11,6 +11,8 @@ from app.models.magic_number_result import MagicNumberResult
 from app.models.reference import Reference
 from app.models.binary_analysis_result import BinaryAnalysisResult
 from app.models.biometric_report import BiometricReport
+from app.evidence.models import EvidenceSource
+from app.processing import StepResult
 
 
 @dataclass(frozen=True)
@@ -90,9 +92,13 @@ class AnalysisResult:
     digital_signature: DigitalSignatureResult
     integrity: IntegrityResult
 
+    analysis_id: str = ""
+
     analyzed_at: datetime = field(
-        default_factory=datetime.now
+        default_factory=lambda: datetime.now(timezone.utc)
     )
+
+    completed_at: datetime | None = None
 
     timeline_events: list[TimelineEvent] = field(
         default_factory=list
@@ -105,6 +111,10 @@ class AnalysisResult:
     binary_analysis: BinaryAnalysisResult | None = None
 
     biometric_report: BiometricReport | None = None
+
+    evidence_source: EvidenceSource | None = None
+
+    processing_steps: list[StepResult[Any]] = field(default_factory=list)
 
     @property
     def has_extracted_text(self) -> bool:

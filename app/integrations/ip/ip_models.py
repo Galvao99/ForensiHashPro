@@ -55,6 +55,9 @@ class IpLookupResult:
     proxy_last_seen: int | None = None
     proxy_threat: str | None = None
     fraud_score: int | None = None
+    provider_metric_name: str | None = None
+    provider_classification: str | None = None
+    limitations: tuple[str, ...] = ()
 
     # Indicadores derivados
     is_vpn: bool | None = None
@@ -124,7 +127,7 @@ class IpLookupResult:
 
         if self.fraud_score is not None:
             indicators.append(
-                f"Score de fraude: {self.fraud_score}"
+                f"Métrica do provedor: {self.fraud_score}"
             )
 
         return (

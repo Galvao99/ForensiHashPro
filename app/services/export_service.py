@@ -2,9 +2,16 @@ import json
 from pathlib import Path
 
 from app.models.comparison_result import ComparisonResult
+from app.contracts import AnalysisContract, AnalysisContractJson
 
 
 class ExportService:
+    def export_analysis_json(
+        self, result: AnalysisContract, output_path: Path
+    ) -> None:
+        """Exporta o contrato técnico versionado em UTF-8 determinístico."""
+        AnalysisContractJson.dump(result, output_path)
+
     def export_comparison_txt(self, result: ComparisonResult, output_path: Path) -> None:
         lines = [
             "ForensiHash Pro - Relatório de Comparação",

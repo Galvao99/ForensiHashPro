@@ -14,6 +14,7 @@ from app.models import (
     DigitalSignatureResult,
     SignatureAnalysisStatus,
 )
+from app.models.digital_signature_result import SignatureValidationStatus
 from app.rules.integrity_rule import IntegrityRule
 from app.widgets.digital_signature_card import DigitalSignatureCard
 
@@ -71,7 +72,7 @@ def test_pdf_without_signature_is_confirmed_absent(
 
     assert result.analysis_status == SignatureAnalysisStatus.ABSENT
     assert result.has_signature is False
-    assert integrity.score == 95
+    assert integrity.score is None
     assert any(
         finding.title == "Assinatura digital não identificada"
         for finding in findings
@@ -104,7 +105,8 @@ def test_pdf_with_signature_is_confirmed_present(
     assert result.analysis_status == SignatureAnalysisStatus.PRESENT
     assert result.has_signature is True
     assert result.signature_count == 1
-    assert integrity.score == 100
+    assert result.validation_status is SignatureValidationStatus.NOT_PERFORMED
+    assert integrity.score is None
     assert not any(
         finding.title == "Assinatura digital não identificada"
         for finding in IntegrityRule().apply(integrity)
@@ -152,7 +154,7 @@ def test_simulated_parser_exception_is_diagnostic_and_not_absence(
     assert result.has_signature is None
     assert result.error_code == "RuntimeError"
     assert result.error_message == "simulated parser failure"
-    assert integrity.score == 100
+    assert integrity.score is None
     assert any(
         finding.title
         == "Não foi possível analisar a assinatura digital"
@@ -231,7 +233,7 @@ def test_not_applicable_and_unsupported_are_not_absence(
         )
 
         assert integrity.digital_signature_present is None
-        assert integrity.score == 100
+        assert integrity.score is None
         assert score_section.weight == 0
         assert not any(
             finding.title == "Assinatura digital não identificada"

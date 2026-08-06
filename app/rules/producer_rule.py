@@ -47,7 +47,9 @@ class ProducerRule(MetadataRule):
         for keyword, definition in PRODUCER_FINDINGS.items():
             if keyword in normalized:
                 return Finding(
-                    severity=self._map_severity(definition.severity.value),
+                    # Producer é metadado técnico, não evidência autônoma de
+                    # edição, autoria, autenticidade ou adulteração.
+                    severity=Severity.INFO,
                     category=definition.category,
                     title=definition.title,
                     description=(
@@ -69,14 +71,8 @@ class ProducerRule(MetadataRule):
         if not producer_info:
             return None
 
-        severity = (
-            Severity.WARNING
-            if producer_info.risk_level.lower() == "atenção"
-            else Severity.INFO
-        )
-
         return Finding(
-            severity=severity,
+            severity=Severity.INFO,
             category=producer_info.category,
             title=f"Vestígio de {producer_info.name}",
             description=(

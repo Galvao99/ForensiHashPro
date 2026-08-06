@@ -79,12 +79,14 @@ class MetadataContractDateRule(BaseCorrelationRule):
         create_date: datetime,
         difference_days: int,
     ) -> None:
-        self.add_warning(
+        self.add_info(
             findings,
-            title="Criação posterior à pactuação",
+            title="Data CreateDate posterior à data textual selecionada",
             description=(
-                f"O arquivo foi criado {difference_days} dia(s) "
-                "após a data de pactuação identificada."
+                f"O valor declarado em CreateDate é {difference_days} dia(s) "
+                "posterior à data textual selecionada como candidata contratual. "
+                "CreateDate descreve o container PDF e não comprova a data de "
+                "contratação nem o instante de criação do conteúdo."
             ),
             icon="calendar-warning",
             source_file=file_name,
@@ -127,12 +129,13 @@ class MetadataContractDateRule(BaseCorrelationRule):
         create_date: datetime,
         difference_days: int,
     ) -> None:
-        self.add_ok(
+        self.add_info(
             findings,
-            title="Datas cronologicamente compatíveis",
+            title="Comparação cronológica de datas declaradas",
             description=(
-                "A data de criação do arquivo não é posterior "
-                "à data de pactuação identificada."
+                "O valor declarado em CreateDate não é posterior à data textual "
+                "selecionada. Essa relação não atesta autenticidade, contratação "
+                "ou origem do conteúdo."
             ),
             icon="calendar-check",
             source_file=file_name,

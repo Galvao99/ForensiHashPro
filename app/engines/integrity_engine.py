@@ -48,47 +48,16 @@ class IntegrityEngine:
     def calculate_score(
         self,
         result: AnalysisResult,
-    ) -> int:
-
-        items = self.evaluate(result)
-
-        applicable_items = [
-            item
-            for item in items
-            if item.passed is not None
-        ]
-
-        if not applicable_items:
-            return 0
-
-        approved = sum(
-            item.passed is True
-            for item in applicable_items
-        )
-
-        return int(
-            approved
-            / len(applicable_items)
-            * 100
-        )
+    ) -> None:
+        """Compatibilidade: o score agregado foi desativado."""
+        return None
 
     def build_status(
         self,
         result: AnalysisResult,
     ) -> str:
 
-        score = self.calculate_score(result)
-
-        if score >= 90:
-            return (
-                "Os elementos técnicos analisados indicam boa integridade estrutural."
-            )
-
-        if score >= 70:
-            return (
-                "A integridade estrutural aparenta estar preservada, embora existam pontos que recomendam análise complementar."
-            )
-
         return (
-            "Não foi possível atestar a integridade estrutural do arquivo."
+            "Verificações registradas por dimensão; nenhuma conclusão agregada "
+            "de integridade foi calculada."
         )

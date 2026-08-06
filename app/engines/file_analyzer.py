@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from app.engines.digital_signature_engine import DigitalSignatureEngine
@@ -7,7 +7,7 @@ from app.engines.hash_engine import HashEngine
 from app.engines.magic_number_engine import MagicNumberEngine
 from app.engines.metadata_engine import MetadataEngine
 from app.engines.pdf_structure_engine import PDFStructureEngine
-from app.models import AnalysisResult, FileInfo
+from app.models import AnalysisResult, FileInfo, MetadataResult
 from app.models.integrity_result import IntegrityResult
 from app.models.json_analysis_result import JsonAnalysisResult
 from app.models.biometric_report import BiometricReport
@@ -19,6 +19,7 @@ from app.services.biometric_report_exceptions import (
 )
 from app.services.biometric_report_service import BiometricReportService
 from app.engines.binary_structure_engine import BinaryStructureEngine
+from app.processing import ProcessingIssue, ProcessingStatus, StepResult
 
 
 class FileAnalyzer:
@@ -75,13 +76,13 @@ class FileAnalyzer:
             extension=file_path.suffix.lower(),
             size_bytes=stat.st_size,
             created_at=datetime.fromtimestamp(
-                stat.st_ctime
+                stat.st_ctime, tz=timezone.utc
             ),
             modified_at=datetime.fromtimestamp(
-                stat.st_mtime
+                stat.st_mtime, tz=timezone.utc
             ),
             accessed_at=datetime.fromtimestamp(
-                stat.st_atime
+                stat.st_atime, tz=timezone.utc
             ),
         )
 
@@ -89,9 +90,14 @@ class FileAnalyzer:
             file_path
         )
 
-        metadata = self.metadata_engine.extract(
-            file_path
-        )
+        processing_steps = []
+        extract_step = getattr(self.metadata_engine, "extract_step", None)
+        if callable(extract_step):
+            metadata_step = extract_step(file_path)
+            processing_steps.append(metadata_step)
+            metadata = metadata_step.value or MetadataResult(raw={})
+        else:
+            metadata = self.metadata_engine.extract(file_path)
 
         magic_numbers = (
             self.magic_number_engine.analyze(
@@ -137,10 +143,29 @@ class FileAnalyzer:
         if self.binary_structure_engine is not None:
             try:
                 binary_analysis = self.binary_structure_engine.analyze(file_path)
+                if binary_analysis is not None:
+                    processing_steps.extend(binary_analysis.processing_steps)
             except Exception as error:
-                print(
-                    "Falha durante a análise binária de "
-                    f"{file_path.name}: {error}"
+                issue = ProcessingIssue(
+                    code="binary_analysis_failed",
+                    status=ProcessingStatus.FAILED,
+                    technical_message=(
+                        "A análise binária falhou antes de produzir resultado."
+                    ),
+                    user_message="A análise binária não pôde ser concluída.",
+                    component="binary",
+                    details={"error_type": type(error).__name__},
+                    original_exception=error,
+                )
+                processing_steps.append(
+                    StepResult(
+                        code="binary_analysis",
+                        component="binary",
+                        status=ProcessingStatus.FAILED,
+                        technical_message=issue.technical_message,
+                        user_message=issue.user_message,
+                        issues=[issue],
+                    )
                 )
 
         return AnalysisResult(
@@ -154,6 +179,7 @@ class FileAnalyzer:
             json_analysis=json_analysis,
             binary_analysis=binary_analysis,
             biometric_report=biometric_report,
+            processing_steps=processing_steps,
         )
 
     def _analyze_biometric_report(
@@ -255,13 +281,10 @@ class FileAnalyzer:
             incremental_updates = (
                 pdf_structure.incremental_updates
             )
-            is_structurally_valid = bool(
-                magic_number_verified
-                and header_valid
-                and eof_valid
-                and xref_valid
-                and trailer_valid
-            )
+            # Esta etapa observa marcadores, mas não executa validação completa.
+            # Xref streams, revisões incrementais e reparos legítimos tornam uma
+            # conclusão booleana baseada nesses marcadores tecnicamente indevida.
+            is_structurally_valid = None
         else:
             header_valid = None
             eof_valid = None
@@ -274,51 +297,13 @@ class FileAnalyzer:
             incremental_updates = None
             is_structurally_valid = None
 
-        score = 100
-
-        if not hash_verified:
-            score -= 20
-
-        if not magic_number_verified:
-            score -= 20
-
-        if pdf_structure_applicable:
-            if not header_valid:
-                score -= 15
-
-            if not eof_valid:
-                score -= 15
-
-            if not xref_valid:
-                score -= 10
-
-            if not trailer_valid:
-                score -= 10
-
-            if javascript_detected:
-                score -= 10
-
-            if embedded_files:
-                score -= 10
-
-            if encrypted:
-                score -= 5
-
-        if digital_signature_present is False:
-            score -= 5
-
-        score = max(
-            0,
-            min(100, score),
-        )
-
         technical_status = (
-            "Verificações técnicas registradas individualmente; "
-            "consulte os estados de cada análise."
+            "Score agregado desativado; consulte separadamente hash, tipo real, "
+            "estrutura observada, assinatura, metadados e limitações."
         )
 
         return IntegrityResult(
-            score=score,
+            score=None,
             technical_status=technical_status,
             is_structurally_valid=is_structurally_valid,
             hash_verified=hash_verified,

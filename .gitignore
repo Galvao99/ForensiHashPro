@@ -35,6 +35,13 @@ daycoval_test.json
 # Local Codex context
 AGENTS.md
 
+# Configuração local e segredos
+.env
+.env.*
+!.env.example
+config/settings.json
+config/settings.local.json
+
 # Temp
 .review_tmp/
 .review_tmp2/

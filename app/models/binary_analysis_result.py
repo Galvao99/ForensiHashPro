@@ -6,6 +6,7 @@ from app.models.binary_region import BinaryRegion
 from app.models.binary_string import BinaryString
 from app.models.entropy_region import EntropyRegion
 from app.models.pdf_raw_analysis_result import PdfRawAnalysisResult
+from app.processing import StepResult
 
 
 @dataclass(slots=True)
@@ -21,3 +22,4 @@ class BinaryAnalysisResult:
     parser_details: dict[str, Any] = field(default_factory=dict)
     average_entropy: float | None = None
     pdf_raw_analysis: PdfRawAnalysisResult | None = None
+    processing_steps: list[StepResult[Any]] = field(default_factory=list)

@@ -194,6 +194,45 @@ Atualmente estão disponíveis:
 - pyHanko
 - pytest
 
+## Ambiente suportado
+
+- Versão principal e garantida nesta fase: **Python 3.12**.
+- Python 3.14 foi usado em uma execução de auditoria, mas não é suportado nem
+  garantido porque parte das wheels instaladas não declarou compatibilidade.
+- O núcleo Rust opcional requer Rust/Cargo e maturin para desenvolvimento.
+
+## Instalação e configuração local
+
+```powershell
+py -3.12 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install --upgrade pip
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe main.py
+```
+
+Copie `config/settings.example.json` para `config/settings.json` somente se
+precisar alterar opções locais. O arquivo local é ignorado pelo Git. A chave da
+IP2Location deve ser fornecida exclusivamente pelo ambiente:
+
+```powershell
+$env:IP2LOCATION_ENABLED = "true"
+$env:IP2LOCATION_API_KEY = "<valor-fornecido-localmente>"
+```
+
+O ForensiHash não carrega `.env` automaticamente. `.env.example` serve apenas
+como catálogo de variáveis e nunca deve conter valores reais.
+
+Ferramentas externas:
+
+- ExifTool: autodetectado no bundle ou no `PATH`; caminho configurável por
+  `FORENSIHASH_EXIFTOOL_PATH`.
+- Tesseract: não é instalado pelo pip; caminho configurável por
+  `FORENSIHASH_TESSERACT_PATH`.
+- Poppler (`pdftoppm`): exigido pelo OCR de PDF e não instalado pelo pip;
+  diretório configurável por `FORENSIHASH_POPPLER_PATH`.
+- Os recursos podem ser desabilitados pelas variáveis documentadas em
+  `.env.example`. Estados ausente, desabilitado e caminho inválido são distintos.
+
 ---
 
 # 🛣 Roadmap

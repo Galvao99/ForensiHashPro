@@ -5,6 +5,8 @@ from PySide6.QtCore import QObject, Signal, Slot
 
 from app.models import AnalysisResult
 from app.services.analysis_service import AnalysisService
+from app.application import AnalysisCoordinator, CancellationToken
+from app.contracts import ProgressEvent
 
 
 class AnalysisWorker(QObject):
@@ -14,6 +16,7 @@ class AnalysisWorker(QObject):
 
     progress_changed = Signal(int, str)
     file_analyzed = Signal(object)
+    contract_analyzed = Signal(object)
     file_failed = Signal(str, str)
 
     investigation_completed = Signal(object)
@@ -36,6 +39,16 @@ class AnalysisWorker(QObject):
         ]
 
         self._cancelled = False
+        self._cancellation = CancellationToken()
+        self._core_base = 0.0
+        self._core_span = 88.0
+
+    def _on_core_progress(self, event: ProgressEvent) -> None:
+        if event.percentage is not None:
+            percentage = int(
+                self._core_base + (event.percentage / 100) * self._core_span
+            )
+            self.progress_changed.emit(percentage, event.message)
 
     @Slot()
     def run(self) -> None:
@@ -67,9 +80,16 @@ class AnalysisWorker(QObject):
                 )
 
                 try:
-                    result = self.analysis_service.analyze(
-                        file_path
+                    self._core_base = ((index - 1) / total_files) * 88
+                    self._core_span = 88 / total_files
+                    execution = AnalysisCoordinator(
+                        self.analysis_service,
+                        progress=self._on_core_progress,
+                    ).execute(
+                        file_path,
+                        cancellation=self._cancellation,
                     )
+                    result = execution.legacy_result
 
                 except Exception as error:
                     self.file_failed.emit(
@@ -80,6 +100,7 @@ class AnalysisWorker(QObject):
 
                 results.append(result)
                 self.file_analyzed.emit(result)
+                self.contract_analyzed.emit(execution.contract)
 
                 end_percentage = int(
                     (index / total_files) * 88
@@ -127,3 +148,4 @@ class AnalysisWorker(QObject):
 
     def cancel(self) -> None:
         self._cancelled = True
+        self._cancellation.cancel()

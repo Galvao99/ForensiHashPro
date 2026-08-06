@@ -271,6 +271,18 @@ class IpExtractionService:
             address,
             ipaddress.IPv6Address,
         ):
+            # Python 3.14 passou a preservar a notação IPv4 pontuada em
+            # endereços IPv4-mapped. O contrato público deste serviço usa
+            # a representação IPv6 hexadecimal canônica, independentemente
+            # da versão do interpretador.
+            if address.ipv4_mapped is not None:
+                mapped_value = int(address.ipv4_mapped)
+                return (
+                    "::ffff:"
+                    f"{mapped_value >> 16:x}:"
+                    f"{mapped_value & 0xFFFF:x}"
+                )
+
             return address.compressed.lower()
 
         return str(address)
