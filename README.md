@@ -1,168 +1,235 @@
-# 🔍 ForensiHash Pro
-
-> **Digital Forensics Analysis Platform**
-
-Uma plataforma de apoio à perícia digital desenvolvida para auxiliar peritos, advogados e profissionais da computação forense na análise técnica de documentos eletrônicos, assinaturas digitais, metadados e evidências computacionais.
-
----
-
 <p align="center">
 
 ![Python](https://img.shields.io/badge/Python-3.12-blue)
-![PySide6](https://img.shields.io/badge/PySide6-Qt-green)
-![Status](https://img.shields.io/badge/Status-In_Development-yellow)
-![License](https://img.shields.io/badge/License-MIT-orange)
+![PySide6](https://img.shields.io/badge/PySide6-Qt6-success)
+![Status](https://img.shields.io/badge/status-Beta-orange)
+![Platform](https://img.shields.io/badge/platform-Windows-lightgrey)
+![License](https://img.shields.io/badge/license-Proprietary-red)
 
-</p>
+<div align="center">
 
----
+# 🔍 ForensiHash Pro
 
-# 📖 Sobre
+### Plataforma de Análise e Correlação Forense de Documentos Digitais
 
-O **ForensiHash Pro** nasceu da necessidade de reunir, em um único ambiente, diversas ferramentas utilizadas diariamente durante perícias digitais.
+Análise técnica de documentos eletrônicos com foco em **integridade**, **rastreabilidade**, **autenticidade** e **correlação de vestígios digitais**.
 
-Ao invés de alternar entre múltiplos softwares para calcular hashes, extrair metadados, verificar assinaturas digitais e interpretar vestígios, o ForensiHash centraliza essas análises em uma interface moderna, organizada e voltada ao raciocínio técnico-pericial.
+> ⚠️ Projeto em desenvolvimento (Beta)
 
----
-
-# 🎯 Objetivos
-
-- Automatizar análises repetitivas realizadas durante perícias digitais;
-- Centralizar informações técnicas em uma única plataforma;
-- Facilitar a elaboração de laudos periciais;
-- Organizar evidências digitais;
-- Auxiliar a identificação de inconsistências em documentos eletrônicos.
+</div>
 
 ---
 
-# 🚀 Funcionalidades
+# Sobre
 
-## ✅ Implementadas
+O **ForensiHash Pro** é uma ferramenta desktop desenvolvida em **Python + PySide6**, voltada para análise pericial de documentos digitais.
 
-### 📄 Análise Geral
+Seu objetivo é centralizar diversas verificações técnicas normalmente realizadas em ferramentas distintas, permitindo uma análise rápida, organizada e reproduzível.
 
-- Informações básicas do arquivo
-- Nome
-- Extensão
-- Caminho
-- Tamanho
-- Datas do sistema
+Entre os principais recursos estão:
 
----
+- cálculo de hashes
+- análise de metadados
+- verificação de assinaturas digitais
+- identificação de produtores de PDF
+- timeline técnica
+- OCR
+- correlação automática de vestígios
+- análise de IP
+- comparação entre arquivos
 
-### 🔐 Hashes
+A ferramenta foi projetada principalmente para auxiliar análises envolvendo:
 
-- MD5
-- SHA-1
-- SHA-224
-- SHA-256
-- SHA-384
-- SHA-512
-
----
-
-### 📑 Metadados
-
-Extração dos principais metadados do arquivo.
+- contratos eletrônicos
+- documentos PDF
+- fotografias
+- imagens
+- evidências digitais
 
 ---
 
-### ⚠ Vestígios Técnicos
+# Funcionalidades
 
-Motor responsável pela identificação automática de possíveis inconsistências técnicas encontradas durante a análise.
+## Integridade
 
----
+- ✅ Hash MD5
+- ✅ SHA-1
+- ✅ SHA-224
+- ✅ SHA-256
+- ✅ SHA-384
+- ✅ SHA-512
 
-### 🧬 Magic Number (Assinatura Binária)
+Em desenvolvimento:
 
-- Identificação do formato real do arquivo
-- Comparação entre extensão e assinatura binária
-- Detecção inicial de incompatibilidades
-
----
-
-### 🔏 Assinatura Digital (PDF)
-
-Integração com **pyHanko**.
-
-Atualmente é possível extrair:
-
-- Quantidade de assinaturas
-- Assinante
-- Emissor
-- Número de Série
-- Algoritmo de Hash
-- Data da Assinatura
-- Vigência do Certificado
-- Status Técnico
+- CRC32
+- BLAKE2
+- BLAKE3
+- SHA3
+- Whirlpool
 
 ---
 
-### 🕒 Timeline
+## Magic Number
 
-Estrutura inicial para organização temporal das evidências.
+Identificação do tipo real do arquivo independentemente da extensão.
+
+Suporte atual:
+
+- PDF
+- JPEG
+- PNG
+- GIF
+- BMP
+- ZIP
+- RAR
+- 7Z
 
 ---
 
-# 🏗 Arquitetura
+## Metadados
 
-O projeto foi desenvolvido seguindo uma arquitetura modular baseada em Engines.
+Extração automática utilizando ExifTool.
 
-```text
-                    UI
+Exemplos:
 
-                     │
+- Producer
+- Creator
+- CreateDate
+- ModifyDate
+- Software
+- GPS
+- Device
+- EXIF
 
-              Analysis Tabs
+---
 
-                     │
+## Assinatura Digital
 
-              Analysis Service
+Análise completa de assinaturas digitais em PDFs.
 
-                     │
+Informações:
 
-              File Analyzer
+- certificado
+- emissor
+- cadeia
+- validade
+- ICP-Brasil
+- algoritmo
+- resumo criptográfico
 
-──────────────────────────────────────────────
+Em evolução para visual semelhante ao Xolido.
 
-Hash Engine
+---
 
-Metadata Engine
+## OCR
 
-Magic Number Engine
+Extração automática de texto.
 
-Digital Signature Engine
+Suporte:
 
-Findings Engine
+- PDFs
+- imagens
 
-──────────────────────────────────────────────
+Planejado:
 
-                  Models
+- OCR multilíngue
+- busca inteligente
+- localização do texto
+
+---
+
+## Timeline Técnica
+
+Construção automática de eventos como:
+
+- criação
+- modificação
+- assinatura
+- datas contratuais
+- eventos correlacionados
+
+---
+
+## Vestígios 2.0
+
+Motor próprio de correlação.
+
+Detecta automaticamente:
+
+- datas incompatíveis
+- hashes mencionados no documento
+- reutilização de arquivos
+- inconsistências
+- relações entre evidências
+
+---
+
+## Contexto de IP
+
+Consulta inteligente de IPs.
+
+Atualmente:
+
+- IPv4
+- IPv6
+- IP privado
+- Loopback
+- Reservado
+- Geolocalização
+- ASN
+- ISP
+
+Planejado:
+
+- VPN
+- Proxy
+- Tor
+- Datacenter
+- Score de fraude
+- WHOIS
+
+---
+
+## Comparação
+
+Comparação entre múltiplos documentos.
+
+Itens comparados:
+
+- Hashes
+- Magic Number
+- Metadados
+- Assinaturas
+- Vestígios
+
+---
+
+# Arquitetura
+
 ```
+ForensiHashPro
 
----
-
-# 📂 Estrutura do Projeto
-
-```text
-app/
-
-├── digital_signature/
-│   └── parsers/
+├── app
 │
-├── engines/
+├── engines
+│   ├── hash
+│   ├── metadata
+│   ├── magic number
+│   ├── assinatura
+│   ├── findings
 │
-├── factory/
+├── investigation
+│   ├── correlation engine
+│   ├── rules
 │
-├── models/
+├── integrations
+│   ├── ip
 │
-├── pages/
+├── pages
 │
-├── rules/
+├── widgets
 │
-├── services/
-│
-├── ui/
+├── services
 │
 ├── widgets/
 
@@ -171,11 +238,7 @@ tests/
 
 ---
 
-# 🖥 Interface
-
-O sistema possui uma interface organizada por módulos independentes.
-
-Atualmente estão disponíveis:
+# Tecnologias
 
 - 📄 Geral
 - 🔐 Hashes
@@ -193,12 +256,12 @@ Atualmente estão disponíveis:
 
 ---
 
-# 🧪 Tecnologias
+Planejado:
 
-- Python 3.12
-- PySide6
-- pyHanko
-- pytest
+- Rust
+- YARA
+- libmagic
+- SQLite
 
 ## Ambiente suportado
 
@@ -241,33 +304,43 @@ Ferramentas externas:
 
 ---
 
-# 🛣 Roadmap
+# Objetivos do Projeto
 
-## Sprint 1
+O projeto busca oferecer uma plataforma única para análise técnica de documentos digitais, reduzindo a necessidade de utilizar diversas ferramentas separadas.
 
-- ✅ Estrutura inicial
-- ✅ Interface principal
+A proposta é reunir em um único ambiente funcionalidades como:
 
-## Sprint 2
+- análise estrutural
+- integridade
+- autenticação
+- metadados
+- OCR
+- timeline
+- correlação automática
+- investigação
 
-- ✅ Hash Engine
-- ✅ Metadata Engine
+---
 
-## Sprint 3
+# Roadmap
 
-- ✅ Findings Engine
-- ✅ Interface modular
-- ✅ Organização por páginas
+## Beta
 
-## Sprint 4
+- [x] Hashes
+- [x] Metadados
+- [x] Magic Number
+- [x] OCR
+- [x] Timeline
+- [x] Assinatura Digital
+- [x] Contexto de IP
+- [x] Correlação
+- [ ] Dashboard Inicial
+- [ ] Parser Hex
+- [ ] Exportação PDF
+- [ ] Melhorias de UX
 
-- ✅ Magic Number
-- ✅ Assinatura Digital
-- ✅ Integração com pyHanko
-- ✅ Parser de PDF
-- 🚧 Validação criptográfica
+---
 
-## Próximas Sprints
+## V1
 
 - 🔍 Hex Viewer
 - 🗺 Timeline Inteligente
@@ -277,35 +350,37 @@ Ferramentas externas:
 
 ---
 
-# 💡 Filosofia do Projeto
+## Futuro
 
-O objetivo do ForensiHash **não é apenas exibir informações técnicas**.
-
-A proposta é fornecer uma plataforma capaz de correlacionar evidências digitais e auxiliar o raciocínio técnico-pericial durante a elaboração de laudos.
-
----
-
-# ⚖️ Aviso
-
-Este software encontra-se em desenvolvimento contínuo.
-
-As informações apresentadas possuem caráter de apoio à perícia digital e não substituem a análise técnica realizada por profissional habilitado.
+- [ ] IA para interpretação técnica
+- [ ] Sistema Antifraude
+- [ ] Banco de indicadores
+- [ ] Regras customizadas
+- [ ] Plugins
+- [ ] Cloud Sync
 
 ---
 
-# 👨‍💻 Autor
+# Licença
 
-**Rodrigo Galvão**
+Este projeto encontra-se em desenvolvimento.
 
-Auxiliar de perícia em Computação Forense
-
-Estudante de Análise e Desenvolvimento de Sistemas — PUC Minas
+A definição da licença ocorrerá após o lançamento da versão Beta.
 
 ---
 
-# ⭐ Status
+# Aviso
 
-🚧 Em desenvolvimento ativo.
+O ForensiHash Pro é uma ferramenta de apoio à análise técnica.
 
-Novas funcionalidades são adicionadas continuamente por meio de sprints planejadas.
+Os resultados produzidos representam vestígios e informações técnicas que devem ser interpretados em conjunto com os demais elementos disponíveis em cada caso concreto.
 
+A ferramenta não substitui a análise pericial.
+
+---
+
+<div align="center">
+
+Desenvolvido por Rodrigo Galvão
+
+</div>
