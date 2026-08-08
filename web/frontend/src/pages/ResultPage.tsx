@@ -1,8 +1,9 @@
-import { useLocation, Link } from 'react-router-dom'
+import { useLocation, Link, useParams } from 'react-router-dom'
 import { JsonView } from '../components/JsonView'
 import { StatusBadge } from '../components/StatusBadge'
 import { TechnicalValue } from '../components/ui'
 import type { AnalysisContract, ProcessingStep } from '../types/api'
+import { useAnalysisSession } from '../context/AnalysisSessionContext'
 
 function ResultSection({ title, value, step }: { title: string; value: unknown; step?: ProcessingStep }) {
   if (value === undefined) return null
@@ -16,7 +17,10 @@ export function ResultView({ result }: { result: AnalysisContract }) {
 
 export function ResultPage() {
   const location = useLocation()
-  const result = (location.state as { result?: AnalysisContract } | null)?.result
+  const { analysisId } = useParams()
+  const { getAnalysis } = useAnalysisSession()
+  const routedResult = (location.state as { result?: AnalysisContract } | null)?.result
+  const result = routedResult ?? (analysisId ? getAnalysis(analysisId) : undefined)
   if (!result) return <div className="app-page"><h1>Nenhum resultado nesta sessão</h1><p>As análises ainda não são persistidas.</p><Link className="button-link" to="/app/analysis">Iniciar análise</Link></div>
   return <ResultView result={result} />
 }

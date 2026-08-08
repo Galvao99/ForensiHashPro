@@ -13,7 +13,7 @@ describe('integração HTTP', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response({ hashes: { available: true }, metadata: { available: false }, ocr: { available: true } })))
     window.history.pushState({}, '', '/app')
     render(<App />)
-    expect(await screen.findByText('Hashes')).toBeInTheDocument()
+    expect(await screen.findByText('Hash')).toBeInTheDocument()
     expect(screen.getAllByText('Disponível').length).toBeGreaterThan(0)
     expect(screen.getAllByText('Indisponível').length).toBeGreaterThan(0)
     expect(fetch).toHaveBeenCalledWith('/api/v1/capabilities', undefined)

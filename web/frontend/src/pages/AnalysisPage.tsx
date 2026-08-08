@@ -2,6 +2,7 @@ import { ChangeEvent, DragEvent, FormEvent, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button, TechnicalValue } from '../components/ui'
 import { ApiError, submitAnalysis } from '../lib/api'
+import { useAnalysisSession } from '../context/AnalysisSessionContext'
 
 export function AnalysisPage() {
   const [file, setFile] = useState<File | null>(null)
@@ -9,6 +10,7 @@ export function AnalysisPage() {
   const [error, setError] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
   const navigate = useNavigate()
+  const { addAnalysis } = useAnalysisSession()
 
   function select(event: ChangeEvent<HTMLInputElement>) { setFile(event.target.files?.[0] ?? null); setError('') }
   function drop(event: DragEvent<HTMLDivElement>) { event.preventDefault(); setFile(event.dataTransfer.files?.[0] ?? null); setError('') }
@@ -18,7 +20,8 @@ export function AnalysisPage() {
     setProcessing(true); setError('')
     try {
       const result = await submitAnalysis(file)
-      navigate('/app/result', { state: { result } })
+      addAnalysis(result)
+      navigate(`/app/result/${encodeURIComponent(result.analysis_id)}`, { state: { result } })
     } catch (caught) {
       setError(caught instanceof ApiError ? caught.message : 'Não foi possível concluir a análise.')
     } finally { setProcessing(false) }
