@@ -112,6 +112,7 @@ class LegacyAnalysisAdapter:
             metadata=_plain(result.metadata.raw),
             technical_structure={
                 "integrity": _plain(result.integrity),
+                "pdf": _plain(result.pdf_structure),
                 "binary": _plain(result.binary_analysis),
                 "json": _plain(result.json_analysis),
             },
@@ -155,6 +156,8 @@ class LegacyAnalysisAdapter:
         ]
         if result.binary_analysis is not None:
             values.append(("binary_structure", "binary_structure_engine", _plain(result.binary_analysis)))
+        if result.pdf_structure is not None:
+            values.append(("pdf_structure", "pdf_structure_engine", _plain(result.pdf_structure)))
         return [
             Fact(_id(analysis_id, "fact", kind, index), kind, source, data)
             for index, (kind, source, data) in enumerate(values)

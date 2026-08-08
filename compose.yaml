@@ -1,0 +1,10 @@
+services:
+  forensihash-api:
+    build:
+      context: .
+      target: runtime
+    image: forensihash-api:local
+    environment:
+      FORENSIHASH_TEMP_DIR: /tmp/forensihash
+    ports:
+      - "8000:8000"

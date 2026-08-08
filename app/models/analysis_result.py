@@ -8,6 +8,7 @@ from app.models.digital_signature_result import DigitalSignatureResult
 from app.models.integrity_result import IntegrityResult
 from app.models.json_analysis_result import JsonAnalysisResult
 from app.models.magic_number_result import MagicNumberResult
+from app.models.pdf_structure_result import PDFStructureResult
 from app.models.reference import Reference
 from app.models.binary_analysis_result import BinaryAnalysisResult
 from app.models.biometric_report import BiometricReport
@@ -109,6 +110,8 @@ class AnalysisResult:
     json_analysis: JsonAnalysisResult | None = None
 
     binary_analysis: BinaryAnalysisResult | None = None
+
+    pdf_structure: PDFStructureResult | None = None
 
     biometric_report: BiometricReport | None = None
 
