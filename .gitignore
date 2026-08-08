@@ -33,8 +33,21 @@ output/exports/*
 !output/exports/.gitkeep
 daycoval_test.json
 
-# Local Codex context
-AGENTS.md
+# Local Codex context / development reports
+/AGENTS.md
+/AUDITORIA_PRE_COMMIT.md
+/AUDITORIA_TECNICA_FORENSIHASH.md
+/aware_knomi_report.json
+/BUGS_E_RISCOS_FORENSIHASH.md
+/CONTRATO_ANALISE_FORENSIHASH.md
+/ESTABILIZACAO_PARTE_1.md
+/ESTABILIZACAO_PARTE_2.md
+/ESTABILIZACAO_PARTE_3.md
+/ESTABILIZACAO_PARTE_4.md
+/ESTABILIZACAO_PARTE_5.md
+/GUIA_REMOCAO_SEGREDOS_GIT.md
+/MAPA_ARQUITETURA_ATUAL.md
+/PLANO_ESTABILIZACAO_FORENSIHASH.md
 
 # Configuração local e segredos
 .env
