@@ -8,7 +8,8 @@ e não chama engines ou `FileAnalyzer` diretamente.
 
 - `backend/app`: aplicação FastAPI, rotas, schemas HTTP mínimos e adapter;
 - `backend/tests`: testes do backend;
-- `frontend`: reservado para uma fase futura, sem React nesta etapa.
+- `frontend`: aplicação React/TypeScript com site institucional, app shell e
+  consumo da API local.
 
 ## Instalação
 
@@ -31,6 +32,18 @@ A partir da raiz do repositório:
 ```text
 python -m uvicorn web.backend.app.main:app --reload
 ```
+
+Em outro terminal, inicie o frontend:
+
+```text
+cd web/frontend
+npm install
+npm run dev
+```
+
+O servidor Vite encaminha `/api` e `/health` ao backend local. Para apontar
+para outro endereço, use `VITE_API_BASE_URL`; nenhuma variável do frontend
+deve conter segredo.
 
 ## Docker
 
@@ -120,8 +133,9 @@ evidência e são extraídos por ferramentas em modo de leitura.
 
 ## Limitações atuais
 
-A execução é local e síncrona. Não há frontend, autenticação, persistência,
-fila, polling, comparação web, correlação web ou deploy. O healthcheck confirma
+A execução é local e síncrona. O frontend não possui autenticação ou cadastro
+reais. Não há persistência, fila, polling, comparação web, correlação web ou
+deploy. O healthcheck confirma
 somente que a API está viva; ele não valida integrações externas. A imagem não
 é uma configuração de produção nem substitui sandbox para arquivos hostis.
 Timeline, IP automático, comparação e correlação não integram o contrato

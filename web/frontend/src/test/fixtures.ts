@@ -1,0 +1,31 @@
+import type { AnalysisContract } from '../types/api'
+
+export const analysisFixture: AnalysisContract = {
+  schema_version: '1.0.0',
+  analysis_id: 'analysis-test',
+  evidence_id: 'evidence-test',
+  state: 'completed',
+  file: { name: 'synthetic.txt', size_bytes: 9 },
+  hashes: { sha256: 'abc123', md5: 'def456' },
+  declared_type: '.txt',
+  detected_type: 'TEXT',
+  metadata: { Producer: 'Synthetic' },
+  technical_structure: { integrity: { hash_verified: true } },
+  native_text: { text: 'synthetic', source: 'native' },
+  ocr: null,
+  signatures: [],
+  ip_addresses: null,
+  timeline: [],
+  biometrics: null,
+  facts: [{ kind: 'hashes' }],
+  findings: [],
+  limitations: [],
+  errors: [],
+  processing_steps: [
+    { code: 'metadata_extraction', component: 'metadata', status: 'success' },
+    { code: 'timeline', component: 'timeline', status: 'no_findings' },
+    { code: 'ip_context', component: 'ip_context', status: 'skipped' },
+    { code: 'biometric_analysis', component: 'biometric', status: 'unavailable' },
+  ],
+  execution: { runtime: 'python' },
+}
