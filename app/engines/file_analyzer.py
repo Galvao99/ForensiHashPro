@@ -149,9 +149,41 @@ class FileAnalyzer:
         pdf_structure = None
 
         if magic_numbers.detected_format == "PDF":
-            pdf_structure = (
-                self.pdf_structure_engine.analyze(
-                    file_path
+            try:
+                pdf_structure = self.pdf_structure_engine.analyze(file_path)
+                processing_steps.append(
+                    self._processing_step(
+                        "pdf_structure",
+                        "pdf_structure",
+                        ProcessingStatus.SUCCESS,
+                        "Estrutura PDF analisada.",
+                        value=pdf_structure,
+                    )
+                )
+            except Exception as error:
+                issue = self._processing_issue(
+                    "pdf_structure_failed",
+                    "pdf_structure",
+                    ProcessingStatus.FAILED,
+                    "A estrutura PDF não pôde ser analisada.",
+                    error,
+                )
+                processing_steps.append(
+                    self._processing_step(
+                        "pdf_structure",
+                        "pdf_structure",
+                        ProcessingStatus.FAILED,
+                        issue.user_message,
+                        issues=[issue],
+                    )
+                )
+        else:
+            processing_steps.append(
+                self._processing_step(
+                    "pdf_structure",
+                    "pdf_structure",
+                    ProcessingStatus.SKIPPED,
+                    "Formato não aplicável à análise de estrutura PDF.",
                 )
             )
 
@@ -217,6 +249,7 @@ class FileAnalyzer:
             integrity=integrity,
             json_analysis=json_analysis,
             binary_analysis=binary_analysis,
+            pdf_structure=pdf_structure,
             biometric_report=biometric_report,
             processing_steps=processing_steps,
         )

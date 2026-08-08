@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 import pytest
@@ -216,6 +217,24 @@ def test_tool_detector_distinguishes_available_invalid_missing_and_disabled(
     assert disabled.state is ToolState.DISABLED
 
 
+@pytest.mark.skipif(os.name != "posix", reason="comportamento específico do Linux")
+def test_poppler_configured_directory_uses_posix_executable_on_linux(
+    tmp_path: Path,
+) -> None:
+    executable = tmp_path / "poppler" / "pdftoppm"
+    executable.parent.mkdir()
+    executable.write_bytes(b"placeholder")
+    status = ToolDetector(
+        _paths(tmp_path),
+        environ={"FORENSIHASH_POPPLER_PATH": str(executable.parent)},
+        which=lambda _command: None,
+    ).poppler()
+
+    assert status.state is ToolState.AVAILABLE
+    assert status.path == executable.parent.resolve()
+
+
+@pytest.mark.skipif(os.name != "nt", reason="binário empacotado específico do Windows")
 def test_metadata_engine_uses_resolved_exiftool_outside_project_cwd(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

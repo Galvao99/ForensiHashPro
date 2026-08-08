@@ -75,11 +75,12 @@ class ToolDetector:
         if not enabled:
             return self._disabled("Poppler")
         if configured is not None:
-            executable = configured / "pdftoppm.exe" if configured.is_dir() else configured
+            command = "pdftoppm.exe" if os.name == "nt" else "pdftoppm"
+            executable = configured / command if configured.is_dir() else configured
             return self._configured_status("Poppler", configured, executable)
 
         bundled_dir = self.paths.resource("tools/poppler/bin")
-        if (bundled_dir / "pdftoppm.exe").is_file():
+        if os.name == "nt" and (bundled_dir / "pdftoppm.exe").is_file():
             return self._available("Poppler", bundled_dir)
 
         discovered = self.which("pdftoppm") or self.which("pdftoppm.exe")
@@ -114,7 +115,7 @@ class ToolDetector:
         if configured is not None:
             return self._configured_status(name, configured, configured)
         bundled = self.paths.resource(bundled_relative)
-        if bundled.is_file():
+        if os.name == "nt" and bundled.is_file():
             return self._available(name, bundled)
         for command in commands:
             discovered = self.which(command)
