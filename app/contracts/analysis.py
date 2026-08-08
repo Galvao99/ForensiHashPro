@@ -88,6 +88,11 @@ class ProgressEvent:
 
 @dataclass(frozen=True, slots=True)
 class AnalysisContract:
+    """Resultado técnico individual de uma única evidência.
+
+    Correlação, comparação e investigação multi-evidência possuem resultados
+    próprios e não são implicitamente agregadas neste contrato.
+    """
     schema_version: str
     analysis_id: str
     evidence_id: str
@@ -101,15 +106,14 @@ class AnalysisContract:
     native_text: dict[str, Any] | None = None
     ocr: dict[str, Any] | None = None
     signatures: list[dict[str, Any]] = field(default_factory=list)
-    ip_addresses: list[dict[str, Any]] = field(default_factory=list)
-    timeline: list[dict[str, Any]] = field(default_factory=list)
+    ip_addresses: list[dict[str, Any]] | None = None
+    timeline: list[dict[str, Any]] | None = None
     comparison: dict[str, Any] | None = None
     biometrics: dict[str, Any] | None = None
     facts: list[Fact] = field(default_factory=list)
     findings: list[FindingContract] = field(default_factory=list)
     limitations: list[Limitation] = field(default_factory=list)
     errors: list[ContractError] = field(default_factory=list)
-    external_results: list[ExternalResult] = field(default_factory=list)
+    external_results: list[ExternalResult] | None = None
     processing_steps: list[dict[str, Any]] = field(default_factory=list)
     execution: dict[str, Any] = field(default_factory=dict)
-

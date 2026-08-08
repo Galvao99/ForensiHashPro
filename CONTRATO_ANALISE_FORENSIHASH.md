@@ -2,10 +2,15 @@
 
 ## Objetivo
 
-O `AnalysisContract` é o envelope técnico, versionado e independente de Qt para
-transportar uma análise entre núcleo, desktop, exportação JSON e testes. Ele não
-é uma API web e não substitui imediatamente o `app.models.AnalysisResult`
-legado. A conversão gradual é feita por `LegacyAnalysisAdapter`.
+O `AnalysisContract 1.0.0` representa o resultado técnico individual de uma
+única evidência. É um envelope versionado e independente de Qt para transportar
+essa análise entre núcleo, desktop, exportação JSON e testes. Ele não é uma API
+web e não substitui imediatamente o `app.models.AnalysisResult` legado. A
+conversão gradual é feita por `LegacyAnalysisAdapter`.
+
+Correlação, comparação e investigação entre múltiplas evidências possuem
+resultados separados (`CorrelationResult` e `ComparisonResult`) e não são
+implicitamente incorporadas ao contrato individual.
 
 Versão inicial do schema: **1.0.0**.
 
@@ -31,11 +36,17 @@ AnalysisContract
     └── runtime
 ```
 
-Campos de módulos não executados podem ser `null`, lista vazia ou objeto vazio,
-conforme a cardinalidade. Uma lista vazia significa que a coleção está presente
-e não possui itens; indisponibilidade, limite e falha devem aparecer em
-`limitations`, `errors` e `processing_steps`, nunca ser inferidos apenas do
-vazio.
+`null` significa que a seção não foi executada ou não pertence ao fluxo
+individual, com a razão registrada em `processing_steps`. Uma lista vazia
+significa que a etapa foi executada e não encontrou itens. Indisponibilidade,
+limite e falha aparecem em `limitations`, `errors` e `processing_steps`, nunca
+são inferidos apenas de `null` ou de uma coleção vazia.
+
+No fluxo individual atual, consulta externa de IP e comparação são marcadas
+como `SKIPPED`: a primeira é iniciada separadamente pela apresentação e a
+segunda pertence ao escopo multi-evidência. `external_results` permanece
+reservado para integrações efetivamente executadas dentro de uma análise
+individual. Timeline é `null` quando não foi construída nesse fluxo.
 
 ## Separação semântica
 
@@ -170,10 +181,13 @@ O desktop continua consumindo `AnalysisResult` legado. Engines podem migrar
 individualmente para fatos nativos sem alterar widgets. Exportadores novos
 recebem o contrato e apenas o transformam.
 
+O `AnalysisWorker` emite um contrato por evidência antes da correlação do lote.
+O `CorrelationResult` posterior continua sendo emitido separadamente e não
+altera retroativamente contratos individuais já produzidos.
+
 ## Extensibilidade futura
 
 O contrato permite futura API, fila ou persistência, mas não implementa nenhum
 desses recursos. Antes de exposição remota ainda são necessários contratos de
 requisição, autorização, retenção, isolamento, quotas, storage, idempotência e
 sandbox de parsers.
-

@@ -64,7 +64,7 @@ def _analyze(
         json_parser_service=_JsonParserService(),
     )
 
-    return analyzer.analyze(file_path), pdf_structure_engine.calls
+    return analyzer.analyze_fixture(file_path), pdf_structure_engine.calls
 
 
 @pytest.mark.parametrize(

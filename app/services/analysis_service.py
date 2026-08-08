@@ -73,7 +73,7 @@ class AnalysisService:
         with self.evidence_manager.acquire(file_path) as lease:
             evidence = lease.source
             working_path = evidence.working_path
-            result = self.analyzer.analyze(working_path)
+            result = self.analyzer.analyze_acquired(evidence)
             result.analysis_id = analysis_id
             result.analyzed_at = started_at
 

@@ -30,7 +30,7 @@ class TestFileAnalyzer:
             pdf_structure_engine=pdf_structure_engine,
         )
 
-        result = analyzer.analyze(test_file)
+        result = analyzer.analyze_fixture(test_file)
 
         assert isinstance(result, AnalysisResult)
         assert isinstance(result.findings, list)

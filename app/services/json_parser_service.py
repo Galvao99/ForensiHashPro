@@ -6,6 +6,12 @@ from app.models.json_analysis_result import (
     JsonAnalysisResult,
     JsonField,
 )
+from app.processing import (
+    ProcessingImpact,
+    ProcessingIssue,
+    ProcessingStatus,
+    StepResult,
+)
 
 
 class JsonParserService:
@@ -34,26 +40,31 @@ class JsonParserService:
         self,
         file_path: str | Path,
     ) -> JsonAnalysisResult:
+        """Adaptador legado; consumidores orquestrados devem usar parse_step."""
+        step = self.parse_step(file_path)
+        return step.value or JsonAnalysisResult(error_message=step.user_message)
+
+    def parse_step(
+        self,
+        file_path: str | Path,
+    ) -> StepResult[JsonAnalysisResult]:
         path = Path(file_path)
 
         if path.suffix.lower() not in self.SUPPORTED_EXTENSIONS:
-            return JsonAnalysisResult(
-                error_message=(
-                    "Extensão JSON não suportada."
-                )
+            return self._step(
+                ProcessingStatus.SKIPPED,
+                "Formato não aplicável à análise JSON.",
             )
 
         try:
             import forensihash_core
 
         except ImportError as error:
-            return JsonAnalysisResult(
-                error_message=(
-                    "O módulo Rust forensihash_core não está "
-                    "instalado no ambiente virtual. Execute "
-                    "'maturin develop' dentro de "
-                    "rust/forensihash_core."
-                )
+            return self._failure_step(
+                ProcessingStatus.UNAVAILABLE,
+                "json_rust_unavailable",
+                "O módulo Rust de análise JSON não está disponível.",
+                error,
             )
 
         try:
@@ -67,11 +78,88 @@ class JsonParserService:
             data = json.loads(raw_result)
 
         except Exception as error:
-            return JsonAnalysisResult(
-                error_message=str(error)
+            return self._failure_step(
+                ProcessingStatus.FAILED,
+                "json_parser_failed",
+                "O parser JSON não concluiu a análise.",
+                error,
             )
 
-        return self._build_result(data)
+        result = self._build_result(data)
+        if not result.is_valid:
+            issue = ProcessingIssue(
+                code="json_invalid",
+                status=ProcessingStatus.FAILED,
+                technical_message="O conteúdo não representa JSON válido.",
+                user_message="O arquivo JSON é inválido.",
+                component="json",
+                impact=ProcessingImpact.COMPONENT_ONLY,
+            )
+            return self._step(
+                ProcessingStatus.FAILED,
+                issue.user_message,
+                value=result,
+                issues=[issue],
+            )
+        if result.truncated:
+            issue = ProcessingIssue(
+                code="json_result_truncated",
+                status=ProcessingStatus.PARTIAL,
+                technical_message="O limite de campos JSON foi atingido.",
+                user_message="A análise JSON foi concluída parcialmente.",
+                component="json",
+                impact=ProcessingImpact.COMPONENT_ONLY,
+            )
+            return self._step(
+                ProcessingStatus.PARTIAL,
+                issue.user_message,
+                value=result,
+                issues=[issue],
+            )
+        status = ProcessingStatus.SUCCESS if result.fields else ProcessingStatus.NO_FINDINGS
+        return self._step(status, "Análise JSON concluída.", value=result)
+
+    @staticmethod
+    def _failure_step(
+        status: ProcessingStatus,
+        code: str,
+        message: str,
+        error: BaseException,
+    ) -> StepResult[JsonAnalysisResult]:
+        issue = ProcessingIssue(
+            code=code,
+            status=status,
+            technical_message=message,
+            user_message=message,
+            component="json",
+            details={"error_type": type(error).__name__},
+            impact=ProcessingImpact.COMPONENT_ONLY,
+            original_exception=error,
+        )
+        return JsonParserService._step(
+            status,
+            message,
+            value=JsonAnalysisResult(is_valid=False, error_message=message),
+            issues=[issue],
+        )
+
+    @staticmethod
+    def _step(
+        status: ProcessingStatus,
+        message: str,
+        *,
+        value: JsonAnalysisResult | None = None,
+        issues: list[ProcessingIssue] | None = None,
+    ) -> StepResult[JsonAnalysisResult]:
+        return StepResult(
+            code="json_analysis",
+            component="json",
+            status=status,
+            technical_message=message,
+            user_message=message,
+            value=value,
+            issues=issues or [],
+        )
 
     def _build_result(
         self,

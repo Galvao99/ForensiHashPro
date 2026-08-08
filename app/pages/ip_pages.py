@@ -254,6 +254,7 @@ class IpPage(QWidget):
 
         self.ip_service = IpAnalysisService()
         self.current_result = None
+        self.current_processing_step = None
         self.current_context: (
             InvestigationContext | None
         ) = None
@@ -695,9 +696,15 @@ class IpPage(QWidget):
         )
 
         try:
-            result = self.ip_service.analyze(
+            step = self.ip_service.analyze_step(
                 ip
             )
+            self.current_processing_step = step
+            result = step.value
+
+            if result is None:
+                self._show_error(step.user_message)
+                return
 
             self.current_result = result
             self._render_result(

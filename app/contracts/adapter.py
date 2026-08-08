@@ -43,7 +43,12 @@ def _plain(value: Any) -> Any:
 
 
 class LegacyAnalysisAdapter:
-    """Converte o DTO desktop existente no schema central sem importar Qt."""
+    """Converte uma análise individual legada sem importar Qt.
+
+    Resultados de correlação e comparação multi-evidência não pertencem a
+    esta adaptação. Seções não executadas permanecem ``None`` e recebem uma
+    etapa ``SKIPPED`` explícita no contrato.
+    """
 
     def convert(self, result: AnalysisResult) -> AnalysisContract:
         analysis_id = result.analysis_id or str(
@@ -113,16 +118,23 @@ class LegacyAnalysisAdapter:
             native_text=text_payload if text_source.startswith("native") else None,
             ocr=text_payload if text_source == "ocr" else None,
             signatures=[_plain(result.digital_signature)],
-            timeline=[_plain(event) for event in result.timeline_events],
+            ip_addresses=None,
+            timeline=(
+                [_plain(event) for event in result.timeline_events]
+                if result.timeline_events
+                else None
+            ),
+            comparison=None,
             biometrics=_plain(result.biometric_report),
             facts=facts,
             findings=findings,
             limitations=limitations,
             errors=errors,
+            external_results=None,
             processing_steps=[
                 self._step(step, analysis_id, index)
                 for index, step in enumerate(result.processing_steps)
-            ],
+            ] + self._scope_steps(result, analysis_id),
             execution={
                 "started_at": result.analyzed_at,
                 "finished_at": result.completed_at or datetime.now(timezone.utc),
@@ -207,6 +219,51 @@ class LegacyAnalysisAdapter:
             if step.code == "text_extraction" and step.value is not None:
                 return str(getattr(step.value, "source", "unknown"))
         return "legacy_unknown" if result.extracted_text else "none"
+
+    @staticmethod
+    def _scope_steps(result: AnalysisResult, analysis_id: str) -> list[dict[str, Any]]:
+        """Declara seções ausentes sem apresentá-las como coleções executadas."""
+        offset = len(result.processing_steps)
+        sections = [
+            (
+                "ip_context",
+                "Consulta externa de IP não integra a análise individual.",
+                "not_part_of_individual_analysis",
+            ),
+            (
+                "comparison",
+                "Comparação entre evidências possui resultado separado.",
+                "different_scope",
+            ),
+            (
+                "external_results",
+                "Nenhuma integração externa individual foi executada neste fluxo.",
+                "not_executed",
+            ),
+        ]
+        if not result.timeline_events:
+            sections.append(
+                (
+                    "timeline",
+                    "Timeline não foi executada no fluxo individual.",
+                    "not_executed",
+                )
+            )
+        return [
+            {
+                "step_id": _id(analysis_id, "step", code, offset + index),
+                "code": code,
+                "component": code,
+                "status": ProcessingStatus.SKIPPED.value,
+                "technical_message": message,
+                "user_message": message,
+                "started_at": result.completed_at or result.analyzed_at,
+                "finished_at": result.completed_at or result.analyzed_at,
+                "duration_ms": 0,
+                "safe_details": {"reason": reason, "scope": "individual_evidence"},
+            }
+            for index, (code, message, reason) in enumerate(sections)
+        ]
 
     @staticmethod
     def _integrations(result: AnalysisResult) -> list[str]:

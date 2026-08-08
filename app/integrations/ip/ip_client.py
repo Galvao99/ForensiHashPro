@@ -8,6 +8,9 @@ from app.integrations.ip.ip_exceptions import (
     InvalidIpLookupError,
     IpRateLimitError,
     MissingIpApiKeyError,
+    IpNetworkUnavailableError,
+    IpProviderError,
+    IpTimeoutError,
 )
 from app.integrations.ip.ip_models import IpLookupResult
 
@@ -46,7 +49,7 @@ class Ip2LocationClient(BaseIpClient):
         normalized_ip = ip.strip()
 
         if not normalized_ip:
-            raise InvalidIpLookupError(
+            raise IpTimeoutError(
                 "Endereço IP não informado."
             )
 
@@ -67,8 +70,8 @@ class Ip2LocationClient(BaseIpClient):
             ) from exc
 
         except requests.RequestException as exc:
-            raise InvalidIpLookupError(
-                f"Falha de comunicação com a API: {exc}"
+            raise IpNetworkUnavailableError(
+                "Falha de comunicação com o provedor de contexto de IP."
             ) from exc
 
         data = self._read_json(response)
@@ -84,7 +87,7 @@ class Ip2LocationClient(BaseIpClient):
         if response.status_code != 200:
             error_message = self._extract_error_message(data)
 
-            raise InvalidIpLookupError(
+            raise IpProviderError(
                 error_message
                 or (
                     "Falha na consulta de IP. "
@@ -93,7 +96,7 @@ class Ip2LocationClient(BaseIpClient):
             )
 
         if data.get("error"):
-            raise InvalidIpLookupError(
+            raise IpProviderError(
                 self._extract_error_message(data)
                 or "A API retornou um erro não identificado."
             )
