@@ -38,13 +38,14 @@ export function Divider() {
   return <hr className="divider" />
 }
 
-export function TechnicalValue({ children, canCopy = false }: { children: ReactNode; canCopy?: boolean }) {
+export function TechnicalValue({ children, canCopy = false, copyValue }: { children: ReactNode; canCopy?: boolean; copyValue?: string }) {
   const value = typeof children === 'string' ? children : ''
+  const copiedValue = copyValue ?? value
   return (
     <span className="technical-value">
       <code>{children}</code>
-      {canCopy && value && (
-        <button type="button" className="copy-button" onClick={() => navigator.clipboard?.writeText(value)}>
+      {canCopy && copiedValue && (
+        <button type="button" className="copy-button" aria-label="Copiar valor" onClick={() => navigator.clipboard?.writeText(copiedValue)}>
           Copiar
         </button>
       )}

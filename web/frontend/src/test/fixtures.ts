@@ -27,5 +27,5 @@ export const analysisFixture: AnalysisContract = {
     { code: 'ip_context', component: 'ip_context', status: 'skipped' },
     { code: 'biometric_analysis', component: 'biometric', status: 'unavailable' },
   ],
-  execution: { runtime: 'python' },
+  execution: { runtime: 'python', started_at: '2026-08-08T14:31:58Z', finished_at: '2026-08-08T14:32:00.400Z' },
 }

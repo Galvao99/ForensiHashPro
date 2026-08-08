@@ -1,5 +1,6 @@
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import { AppShell } from './components/AppShell'
+import { AnalysisSessionProvider } from './context/AnalysisSessionContext'
 import { PublicLayout } from './components/PublicLayout'
 import { AnalysisPage } from './pages/AnalysisPage'
 import { LoginPage, RegisterPage } from './pages/AuthPages'
@@ -25,10 +26,11 @@ export function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
         </Route>
-        <Route path="/app" element={<AppShell />}>
+        <Route path="/app" element={<AnalysisSessionProvider><AppShell /></AnalysisSessionProvider>}>
           <Route index element={<DashboardPage />} />
           <Route path="analysis" element={<AnalysisPage />} />
           <Route path="result" element={<ResultPage />} />
+          <Route path="result/:analysisId" element={<ResultPage />} />
           <Route path="history" element={<PlaceholderPage title="Histórico" message="O histórico depende de persistência e será implementado em fase posterior." />} />
           <Route path="ddna" element={<PlaceholderPage title="DDNA" message="Tecnologia em desenvolvimento. Nenhum registro DDNA é criado nesta versão." />} />
           <Route path="account" element={<PlaceholderPage title="Conta" message="Contas e autenticação ainda não estão disponíveis." />} />

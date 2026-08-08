@@ -109,6 +109,16 @@ async def create_analysis(
             request_id,
         ) from error
     except UploadStagingError as error:
+        LOGGER.error(
+            "web_upload_staging_failed",
+            extra={
+                "request_id": request_id,
+                "component": "upload_storage",
+                "error_type": error.cause_type,
+                "operation": error.operation,
+                "technical_path": str(error.path),
+            },
+        )
         raise _error(
             status.HTTP_500_INTERNAL_SERVER_ERROR,
             "staging_failed",

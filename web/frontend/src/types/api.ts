@@ -45,6 +45,18 @@ export interface AnalysisContract {
   [key: string]: unknown
 }
 
+export interface AnalysisSummary {
+  analysisId: string
+  filename: string
+  detectedType: string | null
+  sha256: string | null
+  status: string
+  createdAt: string | null
+  durationMs: number | null
+  findingsCount: number
+  limitationsCount: number
+}
+
 export interface CapabilityState {
   available?: boolean
   available_in_individual_analysis?: boolean

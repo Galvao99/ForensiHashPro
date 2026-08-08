@@ -3,6 +3,8 @@ from __future__ import annotations
 import re
 import shutil
 import tempfile
+import os
+import getpass
 from hashlib import sha256
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
@@ -28,6 +30,12 @@ class EmptyUploadError(ValueError):
 
 class UploadStagingError(RuntimeError):
     """O upload não pôde ser preservado no staging controlado."""
+
+    def __init__(self, message: str, *, operation: str, path: Path, cause: OSError) -> None:
+        super().__init__(message)
+        self.operation = operation
+        self.path = path
+        self.cause_type = type(cause).__name__
 
 
 class UploadIntegrityError(RuntimeError):
@@ -86,8 +94,13 @@ class UploadStorage:
         *,
         root: Path | None = None,
         max_file_size_bytes: int | None = None,
+        platform_name: str | None = None,
     ) -> None:
         paths = ApplicationPaths.discover()
+        self._platform_name = platform_name or os.name
+        self._allow_fallback = root is None and not os.environ.get(
+            "FORENSIHASH_TEMP_DIR", ""
+        ).strip()
         self.root = Path(root or paths.temp_dir / "web-uploads").resolve()
         if max_file_size_bytes is None:
             settings = SettingsService(paths=paths).load()
@@ -99,13 +112,15 @@ class UploadStorage:
     @asynccontextmanager
     async def stage(self, upload: UploadFile) -> AsyncIterator[StagedUpload]:
         try:
-            self.root.mkdir(mode=0o700, parents=True, exist_ok=True)
-            workspace = Path(
-                tempfile.mkdtemp(prefix="request-", dir=self.root)
-            ).resolve()
+            workspace = self._create_workspace()
         except OSError as error:
             await upload.close()
-            raise UploadStagingError("Falha ao criar o staging do upload.") from error
+            raise UploadStagingError(
+                "Falha ao criar o staging do upload.",
+                operation="create_request_directory",
+                path=self.root,
+                cause=error,
+            ) from error
         destination = workspace / self._internal_name(upload.filename)
         size = 0
         digest = sha256()
@@ -130,10 +145,48 @@ class UploadStorage:
         except (EmptyUploadError, UploadTooLargeError):
             raise
         except OSError as error:
-            raise UploadStagingError("Falha ao gravar o upload no staging.") from error
+            raise UploadStagingError(
+                "Falha ao gravar o upload no staging.",
+                operation="write_upload",
+                path=destination,
+                cause=error,
+            ) from error
         finally:
             await upload.close()
             self._cleanup(workspace)
+
+    def _create_workspace(self) -> Path:
+        try:
+            self._ensure_root(self.root)
+            return Path(tempfile.mkdtemp(prefix="request-", dir=self.root)).resolve()
+        except PermissionError:
+            if not self._allow_fallback or self._platform_name != "nt":
+                raise
+            # Um root legado pode ter sido criado com a ACL 0700 por outra
+            # identidade Windows. Não o removemos: usamos um root gerenciado,
+            # específico da identidade atual e com ACL herdada normalmente.
+            self.root = self._windows_fallback_root()
+            self._ensure_root(self.root)
+            return Path(tempfile.mkdtemp(prefix="request-", dir=self.root)).resolve()
+
+    def _ensure_root(self, root: Path) -> None:
+        if self._platform_name == "nt":
+            root.mkdir(parents=True, exist_ok=True)
+        else:
+            root.mkdir(mode=0o700, parents=True, exist_ok=True)
+            root.chmod(0o700)
+        if not root.is_dir():
+            raise NotADirectoryError(str(root))
+
+    @staticmethod
+    def _windows_fallback_root() -> Path:
+        identity = f"{getpass.getuser()}|{Path.home()}".encode("utf-8")
+        scope = sha256(identity).hexdigest()[:12]
+        return (
+            Path(tempfile.gettempdir())
+            / f"ForensiHashPro-{scope}"
+            / "web-uploads"
+        ).resolve()
 
     def _internal_name(self, client_filename: str | None) -> str:
         suffix = Path(client_filename or "").suffix.lower()

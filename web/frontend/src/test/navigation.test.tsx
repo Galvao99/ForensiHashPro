@@ -13,7 +13,7 @@ describe('navegação pública', () => {
 
   it('o logo navega para a página inicial', async () => {
     renderAt('/ddna')
-    await userEvent.click(screen.getByRole('link', { name: /forensihash pro — página inicial/i }))
+    await userEvent.click(screen.getByRole('link', { name: /forensihash.*página inicial/i }))
     expect(window.location.pathname).toBe('/')
     expect(screen.getByRole('heading', { name: /análise e rastreabilidade/i })).toBeInTheDocument()
   })

@@ -21,6 +21,7 @@ from web.backend.app.services import (
     UploadStorage,
     WebAnalysisService,
 )
+from web.backend.app.services import analysis_service as analysis_service_module
 
 
 def _contract() -> AnalysisContract:
@@ -93,6 +94,128 @@ def test_analysis_upload_is_serializable_randomly_named_and_removed(api_client) 
     assert service.observed_path.suffix == ".txt"
     assert not service.observed_path.exists()
     assert list(storage.root.iterdir()) == []
+
+
+def test_staging_creates_missing_root_and_cleans_request_directory(tmp_path: Path) -> None:
+    root = tmp_path / "missing" / "uploads"
+    storage = UploadStorage(root=root, max_file_size_bytes=16)
+    app.dependency_overrides[get_upload_storage] = lambda: storage
+    app.dependency_overrides[get_web_analysis_service] = lambda: RecordingService()
+    try:
+        with TestClient(app) as client:
+            response = client.post(
+                "/api/v1/analyses",
+                files={"file": ("sample.txt", b"data", "text/plain")},
+            )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    assert root.is_dir()
+    assert list(root.iterdir()) == []
+
+
+def test_windows_staging_does_not_apply_posix_chmod(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    storage = UploadStorage(
+        root=tmp_path / "uploads",
+        max_file_size_bytes=16,
+        platform_name="nt",
+    )
+    monkeypatch.setattr(
+        Path,
+        "chmod",
+        lambda *_args, **_kwargs: pytest.fail("chmod não deve ser usado no Windows"),
+    )
+
+    workspace = storage._create_workspace()
+    storage._cleanup(workspace)
+
+    assert storage.root.is_dir()
+    assert list(storage.root.iterdir()) == []
+
+
+def test_posix_staging_preserves_restrictive_root_mode(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    applied_modes: list[int] = []
+    monkeypatch.setattr(
+        Path,
+        "chmod",
+        lambda _path, mode: applied_modes.append(mode),
+    )
+    storage = UploadStorage(
+        root=tmp_path / "uploads",
+        max_file_size_bytes=16,
+        platform_name="posix",
+    )
+
+    workspace = storage._create_workspace()
+    try:
+        assert applied_modes == [0o700]
+    finally:
+        storage._cleanup(workspace)
+
+
+def test_windows_uses_managed_fallback_without_removing_inaccessible_root(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    primary = tmp_path / "legacy-root"
+    fallback = tmp_path / "identity-root"
+    primary.mkdir()
+    marker = primary / "unknown-content.txt"
+    marker.write_text("preserve", encoding="utf-8")
+    storage = UploadStorage(
+        root=primary,
+        max_file_size_bytes=16,
+        platform_name="nt",
+    )
+    storage._allow_fallback = True
+    original_ensure_root = storage._ensure_root
+
+    def simulate_acl(root: Path) -> None:
+        if root == primary:
+            raise PermissionError("simulated Windows ACL")
+        original_ensure_root(root)
+
+    monkeypatch.setattr(storage, "_ensure_root", simulate_acl)
+    monkeypatch.setattr(storage, "_windows_fallback_root", lambda: fallback)
+
+    workspace = storage._create_workspace()
+    storage._cleanup(workspace)
+
+    assert marker.read_text(encoding="utf-8") == "preserve"
+    assert storage.root == fallback
+    assert list(fallback.iterdir()) == []
+
+
+def test_staging_permission_error_is_logged_and_http_response_remains_safe(
+    api_client, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    client, _service, storage = api_client
+
+    def deny_request_directory(*_args, **_kwargs):
+        raise PermissionError("C:/private/web-uploads secret-detail")
+
+    monkeypatch.setattr(analysis_service_module.tempfile, "mkdtemp", deny_request_directory)
+
+    with caplog.at_level("ERROR", logger="forensihash.web"):
+        response = client.post(
+            "/api/v1/analyses",
+            files={"file": ("sample.txt", b"data", "text/plain")},
+        )
+
+    assert response.status_code == 500
+    assert response.json()["error"]["code"] == "staging_failed"
+    assert "private" not in response.text.lower()
+    assert "secret-detail" not in response.text.lower()
+    record = next(item for item in caplog.records if item.msg == "web_upload_staging_failed")
+    assert record.request_id
+    assert record.component == "upload_storage"
+    assert record.error_type == "PermissionError"
+    assert record.operation == "create_request_directory"
+    assert record.technical_path == str(storage.root)
 
 
 def test_upload_above_limit_is_rejected_and_removed(api_client) -> None:
