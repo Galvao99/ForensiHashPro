@@ -7,6 +7,15 @@ class MissingIpApiKeyError(IpIntegrationError):
 class InvalidIpLookupError(IpIntegrationError):
     pass
 
+class IpTimeoutError(IpIntegrationError):
+    pass
+
+class IpNetworkUnavailableError(IpIntegrationError):
+    pass
+
+class IpProviderError(IpIntegrationError):
+    pass
+
 class UnsupportedIpProviderError(IpIntegrationError):
     pass
 

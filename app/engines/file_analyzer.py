@@ -20,6 +20,12 @@ from app.services.biometric_report_exceptions import (
 from app.services.biometric_report_service import BiometricReportService
 from app.engines.binary_structure_engine import BinaryStructureEngine
 from app.processing import ProcessingIssue, ProcessingStatus, StepResult
+from app.processing import ProcessingImpact
+from app.evidence.models import CaptureState, EvidenceSource
+
+
+class UnacquiredEvidenceError(RuntimeError):
+    """Uso inseguro do agregador fora da fronteira de aquisição."""
 
 
 class FileAnalyzer:
@@ -64,6 +70,35 @@ class FileAnalyzer:
         )
 
     def analyze(
+        self,
+        file_path: Path,
+    ) -> AnalysisResult:
+        """Bloqueia o uso acidental deste componente como entrada pública.
+
+        Use ``AnalysisService.analyze`` para uma análise oficial ou
+        ``analyze_fixture`` em testes unitários controlados.
+        """
+        raise UnacquiredEvidenceError(
+            "FileAnalyzer não é uma fronteira pública. Use AnalysisService.analyze() "
+            "ou analyze_fixture() apenas em testes unitários controlados."
+        )
+
+    def analyze_acquired(self, evidence: EvidenceSource) -> AnalysisResult:
+        """Executa engines somente sobre a cópia criada pelo EvidenceManager."""
+        if evidence.capture_state is not CaptureState.ACQUIRED:
+            raise UnacquiredEvidenceError(
+                "A evidência deve estar no estado ACQUIRED antes dos engines."
+            )
+        working_path = Path(evidence.working_path)
+        if working_path == evidence.original_path or not working_path.is_file():
+            raise UnacquiredEvidenceError("Cópia de trabalho adquirida inválida.")
+        return self._analyze_path(working_path)
+
+    def analyze_fixture(self, file_path: Path) -> AnalysisResult:
+        """Entrada explícita para testes unitários de engines com fixture controlada."""
+        return self._analyze_path(Path(file_path))
+
+    def _analyze_path(
         self,
         file_path: Path,
     ) -> AnalysisResult:
@@ -127,11 +162,15 @@ class FileAnalyzer:
             pdf_structure=pdf_structure,
         )
 
-        json_analysis = self._analyze_json(
+        json_step = self._analyze_json(
             file_path
         )
+        processing_steps.append(json_step)
+        json_analysis = json_step.value
 
-        biometric_report = self._analyze_biometric_report(file_path)
+        biometric_step = self._analyze_biometric_report(file_path)
+        processing_steps.append(biometric_step)
+        biometric_report = biometric_step.value
 
         findings = self.findings_engine.analyze(
             metadata=metadata,
@@ -185,46 +224,140 @@ class FileAnalyzer:
     def _analyze_biometric_report(
         self,
         file_path: Path,
-    ) -> BiometricReport | None:
+    ) -> StepResult[BiometricReport]:
         if (
-            self.biometric_report_service is None
-            or file_path.suffix.lower() != ".json"
+            file_path.suffix.lower() != ".json"
         ):
-            return None
-        try:
-            return self.biometric_report_service.parse(file_path)
-        except (
-            InvalidBiometricJsonError,
-            UnrecognizedBiometricReportError,
-        ):
-            return None
-        except BiometricReportError as error:
-            print(
-                "Falha controlada durante a análise biométrica de "
-                f"{file_path.name}: {error}"
+            return self._processing_step(
+                "biometric_analysis",
+                "biometric",
+                ProcessingStatus.SKIPPED,
+                "Formato não aplicável à análise biométrica.",
             )
-            return None
+        if self.biometric_report_service is None:
+            issue = self._processing_issue(
+                "biometric_parser_unavailable",
+                "biometric",
+                ProcessingStatus.UNAVAILABLE,
+                "Parser biométrico não configurado.",
+            )
+            return self._processing_step(
+                "biometric_analysis",
+                "biometric",
+                ProcessingStatus.UNAVAILABLE,
+                issue.user_message,
+                issues=[issue],
+            )
+        try:
+            report = self.biometric_report_service.parse(file_path)
+            if report is None:
+                return self._processing_step(
+                    "biometric_analysis", "biometric", ProcessingStatus.NO_FINDINGS,
+                    "Nenhuma estrutura biométrica reconhecida.",
+                )
+            status = ProcessingStatus.PARTIAL if report.warnings else ProcessingStatus.SUCCESS
+            return self._processing_step(
+                "biometric_analysis", "biometric", status,
+                "Relatório biométrico interpretado.", value=report,
+            )
+        except UnrecognizedBiometricReportError:
+            return self._processing_step(
+                "biometric_analysis", "biometric", ProcessingStatus.NO_FINDINGS,
+                "JSON válido sem estrutura biométrica reconhecida.",
+            )
+        except InvalidBiometricJsonError as error:
+            issue = self._processing_issue(
+                "biometric_json_invalid", "biometric", ProcessingStatus.FAILED,
+                "O JSON não pôde ser validado para análise biométrica.", error,
+            )
+            return self._processing_step(
+                "biometric_analysis", "biometric", ProcessingStatus.FAILED,
+                issue.user_message, issues=[issue],
+            )
+        except BiometricReportError as error:
+            issue = self._processing_issue(
+                "biometric_parser_failed", "biometric", ProcessingStatus.FAILED,
+                "O parser biométrico não concluiu a análise.", error,
+            )
+            return self._processing_step(
+                "biometric_analysis", "biometric", ProcessingStatus.FAILED,
+                issue.user_message, issues=[issue],
+            )
 
     def _analyze_json(
         self,
         file_path: Path,
-    ) -> JsonAnalysisResult | None:
+    ) -> StepResult[JsonAnalysisResult]:
         if (
             file_path.suffix.lower()
             not in self.JSON_EXTENSIONS
         ):
-            return None
+            return self._processing_step(
+                "json_analysis", "json", ProcessingStatus.SKIPPED,
+                "Formato não aplicável à análise JSON.",
+            )
 
+        parse_step = getattr(self.json_parser_service, "parse_step", None)
+        if callable(parse_step):
+            return parse_step(file_path)
         try:
-            return self.json_parser_service.parse(
-                file_path
-            )
-
+            value = self.json_parser_service.parse(file_path)
         except Exception as error:
-            return JsonAnalysisResult(
-                is_valid=False,
-                error_message=str(error),
+            issue = self._processing_issue(
+                "json_parser_failed", "json", ProcessingStatus.FAILED,
+                "O parser JSON não concluiu a análise.", error,
             )
+            return self._processing_step(
+                "json_analysis", "json", ProcessingStatus.FAILED,
+                issue.user_message,
+                value=JsonAnalysisResult(is_valid=False, error_message=issue.user_message),
+                issues=[issue],
+            )
+        status = ProcessingStatus.SUCCESS if value.is_valid else ProcessingStatus.FAILED
+        return self._processing_step(
+            "json_analysis", "json", status,
+            "Análise JSON concluída." if value.is_valid else "JSON inválido.",
+            value=value,
+        )
+
+    @staticmethod
+    def _processing_issue(
+        code: str,
+        component: str,
+        status: ProcessingStatus,
+        message: str,
+        error: BaseException | None = None,
+    ) -> ProcessingIssue:
+        return ProcessingIssue(
+            code=code,
+            component=component,
+            status=status,
+            technical_message=message,
+            user_message=message,
+            impact=ProcessingImpact.COMPONENT_ONLY,
+            details={"error_type": type(error).__name__} if error else {},
+            original_exception=error,
+        )
+
+    @staticmethod
+    def _processing_step(
+        code: str,
+        component: str,
+        status: ProcessingStatus,
+        message: str,
+        *,
+        value=None,
+        issues: list[ProcessingIssue] | None = None,
+    ) -> StepResult:
+        return StepResult(
+            code=code,
+            component=component,
+            status=status,
+            technical_message=message,
+            user_message=message,
+            value=value,
+            issues=issues or [],
+        )
 
     def _build_integrity_result(
         self,

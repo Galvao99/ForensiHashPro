@@ -121,7 +121,7 @@ class AnalysisContractJson:
                             "observed_at": datetime.fromisoformat(item["observed_at"]),
                         }
                     )
-                    for item in data.get("external_results", [])
-                ],
+                    for item in (data.get("external_results") or [])
+                ] if data.get("external_results") is not None else None,
             }
         )

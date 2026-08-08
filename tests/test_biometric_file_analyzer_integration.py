@@ -35,7 +35,7 @@ def test_file_analyzer_adds_biometric_report_and_keeps_json_analysis() -> None:
     service = BiometricReportService(
         BiometricParserRegistry([AwareKnomiReportParser()])
     )
-    result = _analyzer(service).analyze(
+    result = _analyzer(service).analyze_fixture(
         Path("tests/fixtures/biometrics/aware_knomi_report.json")
     )
     assert result.biometric_report is not None
@@ -53,6 +53,6 @@ def test_common_json_remains_non_biometric(tmp_path: Path) -> None:
     service = BiometricReportService(
         BiometricParserRegistry([AwareKnomiReportParser()])
     )
-    result = _analyzer(service).analyze(path)
+    result = _analyzer(service).analyze_fixture(path)
     assert result.biometric_report is None
     assert result.json_analysis is not None

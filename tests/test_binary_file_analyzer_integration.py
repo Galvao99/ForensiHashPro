@@ -38,7 +38,7 @@ def test_file_analyzer_runs_binary_once_and_keeps_old_analyses(
     path = tmp_path / "sample.txt"
     path.write_text("ForensiHash binary foundation", encoding="utf-8")
     binary_engine = _RecordingBinaryEngine()
-    result = _analyzer(binary_engine).analyze(path)
+    result = _analyzer(binary_engine).analyze_fixture(path)
     assert binary_engine.calls == [path]
     assert result.binary_analysis is not None
     assert result.binary_analysis.file_size == path.stat().st_size
@@ -52,7 +52,7 @@ def test_file_analyzer_runs_binary_once_and_keeps_old_analyses(
 def test_optional_binary_engine_preserves_compatibility(tmp_path: Path) -> None:
     path = tmp_path / "sample.txt"
     path.write_text("legacy construction", encoding="utf-8")
-    result = _analyzer().analyze(path)
+    result = _analyzer().analyze_fixture(path)
     assert result.binary_analysis is None
 
 
@@ -64,7 +64,7 @@ class _FailingBinaryEngine:
 def test_binary_failure_does_not_abort_main_analysis(tmp_path: Path) -> None:
     path = tmp_path / "sample.txt"
     path.write_text("main analysis survives", encoding="utf-8")
-    result = _analyzer(_FailingBinaryEngine()).analyze(path)
+    result = _analyzer(_FailingBinaryEngine()).analyze_fixture(path)
     assert result.binary_analysis is None
     assert result.hashes.sha256
 
