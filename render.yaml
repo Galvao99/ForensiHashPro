@@ -59,6 +59,9 @@ services:
       - key: VITE_API_TIMEOUT_MS
         value: "15000"
 
+      - key: VITE_ANALYSIS_TIMEOUT_MS
+        value: "120000"
+
       - key: VITE_REGISTRATION_ENABLED
         value: "false"
 
