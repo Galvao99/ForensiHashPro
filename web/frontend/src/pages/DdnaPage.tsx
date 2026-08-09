@@ -3,7 +3,7 @@ import { Section } from '../components/ui'
 export function DdnaPage() {
   return (
     <>
-      <Section eyebrow="DDNA · DIGITAL DNA" title="IDENTIDADE TÉCNICA VERIFICÁVEL PARA EVIDÊNCIAS DIGITAIS.">
+      <Section eyebrow="DDNA · DOCUMENT DNA" title="IDENTIDADE TÉCNICA VERIFICÁVEL PARA EVIDÊNCIAS DIGITAIS.">
         <span className="development-flag">EM DESENVOLVIMENTO</span>
         <p className="lead">Uma tecnologia em desenvolvimento no ecossistema ForensiHash para associar a uma evidência digital um registro técnico verificável de identidade, integridade e contexto.</p>
       </Section>

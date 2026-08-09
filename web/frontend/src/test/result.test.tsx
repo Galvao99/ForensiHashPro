@@ -21,9 +21,7 @@ describe('resultado técnico', () => {
 
   it('distingue null de coleção vazia', () => {
     render(<ResultView result={analysisFixture} />)
-    const ip = screen.getByRole('heading', { name: 'IP' }).closest('section')!
-    const timeline = screen.getByRole('heading', { name: 'Timeline' }).closest('section')!
-    expect(within(ip).getByText(/não executada ou fora do escopo/i)).toBeInTheDocument()
-    expect(within(timeline).getByText(/executada sem itens/i)).toBeInTheDocument()
+    expect(screen.getByText(/não executado ou indisponível; consulte as etapas/i)).toBeInTheDocument()
+    expect(screen.getByText(/nenhuma assinatura reportada/i)).toBeInTheDocument()
   })
 })

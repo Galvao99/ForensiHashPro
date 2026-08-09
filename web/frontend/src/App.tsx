@@ -12,10 +12,17 @@ import { ProductPage } from './pages/ProductPage'
 import { ReferencesPage } from './pages/ReferencesPage'
 import { ResultPage } from './pages/ResultPage'
 import { TechnologyPage } from './pages/TechnologyPage'
+import { AuthProvider } from './context/AuthContext'
+import { ThemeProvider } from './context/ThemeContext'
+import { ProtectedRoute } from './components/ProtectedRoute'
+import { AccountPage } from './pages/AccountPage'
+import { PrivacyPage, TermsPage } from './pages/LegalPages'
+import { AdminUsersPage } from './pages/AdminUsersPage'
+import { HistoryPage } from './pages/HistoryPage'
 
 export function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter><AuthProvider><ThemeProvider>
       <Routes>
         <Route element={<PublicLayout />}>
           <Route path="/" element={<HomePage />} />
@@ -25,18 +32,22 @@ export function App() {
           <Route path="/references" element={<ReferencesPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
+          <Route path="/terms" element={<TermsPage />} />
+          <Route path="/privacy" element={<PrivacyPage />} />
         </Route>
-        <Route path="/app" element={<AnalysisSessionProvider><AppShell /></AnalysisSessionProvider>}>
+        <Route element={<ProtectedRoute />}><Route path="/app" element={<AnalysisSessionProvider><AppShell /></AnalysisSessionProvider>}>
           <Route index element={<DashboardPage />} />
           <Route path="analysis" element={<AnalysisPage />} />
           <Route path="result" element={<ResultPage />} />
           <Route path="result/:analysisId" element={<ResultPage />} />
-          <Route path="history" element={<PlaceholderPage title="Histórico" message="O histórico depende de persistência e será implementado em fase posterior." />} />
+          <Route path="history" element={<HistoryPage />} />
           <Route path="ddna" element={<PlaceholderPage title="DDNA" message="Tecnologia em desenvolvimento. Nenhum registro DDNA é criado nesta versão." />} />
-          <Route path="account" element={<PlaceholderPage title="Conta" message="Contas e autenticação ainda não estão disponíveis." />} />
-        </Route>
+          <Route path="account" element={<AccountPage />} />
+          <Route path="assistant" element={<PlaceholderPage title="Assistente" message="Em desenvolvimento. Nenhum documento ou resultado é enviado a serviços de IA." />} />
+        </Route></Route>
+        <Route element={<ProtectedRoute admin />}><Route path="/admin/users" element={<AdminUsersPage />} /></Route>
         <Route path="*" element={<PlaceholderPage title="Página não encontrada" message="Verifique o endereço informado." />} />
       </Routes>
-    </BrowserRouter>
+    </ThemeProvider></AuthProvider></BrowserRouter>
   )
 }

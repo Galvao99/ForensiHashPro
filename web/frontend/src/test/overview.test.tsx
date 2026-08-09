@@ -7,7 +7,7 @@ import { AnalysisSessionProvider, summarizeAnalysis } from '../context/AnalysisS
 import { DashboardPage } from '../pages/DashboardPage'
 import { ResultPage } from '../pages/ResultPage'
 import type { AnalysisContract } from '../types/api'
-import { analysisFixture } from './fixtures'
+import { analysisFixture, authFixture } from './fixtures'
 
 function response(body: unknown, ok = true): Response {
   return { ok, json: async () => body } as Response
@@ -56,7 +56,7 @@ describe('overview da sessão', () => {
     renderOverview([contract(1)])
     await userEvent.click(screen.getByRole('link', { name: 'document-1.pdf' }))
     expect(screen.getByRole('heading', { name: 'document-1.pdf' })).toBeInTheDocument()
-    expect(screen.getByText('analysis-1')).toBeInTheDocument()
+    expect(screen.getAllByText(/123456789abcdef/).length).toBeGreaterThan(0)
   })
 
   it('abrevia o SHA visualmente sem alterar o valor copiado', () => {
@@ -90,15 +90,15 @@ describe('overview da sessão', () => {
   })
 
   it('adiciona uma análise real à sessão sem usar armazenamento persistente', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response(analysisFixture)))
+    vi.stubGlobal('fetch', vi.fn((input: string) => Promise.resolve(response(String(input).includes('/auth/me') ? authFixture : analysisFixture))))
     window.history.pushState({}, '', '/app/analysis')
     render(<App />)
-    await userEvent.upload(screen.getByLabelText('Selecionar arquivo'), new File(['synthetic'], 'synthetic.txt'))
+    await userEvent.upload(await screen.findByLabelText('Selecionar arquivo'), new File(['synthetic'], 'synthetic.txt'))
     await userEvent.click(screen.getByRole('button', { name: 'Analisar' }))
-    expect(await screen.findByText('analysis-test')).toBeInTheDocument()
-    await userEvent.click(screen.getByRole('link', { name: 'Overview' }))
+    expect(await screen.findByRole('heading', { name: 'synthetic.txt' })).toBeInTheDocument()
+    await userEvent.click(screen.getAllByRole('link', { name: 'Overview' }).find((link) => link.getAttribute('href') === '/app')!)
     expect(screen.getByText('synthetic.txt')).toBeInTheDocument()
-    expect(localStorage.length).toBe(0)
+    expect(localStorage.getItem('forensihash-theme')).toBe('SYSTEM')
     expect(sessionStorage.length).toBe(0)
   })
 })

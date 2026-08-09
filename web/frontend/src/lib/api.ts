@@ -1,6 +1,7 @@
-import type { AnalysisContract, ApiErrorEnvelope, Capabilities } from '../types/api'
+import type { AnalysisContract, ApiErrorEnvelope, AuthResponse, Capabilities, PrivacyPreferences, WebUser } from '../types/api'
 
 const configuredBase = import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, '') ?? ''
+const requestTimeoutMs = Number(import.meta.env.VITE_API_TIMEOUT_MS ?? 15_000)
 
 export class ApiError extends Error {
   constructor(
@@ -13,29 +14,58 @@ export class ApiError extends Error {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${configuredBase}${path}`, init)
-  if (!response.ok) {
-    let payload: ApiErrorEnvelope = {}
-    try {
-      payload = (await response.json()) as ApiErrorEnvelope
-    } catch {
-      // A resposta pública permanece genérica quando o servidor não envia JSON.
+  const controller = new AbortController()
+  const timeout = window.setTimeout(() => controller.abort(), requestTimeoutMs)
+  try {
+    const response = await fetch(`${configuredBase}${path}`, { credentials: 'include', ...init, signal: init?.signal ?? controller.signal })
+    if (!response.ok) {
+      let payload: ApiErrorEnvelope = {}
+      try {
+        payload = (await response.json()) as ApiErrorEnvelope
+      } catch {
+        // A resposta pública permanece genérica quando o servidor não envia JSON.
+      }
+      throw new ApiError(
+        payload.error?.message ?? 'Não foi possível concluir a solicitação.',
+        payload.error?.code,
+        payload.error?.request_id,
+      )
     }
-    throw new ApiError(
-      payload.error?.message ?? 'Não foi possível concluir a solicitação.',
-      payload.error?.code,
-      payload.error?.request_id,
-    )
+    if (response.status === 204) return undefined as T
+    return (await response.json()) as T
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      throw new ApiError('O backend não respondeu dentro do tempo esperado.', 'request_timeout')
+    }
+    if (error instanceof TypeError) {
+      throw new ApiError('Não foi possível conectar ao backend.', 'network_error')
+    }
+    throw error
+  } finally {
+    window.clearTimeout(timeout)
   }
-  return (await response.json()) as T
 }
 
 export function getCapabilities(): Promise<Capabilities> {
   return request<Capabilities>('/api/v1/capabilities')
 }
 
-export function submitAnalysis(file: File): Promise<AnalysisContract> {
+export function submitAnalysis(file: File, options?: { retentionMode?: string; privateSession?: boolean; csrfToken?: string }): Promise<AnalysisContract> {
   const body = new FormData()
   body.append('file', file)
-  return request<AnalysisContract>('/api/v1/analyses', { method: 'POST', body })
+  if (options?.retentionMode) body.append('retention_mode', options.retentionMode)
+  body.append('private_session', String(Boolean(options?.privateSession)))
+  return request<AnalysisContract>('/api/v1/analyses', { method: 'POST', body, headers: options?.csrfToken ? { 'X-CSRF-Token': options.csrfToken } : undefined })
 }
+
+export const authApi = {
+  me: () => request<AuthResponse>('/api/v1/auth/me'),
+  login: (email: string, password: string) => request<AuthResponse>('/api/v1/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) }),
+  register: (payload: object) => request<AuthResponse>('/api/v1/auth/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }),
+  logout: (csrf: string) => request<void>('/api/v1/auth/logout', { method: 'POST', headers: { 'X-CSRF-Token': csrf } }),
+  updatePrivacy: (payload: object, csrf: string) => request<PrivacyPreferences>('/api/v1/auth/privacy', { method: 'PATCH', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf }, body: JSON.stringify(payload) }),
+  users: () => request<WebUser[]>('/api/v1/admin/users'),
+  updateUser: (id: string, payload: object, csrf: string) => request<WebUser>(`/api/v1/admin/users/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf }, body: JSON.stringify(payload) }),
+}
+
+export function getHistory(): Promise<Array<{ id: string; result: AnalysisContract }>> { return request('/api/v1/analyses/history') }

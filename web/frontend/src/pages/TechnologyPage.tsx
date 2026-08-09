@@ -8,7 +8,7 @@ function TechnologyGrid({ items }: { items: string[][] }) {
 export function TechnologyPage() {
   return (
     <>
-      <Section eyebrow="TECNOLOGIA" title="COMPONENTES REAIS. RESPONSABILIDADES DEFINIDAS."><p className="lead">A plataforma combina um núcleo Python, componentes especializados e ferramentas externas detectadas pelo ambiente. A interface não replica regras de análise.</p></Section>
+      <Section eyebrow="TECNOLOGIA" title="COMPONENTES REAIS E RESPONSABILIDADES DEFINIDAS"><p className="lead">A plataforma combina um núcleo Python, componentes especializados e ferramentas externas detectadas pelo ambiente. A interface não replica regras de análise.</p></Section>
       <Section className="surface-section" eyebrow="UTILIZADO ATUALMENTE" title="STACK TÉCNICA"><TechnologyGrid items={currentTechnologies} /></Section>
       <Section eyebrow="ROADMAP" title="EM DESENVOLVIMENTO / PLANEJADO"><TechnologyGrid items={roadmapTechnologies} /></Section>
     </>

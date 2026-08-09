@@ -6,5 +6,29 @@ services:
     image: forensihash-api:local
     environment:
       FORENSIHASH_TEMP_DIR: /tmp/forensihash
+      FORENSIHASH_DATABASE_URL: postgresql+psycopg://forensihash:${POSTGRES_PASSWORD:-local-only}@postgres:5432/forensihash
+      FORENSIHASH_SESSION_SECRET: ${FORENSIHASH_SESSION_SECRET:-development-only-change-before-production}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: ["sh", "-c", "python -m alembic upgrade head && python -m uvicorn web.backend.app.main:app --host 0.0.0.0 --port 8000"]
     ports:
       - "8000:8000"
+  postgres:
+    image: postgres:17-bookworm
+    environment:
+      POSTGRES_DB: forensihash
+      POSTGRES_USER: forensihash
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local-only}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U forensihash -d forensihash"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    ports:
+      - "${POSTGRES_HOST_PORT:-5432}:5432"
+    volumes:
+      - forensihash-postgres:/var/lib/postgresql/data
+
+volumes:
+  forensihash-postgres:
