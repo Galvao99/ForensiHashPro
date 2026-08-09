@@ -11,6 +11,8 @@ import time
 from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerifyMismatchError
 
+from web.backend.app.runtime_config import cookie_samesite, cookie_secure, deployed_environment
+
 
 COOKIE_NAME = "forensihash_session"
 CSRF_COOKIE_NAME = "forensihash_csrf"
@@ -47,7 +49,7 @@ def normalize_email(email: str) -> str:
 def _secret() -> bytes:
     value = os.environ.get("FORENSIHASH_SESSION_SECRET", "")
     if len(value) < 32:
-        if os.environ.get("FORENSIHASH_ENV", "development") == "production":
+        if deployed_environment():
             raise RuntimeError("FORENSIHASH_SESSION_SECRET deve possuir ao menos 32 caracteres.")
         value = "development-only-change-before-production"
     return value.encode("utf-8")
@@ -81,4 +83,8 @@ def new_csrf_token() -> str:
 
 
 def secure_cookies() -> bool:
-    return os.environ.get("FORENSIHASH_COOKIE_SECURE", "false").lower() == "true"
+    return cookie_secure()
+
+
+def same_site_cookies() -> str:
+    return cookie_samesite()

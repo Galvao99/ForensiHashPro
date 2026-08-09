@@ -14,8 +14,9 @@ from web.backend.app.api.dependencies import current_user, require_csrf
 from web.backend.app.database import get_db
 from web.backend.app.errors import WebApiError
 from web.backend.app.models import Consent, ConsentType, RetentionMode, User, UserPrivacyPreferences
+from web.backend.app.runtime_config import registration_enabled
 from web.backend.app.schemas.auth import AuthResponse, LoginRequest, PrivacyPatchRequest, PrivacyResponse, RegisterRequest, UserPatchRequest, UserResponse
-from web.backend.app.security import COOKIE_NAME, CSRF_COOKIE_NAME, SESSION_MAX_AGE, create_session_token, hash_password, new_csrf_token, normalize_email, secure_cookies, validate_password, verify_password
+from web.backend.app.security import COOKIE_NAME, CSRF_COOKIE_NAME, SESSION_MAX_AGE, create_session_token, hash_password, new_csrf_token, normalize_email, same_site_cookies, secure_cookies, validate_password, verify_password
 
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
@@ -34,7 +35,7 @@ def _privacy(preferences: UserPrivacyPreferences) -> PrivacyResponse:
 
 def _set_auth_cookies(response: Response, user: User) -> str:
     csrf = new_csrf_token()
-    common = {"secure": secure_cookies(), "samesite": "lax", "max_age": SESSION_MAX_AGE, "path": "/"}
+    common = {"secure": secure_cookies(), "samesite": same_site_cookies(), "max_age": SESSION_MAX_AGE, "path": "/"}
     response.set_cookie(COOKIE_NAME, create_session_token(user.id, user.session_version), httponly=True, **common)
     response.set_cookie(CSRF_COOKIE_NAME, csrf, httponly=False, **common)
     return csrf
@@ -53,6 +54,13 @@ def _rate_limit(request: Request, email: str) -> None:
 
 @router.post("/register", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
 def register(payload: RegisterRequest, response: Response, db: Session = Depends(get_db)) -> AuthResponse:
+    if not registration_enabled():
+        raise WebApiError(
+            status.HTTP_403_FORBIDDEN,
+            "registration_disabled",
+            "O cadastro público está desabilitado. O acesso é restrito.",
+            str(uuid4()),
+        )
     if not payload.accept_terms or not payload.accept_privacy:
         raise WebApiError(422, "consent_required", "É necessário aceitar os termos e a política de privacidade.", str(uuid4()))
     try:
@@ -102,7 +110,7 @@ def logout(response: Response, user: User = Depends(current_user), db: Session =
 @router.get("/me", response_model=AuthResponse)
 def me(response: Response, user: User = Depends(current_user)) -> AuthResponse:
     csrf = new_csrf_token()
-    response.set_cookie(CSRF_COOKIE_NAME, csrf, httponly=False, secure=secure_cookies(), samesite="lax", max_age=SESSION_MAX_AGE, path="/")
+    response.set_cookie(CSRF_COOKIE_NAME, csrf, httponly=False, secure=secure_cookies(), samesite=same_site_cookies(), max_age=SESSION_MAX_AGE, path="/")
     return AuthResponse(user=_user(user), privacy=_privacy(user.privacy), csrf_token=csrf)
 
 

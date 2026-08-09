@@ -3,6 +3,10 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { Button, Input } from '../components/ui'
 import { useAuth } from '../context/AuthContext'
 
+export function publicRegistrationEnabled() {
+  return import.meta.env.VITE_REGISTRATION_ENABLED?.toLowerCase() !== 'false'
+}
+
 function AuthFrame({ title, children }: { title: string; children: ReactNode }) {
   return <div className="auth-page"><div className="auth-panel"><p className="eyebrow">ACESSO À PLATAFORMA</p><h1>{title}</h1>{children}</div></div>
 }
@@ -39,7 +43,9 @@ export function LoginPage() {
       </form>
       {submitting && <p role="status" className="processing-note">{authStage === 'VALIDATING' ? 'VALIDANDO SESSÃO…' : 'ENVIANDO CREDENCIAIS…'}</p>}
       {error && <p role="alert" className="error-panel">{error}</p>}
-      <p>Não possui conta? <Link to="/register">Criar conta</Link></p>
+      {publicRegistrationEnabled()
+        ? <p>Não possui conta? <Link to="/register">Criar conta</Link></p>
+        : <p>Acesso restrito. Solicite uma conta ao administrador.</p>}
     </AuthFrame>
   )
 }
@@ -49,6 +55,16 @@ export function RegisterPage() {
   const navigate = useNavigate()
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
+
+  if (!publicRegistrationEnabled()) {
+    return (
+      <AuthFrame title="Acesso restrito">
+        <p>O cadastro público está desabilitado neste ambiente.</p>
+        <p>Contas são fornecidas pela administração durante o beta interno.</p>
+        <p><Link to="/login">Voltar para o login</Link></p>
+      </AuthFrame>
+    )
+  }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()

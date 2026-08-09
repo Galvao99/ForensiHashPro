@@ -72,6 +72,20 @@ def test_registration_normalizes_email_hashes_password_and_records_consents(plat
         assert len(list(db.scalars(select(Consent)))) == 2
 
 
+def test_public_registration_can_be_disabled_safely(
+    platform, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client, factory, _ = platform
+    monkeypatch.setenv("FORENSIHASH_REGISTRATION_ENABLED", "false")
+
+    response = register(client)
+
+    assert response.status_code == 403
+    assert response.json()["error"]["code"] == "registration_disabled"
+    with factory() as database:
+        assert database.scalar(select(User)) is None
+
+
 def test_duplicate_email_and_invalid_password_are_safe(platform) -> None:
     client, _, _ = platform
     assert register(client).status_code == 201
@@ -95,6 +109,26 @@ def test_login_session_me_logout_and_csrf(platform) -> None:
     csrf = me.json()["csrf_token"]
     assert client.post("/api/v1/auth/logout", headers={"X-CSRF-Token": csrf}).status_code == 204
     assert client.get("/api/v1/auth/me").status_code == 401
+
+
+def test_staging_cookie_attributes_remain_secure(
+    platform, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client, _, _ = platform
+    monkeypatch.setenv("FORENSIHASH_COOKIE_SECURE", "true")
+    monkeypatch.setenv("FORENSIHASH_COOKIE_SAMESITE", "none")
+
+    response = register(client)
+
+    cookies = response.headers.get_list("set-cookie")
+    session_cookie = next(item for item in cookies if item.startswith("forensihash_session="))
+    csrf_cookie = next(item for item in cookies if item.startswith("forensihash_csrf="))
+    assert "HttpOnly" in session_cookie
+    assert "Secure" in session_cookie
+    assert "SameSite=none" in session_cookie
+    assert "Path=/" in session_cookie
+    assert "HttpOnly" not in csrf_cookie
+    assert "Secure" in csrf_cookie
 
 
 def test_inactive_user_cannot_login(platform) -> None:

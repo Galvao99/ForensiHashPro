@@ -16,7 +16,16 @@ class Base(DeclarativeBase):
 
 
 def database_url() -> str:
-    return os.environ.get("FORENSIHASH_DATABASE_URL", DEFAULT_DATABASE_URL)
+    configured = (
+        os.environ.get("FORENSIHASH_DATABASE_URL")
+        or os.environ.get("DATABASE_URL")
+        or DEFAULT_DATABASE_URL
+    )
+    if configured.startswith("postgres://"):
+        return configured.replace("postgres://", "postgresql+psycopg://", 1)
+    if configured.startswith("postgresql://"):
+        return configured.replace("postgresql://", "postgresql+psycopg://", 1)
+    return configured
 
 
 def database_connect_timeout() -> int:

@@ -51,6 +51,27 @@ describe('formulários reais de autenticação', () => {
     expect(window.location.pathname).toBe('/app')
   })
 
+  it('informa acesso restrito quando cadastro público está desabilitado', async () => {
+    vi.stubEnv('VITE_REGISTRATION_ENABLED', 'false')
+    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(response({}, 401))))
+
+    renderAt('/register')
+
+    expect(await screen.findByRole('heading', { name: 'Acesso restrito' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Criar conta' })).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Voltar para o login' })).toHaveAttribute('href', '/login')
+  })
+
+  it('não oferece criação de conta no login restrito', async () => {
+    vi.stubEnv('VITE_REGISTRATION_ENABLED', 'false')
+    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(response({}, 401))))
+
+    renderAt('/login')
+
+    expect(await screen.findByText('Acesso restrito. Solicite uma conta ao administrador.')).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Criar conta' })).not.toBeInTheDocument()
+  })
+
   it('Enter submete login, reconsulta /me e não persiste senha ou sessão no navegador', async () => {
     let meCalls = 0
     const fetchMock = vi.fn((input: string | URL | Request, _init?: RequestInit) => {
