@@ -5,6 +5,7 @@ import pytest
 from web.backend.app.database import (
     DEFAULT_CONNECT_TIMEOUT_SECONDS,
     database_connect_timeout,
+    database_url,
 )
 
 
@@ -26,3 +27,10 @@ def test_database_connect_timeout_is_validated(
     monkeypatch.setenv("FORENSIHASH_DATABASE_CONNECT_TIMEOUT", configured)
 
     assert database_connect_timeout() == expected
+
+
+def test_render_postgres_url_uses_psycopg_driver(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("FORENSIHASH_DATABASE_URL", raising=False)
+    monkeypatch.setenv("DATABASE_URL", "postgresql://user:password@db/forensihash")
+
+    assert database_url() == "postgresql+psycopg://user:password@db/forensihash"

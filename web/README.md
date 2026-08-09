@@ -177,3 +177,20 @@ As dependências exclusivas da suíte Python ficam em `requirements-test.txt`.
 No runner Linux, o Qt usa a plataforma `offscreen`, sem depender de display real.
 
 O CI não publica imagens e não executa staging, CD ou deploy.
+
+## Imagem de staging no GHCR
+
+Depois que o workflow `CI` aprova um push na `main`, um workflow separado
+publica somente a imagem da API em:
+
+```text
+ghcr.io/<owner>/forensihashpro-api:staging
+ghcr.io/<owner>/forensihashpro-api:<commit-sha>
+```
+
+A tag `staging` aponta para a publicação mais recente da `main` aprovada. A tag
+com SHA identifica uma imagem imutável e permite selecionar exatamente uma
+revisão anterior. Após o primeiro push, o pacote aparecerá em **GitHub →
+Packages**, onde visibilidade e acesso podem ser revisados manualmente.
+
+Essa publicação não realiza deploy e não inclui o build do frontend.

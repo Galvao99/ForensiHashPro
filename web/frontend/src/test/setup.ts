@@ -7,6 +7,7 @@ Object.defineProperty(window, 'matchMedia', { writable: true, value: (query: str
 afterEach(() => {
   cleanup()
   vi.restoreAllMocks()
+  vi.unstubAllEnvs()
   localStorage.clear()
   sessionStorage.clear()
 })
