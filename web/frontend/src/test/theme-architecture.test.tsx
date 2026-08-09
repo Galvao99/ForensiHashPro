@@ -5,6 +5,7 @@ import { App } from '../App'
 import { authFixture } from './fixtures'
 
 const LIGHT_LOGO = 'forensihash_logo_completo.png'
+const DARK_LOGO = 'forensihash_logo_dark_cropped.png'
 
 function response(body: unknown, status = 200): Response {
   return { ok: status >= 200 && status < 300, status, json: async () => body } as Response
@@ -75,10 +76,16 @@ describe('fronteira pública e autenticada do tema', () => {
     const selector = await screen.findByLabelText('Tema')
     await waitFor(() => expect(document.documentElement.dataset.theme).toBe('dark'))
     expect(document.querySelector('.app-sidebar')).toBeInTheDocument()
-    screen.getAllByAltText('ForensiHash').forEach((logo) => expect(logo.getAttribute('src')).toContain('ChatGPT Image'))
+    screen.getAllByAltText('ForensiHash').forEach((logo) => {
+      expect(logo.getAttribute('src')).toContain(DARK_LOGO)
+      expect(logo).toHaveClass('brand__logo')
+    })
     await userEvent.selectOptions(selector, 'LIGHT')
     await waitFor(() => expect(document.documentElement.dataset.theme).toBe('light'))
-    screen.getAllByAltText('ForensiHash').forEach((logo) => expect(logo.getAttribute('src')).toContain(LIGHT_LOGO))
+    screen.getAllByAltText('ForensiHash').forEach((logo) => {
+      expect(logo.getAttribute('src')).toContain(LIGHT_LOGO)
+      expect(logo).toHaveClass('brand__logo')
+    })
   })
 
   it('resolve SYSTEM apenas autenticado e acompanha mudança do sistema', async () => {
@@ -91,7 +98,7 @@ describe('fronteira pública e autenticada do tema', () => {
     expect(document.documentElement.dataset.theme).toBe('light')
     system.setDark(true)
     await waitFor(() => expect(document.documentElement.dataset.theme).toBe('dark'))
-    screen.getAllByAltText('ForensiHash').forEach((logo) => expect(logo.getAttribute('src')).toContain('ChatGPT Image'))
+    screen.getAllByAltText('ForensiHash').forEach((logo) => expect(logo.getAttribute('src')).toContain(DARK_LOGO))
   })
 
   it('logout força light sem apagar a preferência visual', async () => {

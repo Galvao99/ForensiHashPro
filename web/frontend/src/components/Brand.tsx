@@ -2,7 +2,7 @@ import { Link } from "react-router-dom";
 import { useTheme } from "../context/ThemeContext";
 
 const LIGHT_LOGO = "/assets/forensihash_logo_completo.png";
-const DARK_LOGO = "/assets/ChatGPT Image 8 de ago. de 2026, 19_11_22.png";
+const DARK_LOGO = "/assets/forensihash_logo_dark_cropped.png";
 
 export function Brand() {
   const { resolvedTheme } = useTheme();
