@@ -8,6 +8,7 @@ from web.backend.app.services.analysis_service import (
     WebAnalysisService,
 )
 from web.backend.app.services.capabilities_service import CapabilitiesService
+from web.backend.app.services.analysis_jobs import AnalysisJobExecutor, PRIVATE_RESULT_TTL, TERMINAL_JOB_STATUSES
 
 __all__ = [
     "CapabilitiesService",
@@ -18,4 +19,7 @@ __all__ = [
     "UploadStagingError",
     "UploadTooLargeError",
     "WebAnalysisService",
+    "AnalysisJobExecutor",
+    "PRIVATE_RESULT_TTL",
+    "TERMINAL_JOB_STATUSES",
 ]

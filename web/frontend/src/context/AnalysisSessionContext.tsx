@@ -1,9 +1,10 @@
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
-import { ApiError, submitAnalysis } from '../lib/api'
+import { ApiError, createAnalysisJob, getAnalysisJob, getAnalysisJobResult } from '../lib/api'
 import type { AnalysisContract, AnalysisSummary } from '../types/api'
 
 export const ANALYSIS_CONCURRENCY = 2
 export const MAX_WORKSPACE_FILES = 50
+export const JOB_POLL_INTERVAL_MS = 2_500
 
 export type WorkspaceAnalysisStatus =
   | 'QUEUED'
@@ -17,12 +18,16 @@ export type WorkspaceAnalysisStatus =
 
 export interface WorkspaceAnalysis {
   analysisId: string
+  jobId?: string
   filename: string
   relativePath?: string
   status: WorkspaceAnalysisStatus
   contract?: AnalysisContract
   persisted: boolean
   error?: string
+  errorCode?: string
+  currentStage?: string
+  startedAt?: string
 }
 
 export interface AnalysisWorkspace {
@@ -132,6 +137,7 @@ export function AnalysisSessionProvider({ children, initialResults = [] }: { chi
   const workspaceRef = useRef(internalWorkspace)
   const running = useRef(new Set<string>())
   const dismissed = useRef(new Set<string>())
+  const polling = useRef(new Map<string, { controller: AbortController; timer?: number }>())
 
   const updateWorkspace = useCallback((update: (current: InternalWorkspace) => InternalWorkspace) => {
     setInternalWorkspace((current) => {
@@ -146,39 +152,73 @@ export function AnalysisSessionProvider({ children, initialResults = [] }: { chi
     setAnalyses((current) => [entry, ...current.filter(({ summary }) => summary.analysisId !== result.analysis_id)])
   }, [])
 
+  const pollJob = useCallback((localAnalysisId: string, jobId: string, persisted: boolean) => {
+    const controller = new AbortController()
+    const state = { controller, timer: undefined as number | undefined }
+    polling.current.set(localAnalysisId, state)
+    const poll = async () => {
+      try {
+        const job = await getAnalysisJob(jobId, controller.signal)
+        if (dismissed.current.has(localAnalysisId)) return
+        updateWorkspace((current) => ({ ...current, analyses: current.analyses.map((candidate) => candidate.analysisId === localAnalysisId ? {
+          ...candidate, status: job.status, currentStage: job.current_stage ?? undefined,
+          startedAt: job.started_at ?? candidate.startedAt, error: job.safe_error_message ?? undefined,
+          errorCode: job.error_code ?? undefined,
+        } : candidate) }))
+        if (job.status === 'SUCCESS' || job.status === 'PARTIAL') {
+          const result = await getAnalysisJobResult(jobId, controller.signal)
+          storeResult(result, persisted)
+          updateWorkspace((current) => ({
+            ...current,
+            activeAnalysisId: current.activeAnalysisId === localAnalysisId ? result.analysis_id : current.activeAnalysisId,
+            analyses: current.analyses.map((candidate) => candidate.analysisId === localAnalysisId ? {
+              ...candidate, analysisId: result.analysis_id, filename: asString(result.file.name) ?? candidate.filename,
+              status: resultStatus(result), contract: result,
+            } : candidate),
+          }))
+          polling.current.delete(localAnalysisId)
+          return
+        }
+        if (['FAILED', 'LIMIT_EXCEEDED', 'CANCELLED'].includes(job.status)) {
+          polling.current.delete(localAnalysisId)
+          return
+        }
+        state.timer = window.setTimeout(poll, JOB_POLL_INTERVAL_MS)
+      } catch (error) {
+        if (controller.signal.aborted || dismissed.current.has(localAnalysisId)) return
+        if (error instanceof ApiError && (error.code === 'network_error' || error.code === 'request_timeout')) {
+          updateWorkspace((current) => ({ ...current, analyses: current.analyses.map((candidate) => candidate.analysisId === localAnalysisId ? {
+            ...candidate, errorCode: 'status_unavailable', error: 'Não foi possível atualizar o status; uma nova tentativa será feita.',
+          } : candidate) }))
+          state.timer = window.setTimeout(poll, JOB_POLL_INTERVAL_MS)
+          return
+        }
+        updateWorkspace((current) => ({ ...current, analyses: current.analyses.map((candidate) => candidate.analysisId === localAnalysisId ? {
+          ...candidate, status: 'FAILED', errorCode: error instanceof ApiError ? error.code : 'status_unavailable',
+          error: error instanceof ApiError ? error.message : 'Não foi possível acompanhar a análise.',
+        } : candidate) }))
+        polling.current.delete(localAnalysisId)
+      }
+    }
+    void poll()
+  }, [storeResult, updateWorkspace])
+
   const runAnalysis = useCallback(async (item: InternalWorkspaceAnalysis) => {
     running.current.add(item.analysisId)
     updateWorkspace((current) => ({
       ...current,
       analyses: current.analyses.map((candidate) => candidate.analysisId === item.analysisId ? { ...candidate, status: 'UPLOADING' } : candidate),
     }))
-    const request = submitAnalysis(item.file, {
-      retentionMode: item.request.retentionMode,
-      privateSession: item.request.privateSession,
-      csrfToken: item.request.csrfToken,
-    })
-    queueMicrotask(() => updateWorkspace((current) => ({
-      ...current,
-      analyses: current.analyses.map((candidate) => candidate.analysisId === item.analysisId ? { ...candidate, status: 'PROCESSING' } : candidate),
-    })))
     try {
-      const result = await request
-      if (item.persisted || !dismissed.current.has(item.analysisId)) storeResult(result, item.persisted)
-      updateWorkspace((current) => {
-        if (dismissed.current.has(item.analysisId)) return current
-        return {
-          ...current,
-          activeAnalysisId: current.activeAnalysisId === item.analysisId ? result.analysis_id : current.activeAnalysisId,
-          analyses: current.analyses.map((candidate) => candidate.analysisId === item.analysisId ? {
-            ...candidate,
-            analysisId: result.analysis_id,
-            filename: asString(result.file.name) ?? candidate.filename,
-            status: resultStatus(result),
-            contract: result,
-            file: candidate.file,
-          } : candidate),
-        }
+      const created = await createAnalysisJob(item.file, {
+        retentionMode: item.request.retentionMode, privateSession: item.request.privateSession, csrfToken: item.request.csrfToken,
       })
+      if (!dismissed.current.has(item.analysisId)) {
+        updateWorkspace((current) => ({ ...current, analyses: current.analyses.map((candidate) => candidate.analysisId === item.analysisId ? {
+          ...candidate, jobId: created.job_id, status: created.status,
+        } : candidate) }))
+        pollJob(item.analysisId, created.job_id, item.persisted)
+      }
     } catch (error) {
       if (!dismissed.current.has(item.analysisId)) {
         updateWorkspace((current) => ({
@@ -195,7 +235,15 @@ export function AnalysisSessionProvider({ children, initialResults = [] }: { chi
       dismissed.current.delete(item.analysisId)
       updateWorkspace((current) => ({ ...current }))
     }
-  }, [storeResult, updateWorkspace])
+  }, [pollJob, updateWorkspace])
+
+  useEffect(() => () => {
+    polling.current.forEach(({ controller, timer }) => {
+      controller.abort()
+      if (timer !== undefined) window.clearTimeout(timer)
+    })
+    polling.current.clear()
+  }, [])
 
   useEffect(() => {
     const available = ANALYSIS_CONCURRENCY - running.current.size
@@ -275,6 +323,10 @@ export function AnalysisSessionProvider({ children, initialResults = [] }: { chi
   const closeAnalysis = useCallback((analysisId: string) => {
     const closing = workspaceRef.current.analyses.find((item) => item.analysisId === analysisId)
     if (!closing) return
+    const activePoll = polling.current.get(analysisId)
+    activePoll?.controller.abort()
+    if (activePoll?.timer !== undefined) window.clearTimeout(activePoll.timer)
+    polling.current.delete(analysisId)
     if (running.current.has(analysisId)) dismissed.current.add(analysisId)
     if (!closing.persisted && closing.contract) {
       setAnalyses((current) => current.filter(({ summary }) => summary.analysisId !== closing.contract?.analysis_id))
@@ -291,6 +343,8 @@ export function AnalysisSessionProvider({ children, initialResults = [] }: { chi
 
   const closeAllAnalyses = useCallback(() => {
     const current = workspaceRef.current.analyses
+    polling.current.forEach(({ controller, timer }) => { controller.abort(); if (timer !== undefined) window.clearTimeout(timer) })
+    polling.current.clear()
     current.forEach((item) => { if (running.current.has(item.analysisId)) dismissed.current.add(item.analysisId) })
     const privateIds = new Set(current.filter((item) => !item.persisted && item.contract).map((item) => item.contract!.analysis_id))
     setAnalyses((entries) => entries.filter(({ summary }) => !privateIds.has(summary.analysisId)))
@@ -303,12 +357,16 @@ export function AnalysisSessionProvider({ children, initialResults = [] }: { chi
     activeAnalysisId: internalWorkspace.activeAnalysisId,
     analyses: internalWorkspace.analyses.map((item) => ({
       analysisId: item.analysisId,
+      jobId: item.jobId,
       filename: item.filename,
       relativePath: item.relativePath,
       status: item.status,
       contract: item.contract,
       persisted: item.persisted,
       error: item.error,
+      errorCode: item.errorCode,
+      currentStage: item.currentStage,
+      startedAt: item.startedAt,
     })),
   }), [internalWorkspace])
 

@@ -83,6 +83,7 @@ FORENSIHASH_COOKIE_SECURE=true
 FORENSIHASH_COOKIE_SAMESITE=none
 FORENSIHASH_ALLOWED_ORIGINS=https://<frontend>.onrender.com
 FORENSIHASH_REGISTRATION_ENABLED=false
+FORENSIHASH_JOB_WORKER_ENABLED=true
 FORENSIHASH_TEMP_DIR=/tmp/forensihash
 IP2LOCATION_ENABLED=false
 PORT=<fornecido pelo Render>
@@ -93,6 +94,7 @@ Frontend, no momento do build:
 ```text
 VITE_API_BASE_URL=https://<api>.onrender.com
 VITE_API_TIMEOUT_MS=15000
+VITE_JOB_UPLOAD_TIMEOUT_MS=60000
 VITE_REGISTRATION_ENABLED=false
 ```
 
@@ -137,11 +139,21 @@ job de um plano que ofereça o recurso; nenhum upgrade é feito pelo repositóri
 
 ## Uploads e retenção
 
-Uploads usam diretório temporário, passam pelo `EvidenceManager` e são removidos
-após sucesso ou falha. Não há disco persistente no serviço e arquivos não são
-gravados no PostgreSQL. `PRIVATE` permanece o padrão; `RESULT_ONLY` persiste
-somente resultado HTTP sanitizado mediante opção do usuário;
-`FILE_AND_RESULT` continua recusado.
+Uploads criam `AnalysisJob` persistente no PostgreSQL e usam um staging local
+temporário até o worker interno concluir. O worker tem concorrência 1, reutiliza
+o pipeline forense normal e sempre tenta remover o staging ao finalizar. Arquivos
+brutos não são gravados no PostgreSQL. Se um restart perder o staging, o job
+termina com `staging_lost`, sem expor o path interno.
+
+`PRIVATE` permanece o padrão: o resultado sanitizado fica temporariamente no
+job por uma hora para permitir polling e é excluído logicamente ao expirar; ele
+não entra no histórico. `RESULT_ONLY` persiste somente o resultado sanitizado
+na tabela de análises. `FILE_AND_RESULT` continua recusado.
+
+Esta fila V1 pressupõe uma única instância. O filesystem do Render é efêmero,
+cold starts interrompem trabalho em curso e escala horizontal ainda exigirá um
+worker/queue dedicado com leasing distribuído. PostgreSQL é a fonte de verdade
+do estado operacional, mas não substitui armazenamento temporário do arquivo.
 
 ## Smoke tests
 
@@ -155,7 +167,8 @@ Use somente uma fixture sintética e não sensível:
 - cadastro público retorna `registration_disabled`;
 - login retorna 200 e estabelece sessão Secure/HttpOnly;
 - `GET /api/v1/auth/me` retorna 200 após login;
-- upload pequeno retorna `AnalysisContract` 1.0.0;
+- upload pequeno retorna 202, o job progride até estado terminal e seu endpoint
+  de resultado retorna `AnalysisContract` 1.0.0;
 - SHA-256 do contrato coincide com o SHA-256 calculado localmente;
 - sessão `PRIVATE` não cria item no histórico;
 - opção `RESULT_ONLY` cria item no histórico;
