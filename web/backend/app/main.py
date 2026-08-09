@@ -5,12 +5,16 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from web.backend.app.api import router
-from web.backend.app.api.routes import WebApiError
+from web.backend.app.api.admin import router as admin_router
+from web.backend.app.api.auth import router as auth_router
+from web.backend.app.errors import WebApiError
 from web.backend.app.schemas import ErrorDetail, ErrorResponse, HealthResponse
 
 
 app = FastAPI(title="ForensiHash API")
 app.include_router(router)
+app.include_router(auth_router)
+app.include_router(admin_router)
 
 
 @app.exception_handler(WebApiError)

@@ -4,7 +4,9 @@ import logging
 import time
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, File, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, Request, UploadFile, status
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from app.application.analysis_coordinator import AnalysisCancelledError
 from app.evidence import (
@@ -12,6 +14,10 @@ from app.evidence import (
     EvidenceIntegrityError,
     EvidenceSizeLimitError,
 )
+from web.backend.app.errors import WebApiError
+from web.backend.app.api.dependencies import current_user, optional_user, require_csrf
+from web.backend.app.database import get_db
+from web.backend.app.models import RetentionMode, StoredAnalysis, User
 from web.backend.app.presentation import AnalysisPresenter
 from web.backend.app.services import (
     CapabilitiesService,
@@ -44,15 +50,6 @@ def get_capabilities_service() -> CapabilitiesService:
     return CapabilitiesService()
 
 
-class WebApiError(RuntimeError):
-    def __init__(self, status_code: int, code: str, message: str, request_id: str) -> None:
-        super().__init__(message)
-        self.status_code = status_code
-        self.code = code
-        self.message = message
-        self.request_id = request_id
-
-
 def _error(status_code: int, code: str, message: str, request_id: str) -> WebApiError:
     return WebApiError(status_code, code, message, request_id)
 
@@ -66,19 +63,49 @@ def capabilities(
 
 @router.post("/analyses", response_model=None)
 async def create_analysis(
+    request: Request,
     file: UploadFile = File(...),
+    retention_mode: str | None = Form(default=None),
+    private_session: bool = Form(default=False),
     service: WebAnalysisService = Depends(get_web_analysis_service),
     storage: UploadStorage = Depends(get_upload_storage),
     presenter: AnalysisPresenter = Depends(get_analysis_presenter),
+    user: User | None = Depends(optional_user),
+    db: Session = Depends(get_db),
 ) -> dict[str, object]:
     request_id = str(uuid4())
     started = time.monotonic()
     size_bytes = 0
     try:
+        if user is not None:
+            require_csrf(request)
+        selected_retention = RetentionMode.PRIVATE
+        if user is not None and not private_session:
+            try:
+                selected_retention = RetentionMode(retention_mode or user.privacy.retention_mode)
+            except ValueError as error:
+                raise ValueError("Modo de retenção inválido.") from error
+        if selected_retention is RetentionMode.FILE_AND_RESULT:
+            raise ValueError("Retenção permanente do arquivo ainda não está disponível.")
         async with storage.stage(file) as staged:
             size_bytes = staged.size_bytes
             contract = service.analyze(staged.path, staging_sha256=staged.sha256)
             payload = presenter.present(contract, display_name=staged.display_name)
+            if user is not None and selected_retention is RetentionMode.RESULT_ONLY:
+                db.add(
+                    StoredAnalysis(
+                        id=contract.analysis_id,
+                        user_id=user.id,
+                        filename=staged.display_name,
+                        detected_type=contract.detected_type,
+                        sha256=contract.hashes.get("sha256", ""),
+                        status=contract.state.value,
+                        retention_mode=selected_retention.value,
+                        result_json=payload,
+                        finished_at=contract.execution.get("finished_at"),
+                    )
+                )
+                db.commit()
             LOGGER.info(
                 "web_analysis_completed",
                 extra={
@@ -101,6 +128,8 @@ async def create_analysis(
             "O arquivo excede o limite de segurança configurado.",
             request_id,
         ) from error
+
+
     except EmptyUploadError as error:
         raise _error(
             status.HTTP_400_BAD_REQUEST,
@@ -178,3 +207,28 @@ async def create_analysis(
             "A análise não pôde ser concluída.",
             request_id,
         ) from error
+
+
+@router.get("/analyses/history", response_model=None)
+def analysis_history(
+    user: User = Depends(current_user), db: Session = Depends(get_db)
+) -> list[dict[str, object]]:
+    analyses = db.scalars(
+        select(StoredAnalysis)
+        .where(StoredAnalysis.user_id == user.id)
+        .order_by(StoredAnalysis.created_at.desc())
+    )
+    return [
+        {
+            "id": item.id,
+            "filename": item.filename,
+            "detected_type": item.detected_type,
+            "sha256": item.sha256,
+            "status": item.status,
+            "retention_mode": item.retention_mode,
+            "created_at": item.created_at,
+            "finished_at": item.finished_at,
+            "result": item.result_json,
+        }
+        for item in analyses
+    ]

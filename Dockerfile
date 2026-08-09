@@ -32,6 +32,7 @@ RUN python -m pip install --no-cache-dir -r requirements-web.txt /tmp/wheels/*.w
     && rm -rf /tmp/wheels
 COPY app/ ./app/
 COPY web/ ./web/
+COPY alembic.ini ./
 RUN groupadd --system forensihash \
     && useradd --system --gid forensihash --home-dir /nonexistent --no-create-home forensihash \
     && install -d -o forensihash -g forensihash -m 0750 /tmp/forensihash

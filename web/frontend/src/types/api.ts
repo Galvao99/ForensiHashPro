@@ -72,3 +72,7 @@ export interface ApiErrorEnvelope {
     request_id?: string
   }
 }
+
+export interface WebUser { id: string; name: string; email: string; role: 'USER' | 'ADMIN'; is_active: boolean; created_at: string; last_login_at: string | null }
+export interface PrivacyPreferences { retention_mode: 'PRIVATE' | 'RESULT_ONLY' | 'FILE_AND_RESULT'; retain_analysis_results: boolean; retain_original_files: boolean; allow_external_services: boolean; updated_at: string }
+export interface AuthResponse { user: WebUser; privacy: PrivacyPreferences; csrf_token: string }

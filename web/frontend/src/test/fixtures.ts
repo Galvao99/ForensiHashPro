@@ -1,4 +1,11 @@
 import type { AnalysisContract } from '../types/api'
+import type { AuthResponse } from '../types/api'
+
+export const authFixture: AuthResponse = {
+  user: { id: 'user-test', name: 'Pessoa Teste', email: 'person@example.test', role: 'USER', is_active: true, created_at: '2026-08-08T12:00:00Z', last_login_at: null },
+  privacy: { retention_mode: 'PRIVATE', retain_analysis_results: false, retain_original_files: false, allow_external_services: false, updated_at: '2026-08-08T12:00:00Z' },
+  csrf_token: 'csrf-test',
+}
 
 export const analysisFixture: AnalysisContract = {
   schema_version: '1.0.0',

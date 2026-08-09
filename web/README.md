@@ -82,6 +82,11 @@ somente em runtime; arquivos `.env` não entram no contexto da imagem.
   sem paths ou configuração sensível;
 - `POST /api/v1/analyses`: recebe um arquivo no campo multipart `file`, executa
   uma análise individual síncrona e retorna o `AnalysisContract 1.0.0`.
+- `POST /api/v1/auth/register`, `login` e `logout`: conta e sessão por cookie
+  HttpOnly;
+- `GET/PATCH /api/v1/auth/me`: perfil e preferências do usuário autenticado;
+- `GET /api/v1/analyses/history`: resultados cuja retenção foi autorizada;
+- `GET/PATCH /api/v1/admin/users`: gestão restrita a administradores.
 
 O resultado de análise mantém o formato do contrato central, sem criar um DTO
 paralelo. Seções opcionais usam `null` quando não foram executadas, enquanto
@@ -131,12 +136,31 @@ filesystem operacional e podem diferir. Isso não significa alteração dos
 metadados internos do documento, que permanecem nos bytes imutáveis da
 evidência e são extraídos por ferramentas em modo de leitura.
 
+## Contas, privacidade e persistência
+
+O backend usa PostgreSQL, SQLAlchemy 2 e migrações Alembic. Senhas recebem hash
+Argon2id e a autenticação utiliza sessão assinada em cookie HttpOnly, com CSRF
+nas operações mutáveis. `PRIVATE` é o padrão e não persiste o contrato;
+`RESULT_ONLY` guarda somente o resultado HTTP sanitizado em JSONB.
+`FILE_AND_RESULT` está modelado, porém recusado enquanto não houver object
+storage: arquivos originais não são persistidos no PostgreSQL nem no filesystem.
+
+Configure `FORENSIHASH_DATABASE_URL`, `FORENSIHASH_SESSION_SECRET` e
+`FORENSIHASH_COOKIE_SECURE` por ambiente. Execute `python -m alembic upgrade
+head` antes da API; o Compose faz isso automaticamente após o PostgreSQL ficar
+saudável.
+
+Uma assistente futura deverá consumir resultados estruturados, nunca substituir
+engines, modificar findings ou recalcular severidade. Ela deverá citar os campos
+que fundamentam interpretações e não poderá enviar documentos a serviços
+externos sem consentimento explícito. Nenhuma IA foi implementada nesta fase.
+
 ## Limitações atuais
 
-A execução é local e síncrona. O frontend não possui autenticação ou cadastro
-reais. Não há persistência, fila, polling, comparação web, correlação web ou
-deploy. O healthcheck confirma
+A execução é local e síncrona. Não há fila, polling, comparação web, correlação
+web, object storage ou deploy. Exportação de dados e exclusão de conta são fluxos
+futuros explicitamente indicados na interface. O healthcheck confirma
 somente que a API está viva; ele não valida integrações externas. A imagem não
 é uma configuração de produção nem substitui sandbox para arquivos hostis.
 Timeline, IP automático, comparação e correlação não integram o contrato
-individual normal. Não há persistência nem consulta posterior por ID.
+individual normal.

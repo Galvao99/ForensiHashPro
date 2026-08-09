@@ -1,0 +1,6 @@
+import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
+import { useAnalysisSession } from '../context/AnalysisSessionContext'
+import { getHistory } from '../lib/api'
+
+export function HistoryPage() { const [loading, setLoading] = useState(true); const [error, setError] = useState(''); const { analyses, addAnalysis } = useAnalysisSession(); useEffect(() => { getHistory().then((items) => items.forEach((item) => addAnalysis(item.result))).catch(() => setError('Não foi possível consultar o histórico.')).finally(() => setLoading(false)) }, []); return <div className="app-page"><p className="eyebrow">HISTÓRICO</p><h1>Resultados mantidos</h1><p>Somente análises cuja retenção de resultado foi autorizada.</p>{loading && <p>Consultando…</p>}{error && <p role="alert" className="error-panel">{error}</p>}<div className="app-panel"><table className="technical-table"><thead><tr><th>Arquivo</th><th>Status</th><th>SHA-256</th></tr></thead><tbody>{analyses.map(({ summary }) => <tr key={summary.analysisId}><td><Link to={`/app/result/${summary.analysisId}`}>{summary.filename}</Link></td><td>{summary.status}</td><td><code>{summary.sha256}</code></td></tr>)}</tbody></table>{!loading && analyses.length === 0 && <p>Nenhum resultado mantido.</p>}</div></div> }

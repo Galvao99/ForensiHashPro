@@ -33,3 +33,7 @@ tzlocal==5.4.3
 uritools==6.1.2
 urllib3==2.7.0
 uvicorn==0.52.1
+SQLAlchemy==2.0.48
+alembic==1.18.4
+psycopg[binary]==3.3.3
+argon2-cffi==25.1.0
