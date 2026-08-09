@@ -5,7 +5,7 @@ import { App } from '../App'
 import { authFixture } from './fixtures'
 
 const LIGHT_LOGO = 'forensihash_logo_completo.png'
-const DARK_LOGO = 'forensihash_logo_dark_cropped.png'
+const DARK_LOGO = 'forensihash_logo_dark_transparent.png'
 
 function response(body: unknown, status = 200): Response {
   return { ok: status >= 200 && status < 300, status, json: async () => body } as Response
