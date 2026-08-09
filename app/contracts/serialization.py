@@ -5,7 +5,7 @@ import math
 from dataclasses import asdict, is_dataclass
 from datetime import datetime
 from enum import Enum
-from pathlib import Path
+from pathlib import Path, PurePath
 from typing import Any
 
 from app.contracts.analysis import (
@@ -40,8 +40,8 @@ def json_safe(value: Any) -> Any:
         if not math.isfinite(value):
             raise ValueError("Números não finitos não são permitidos no contrato.")
         return value
-    if isinstance(value, Path):
-        return str(value)
+    if isinstance(value, PurePath):
+        return value.as_posix()
     if isinstance(value, datetime):
         if value.tzinfo is None:
             raise ValueError("Datetime do contrato deve conter timezone.")

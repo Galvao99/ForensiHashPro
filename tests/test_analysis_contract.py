@@ -2,7 +2,7 @@ from dataclasses import replace
 from datetime import datetime, timezone
 import inspect
 import json
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 
 import pytest
 
@@ -121,7 +121,9 @@ def test_contract_is_versioned_json_safe_and_deterministic() -> None:
     assert "must-not-leak" not in first
     assert "secret" not in first
     assert "private stack detail" not in first
-    assert json_safe(Path("folder/file.bin")) == "folder\\file.bin"
+    assert json_safe(Path("folder/file.bin")) == "folder/file.bin"
+    assert json_safe(PurePosixPath("folder/file.bin")) == "folder/file.bin"
+    assert json_safe(PureWindowsPath("folder/file.bin")) == "folder/file.bin"
 
 
 def test_contract_round_trip_preserves_sections_and_external_results() -> None:
