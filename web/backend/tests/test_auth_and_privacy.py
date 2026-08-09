@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import pytest
@@ -19,8 +20,17 @@ from web.backend.app.services import UploadStorage
 
 @pytest.fixture
 def platform(tmp_path: Path):
-    engine = create_engine("sqlite+pysqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
-    Base.metadata.create_all(engine)
+    ci_database_url = os.environ.get("FORENSIHASH_TEST_DATABASE_URL")
+    if ci_database_url:
+        engine = create_engine(ci_database_url)
+        _clear_database(engine)
+    else:
+        engine = create_engine(
+            "sqlite+pysqlite://",
+            connect_args={"check_same_thread": False},
+            poolclass=StaticPool,
+        )
+        Base.metadata.create_all(engine)
     factory = sessionmaker(bind=engine, expire_on_commit=False)
 
     def database_override():
@@ -32,8 +42,18 @@ def platform(tmp_path: Path):
         yield TestClient(app), factory, tmp_path
     finally:
         app.dependency_overrides.clear()
-        Base.metadata.drop_all(engine)
+        if ci_database_url:
+            _clear_database(engine)
+        else:
+            Base.metadata.drop_all(engine)
         engine.dispose()
+
+
+def _clear_database(engine) -> None:
+    """Keep migrated PostgreSQL tables while isolating each integration test."""
+    with engine.begin() as connection:
+        for table in reversed(Base.metadata.sorted_tables):
+            connection.execute(table.delete())
 
 
 def register(client: TestClient, email: str = "person@example.test"):

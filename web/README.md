@@ -164,3 +164,13 @@ somente que a API está viva; ele não valida integrações externas. A imagem n
 é uma configuração de produção nem substitui sandbox para arquivos hostis.
 Timeline, IP automático, comparação e correlação não integram o contrato
 individual normal.
+
+## Integração contínua
+
+O GitHub Actions executa a cada pull request e em pushes para `main`,
+`feature/**` e `fix/**`. O workflow valida a suíte Python 3.12 com PostgreSQL e
+migrations, compila e verifica o backend, e executa testes, lint e build do
+frontend com Node.js. Um job separado constrói a imagem Docker runtime completa,
+incluindo a extensão Rust e as ferramentas forenses nativas.
+
+O CI não publica imagens e não executa staging, CD ou deploy.
