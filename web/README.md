@@ -173,4 +173,7 @@ migrations, compila e verifica o backend, e executa testes, lint e build do
 frontend com Node.js. Um job separado constrói a imagem Docker runtime completa,
 incluindo a extensão Rust e as ferramentas forenses nativas.
 
+As dependências exclusivas da suíte Python ficam em `requirements-test.txt`.
+No runner Linux, o Qt usa a plataforma `offscreen`, sem depender de display real.
+
 O CI não publica imagens e não executa staging, CD ou deploy.
