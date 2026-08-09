@@ -4,6 +4,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { describe, expect, it, vi } from 'vitest'
 import { App } from '../App'
 import { AnalysisSessionProvider, summarizeAnalysis } from '../context/AnalysisSessionContext'
+import { AuthProvider } from '../context/AuthContext'
 import { DashboardPage } from '../pages/DashboardPage'
 import { ResultPage } from '../pages/ResultPage'
 import type { AnalysisContract } from '../types/api'
@@ -26,7 +27,7 @@ function contract(index: number, state = 'completed'): AnalysisContract {
 }
 
 function renderOverview(initialResults: AnalysisContract[] = []) {
-  return render(<MemoryRouter initialEntries={['/app']}><AnalysisSessionProvider initialResults={initialResults}><Routes><Route path="/app" element={<DashboardPage />} /><Route path="/app/result/:analysisId" element={<ResultPage />} /></Routes></AnalysisSessionProvider></MemoryRouter>)
+  return render(<MemoryRouter initialEntries={['/app']}><AuthProvider><AnalysisSessionProvider initialResults={initialResults}><Routes><Route path="/app" element={<DashboardPage />} /><Route path="/app/result/:analysisId" element={<ResultPage />} /></Routes></AnalysisSessionProvider></AuthProvider></MemoryRouter>)
 }
 
 describe('overview da sessão', () => {
@@ -55,7 +56,7 @@ describe('overview da sessão', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response({})))
     renderOverview([contract(1)])
     await userEvent.click(screen.getByRole('link', { name: 'document-1.pdf' }))
-    expect(screen.getByRole('heading', { name: 'document-1.pdf' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'document-1.pdf' })).toBeInTheDocument()
     expect(screen.getAllByText(/123456789abcdef/).length).toBeGreaterThan(0)
   })
 
@@ -77,7 +78,10 @@ describe('overview da sessão', () => {
     expect(screen.getByText('document-1.pdf')).toBeInTheDocument()
     expect(await screen.findByText('Backend indisponível no momento.')).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Tentar novamente' }))
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2))
+    await waitFor(() => {
+      const capabilityCalls = fetchMock.mock.calls.filter(([input]) => String(input).includes('/api/v1/capabilities'))
+      expect(capabilityCalls).toHaveLength(2)
+    })
     expect(screen.getByText('document-1.pdf')).toBeInTheDocument()
   })
 
@@ -94,7 +98,6 @@ describe('overview da sessão', () => {
     window.history.pushState({}, '', '/app/analysis')
     render(<App />)
     await userEvent.upload(await screen.findByLabelText('Selecionar arquivo'), new File(['synthetic'], 'synthetic.txt'))
-    await userEvent.click(screen.getByRole('button', { name: 'Analisar' }))
     expect(await screen.findByRole('heading', { name: 'synthetic.txt' })).toBeInTheDocument()
     await userEvent.click(screen.getAllByRole('link', { name: 'Overview' }).find((link) => link.getAttribute('href') === '/app')!)
     expect(screen.getByText('synthetic.txt')).toBeInTheDocument()
