@@ -36,8 +36,9 @@ services:
     runtime: static
     name: forensihash-staging-web
     branch: main
-    buildCommand: cd web/frontend && npm ci && npm run build
-    staticPublishPath: web/frontend/dist
+    rootDir: web/frontend
+    buildCommand: npm ci && npm run build
+    staticPublishPath: ./dist
     autoDeployTrigger: checksPass
     envVars:
       - key: VITE_API_BASE_URL
