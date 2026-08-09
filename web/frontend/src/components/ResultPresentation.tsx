@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { JsonView } from './JsonView'
 import { StatusBadge } from './StatusBadge'
 import { TechnicalValue } from './ui'
+import { TechnicalTree } from './TechnicalTree'
 import type { AnalysisContract, ProcessingStatus } from '../types/api'
 
 const PROCESSING_STATUSES = new Set<ProcessingStatus>(['success', 'no_findings', 'partial', 'skipped', 'unavailable', 'failed', 'cancelled', 'limit_exceeded'])
@@ -35,21 +36,17 @@ export function TechnicalSection({ id, title, children }: { id: string; title: s
   return <section id={id} className="result-section"><header><h2>{title}</h2></header>{children}</section>
 }
 
-export function KeyValueGrid({ value, depth = 0 }: { value: Record<string, unknown>; depth?: number }) {
+export function KeyValueGrid({ value }: { value: Record<string, unknown> }) {
   const entries = Object.entries(value).filter(([, item]) => present(item))
   if (!entries.length) return <EmptyState>Nenhum dado aplicável foi reportado.</EmptyState>
-  return <dl className="key-value-grid">{entries.map(([key, item]) => <div key={key}><dt>{label(key)}</dt><dd><StructuredValue value={item} depth={depth} /></dd></div>)}</dl>
+  const leaves = entries.filter(([, item]) => typeof item !== 'object')
+  const branches = Object.fromEntries(entries.filter(([, item]) => typeof item === 'object'))
+  return <><dl className="key-value-grid">{leaves.map(([key, item]) => <div key={key}><dt>{label(key)}</dt><dd><StructuredValue value={item} /></dd></div>)}</dl>{Object.keys(branches).length > 0 && <TechnicalTree value={branches} showActions={false} />}</>
 }
 
-function StructuredValue({ value, depth = 0 }: { value: unknown; depth?: number }): ReactNode {
+function StructuredValue({ value }: { value: unknown }): ReactNode {
   if (!present(value)) return null
-  if (Array.isArray(value)) {
-    return <div className="structured-list">{value.filter(present).map((item, index) => <article key={index}>{typeof item === 'object' && item !== null ? <KeyValueGrid value={item as Record<string, unknown>} depth={depth + 1} /> : <TechnicalValue>{textValue(item)}</TechnicalValue>}</article>)}</div>
-  }
-  if (typeof value === 'object' && value !== null) {
-    if (depth >= 2) return <details className="technical-details"><summary>Ver detalhes</summary><KeyValueGrid value={value as Record<string, unknown>} depth={depth + 1} /></details>
-    return <KeyValueGrid value={value as Record<string, unknown>} depth={depth + 1} />
-  }
+  if (Array.isArray(value) || (typeof value === 'object' && value !== null)) return <TechnicalTree value={value as Record<string, unknown> | unknown[]} showActions={false} />
   return <TechnicalValue>{textValue(value)}</TechnicalValue>
 }
 
@@ -94,11 +91,11 @@ export function MetadataResultView({ metadata }: { metadata: Record<string, unkn
   }).filter(([, fields]) => Object.keys(fields).length)
   if (remaining.size) groups.push(['Outros metadados', Object.fromEntries(remaining)])
   if (!groups.length) return <EmptyState>Nenhum metadado útil foi reportado.</EmptyState>
-  return <div className="technical-groups">{groups.map(([name, fields]) => <section key={name}><h3>{name}</h3><KeyValueGrid value={fields} /></section>)}<details className="technical-details"><summary>Ver todos os metadados</summary><KeyValueGrid value={metadata} /></details></div>
+  return <div className="technical-groups">{groups.map(([name, fields]) => <section key={name}><h3>{name}</h3><KeyValueGrid value={fields} /></section>)}<details className="technical-details"><summary>Ver todos os metadados</summary><TechnicalTree value={metadata} /></details></div>
 }
 
 export function StructureResultView({ structure }: { structure: Record<string, unknown> }) {
-  return present(structure) ? <KeyValueGrid value={structure} /> : <EmptyState>Nenhum dado estrutural foi reportado.</EmptyState>
+  return present(structure) ? <TechnicalTree value={structure} /> : <EmptyState>Nenhum dado estrutural foi reportado.</EmptyState>
 }
 
 export function SignatureResultView({ signatures }: { signatures: Array<Record<string, unknown>> }) {

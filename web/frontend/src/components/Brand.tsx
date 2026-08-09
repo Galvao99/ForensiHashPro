@@ -2,7 +2,7 @@ import { Link } from "react-router-dom";
 import { useTheme } from "../context/ThemeContext";
 
 const LIGHT_LOGO = "/assets/forensihash_logo_completo.png";
-const DARK_LOGO = "/assets/forensihash_logo_dark_cropped.png";
+const DARK_LOGO = "/assets/forensihash_logo_dark_transparent.png";
 
 export function Brand() {
   const { resolvedTheme } = useTheme();
