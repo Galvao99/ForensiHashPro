@@ -28,7 +28,6 @@ describe('integração HTTP', () => {
     render(<App />)
     const file = new File(['synthetic'], 'synthetic.txt', { type: 'text/plain' })
     await userEvent.upload(await screen.findByLabelText('Selecionar arquivo'), file)
-    await userEvent.click(screen.getByRole('button', { name: 'Analisar' }))
     expect((await screen.findAllByText('abc123')).length).toBeGreaterThan(0)
     const analysisCall = fetchMock.mock.calls.find(([url]) => url === '/api/v1/analyses')!
     const [, init] = analysisCall
@@ -42,7 +41,6 @@ describe('integração HTTP', () => {
     window.history.pushState({}, '', '/app/analysis')
     render(<App />)
     await userEvent.upload(await screen.findByLabelText('Selecionar arquivo'), new File(['x'], 'large.bin'))
-    await userEvent.click(screen.getByRole('button', { name: 'Analisar' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('O arquivo excede o limite permitido.')
     expect(screen.queryByText(/traceback|exception|\/tmp/i)).not.toBeInTheDocument()
   })
@@ -52,8 +50,7 @@ describe('integração HTTP', () => {
     window.history.pushState({}, '', '/app/analysis')
     render(<App />)
     await userEvent.upload(await screen.findByLabelText('Selecionar arquivo'), new File(['x'], 'pending.bin'))
-    await userEvent.click(screen.getByRole('button', { name: 'Analisar' }))
-    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('PROCESSING'))
+    await waitFor(() => expect(screen.getAllByText('Processando').length).toBeGreaterThan(0))
     expect(screen.queryByText(/\d+%/)).not.toBeInTheDocument()
   })
 })
