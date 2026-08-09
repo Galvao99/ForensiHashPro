@@ -111,6 +111,14 @@ class UploadStorage:
 
     @asynccontextmanager
     async def stage(self, upload: UploadFile) -> AsyncIterator[StagedUpload]:
+        staged = await self.store(upload)
+        try:
+            yield staged
+        finally:
+            self.cleanup(staged.path)
+
+    async def store(self, upload: UploadFile) -> StagedUpload:
+        """Preserva o upload até que o executor do job faça o cleanup explícito."""
         try:
             workspace = self._create_workspace()
         except OSError as error:
@@ -124,6 +132,7 @@ class UploadStorage:
         destination = workspace / self._internal_name(upload.filename)
         size = 0
         digest = sha256()
+        preserved = False
         try:
             with destination.open("xb") as stream:
                 while chunk := await upload.read(self.CHUNK_SIZE):
@@ -136,12 +145,14 @@ class UploadStorage:
                     digest.update(chunk)
             if size == 0:
                 raise EmptyUploadError("O upload está vazio.")
-            yield StagedUpload(
+            staged = StagedUpload(
                 destination,
                 size,
                 digest.hexdigest(),
                 self._safe_display_name(upload.filename),
             )
+            preserved = True
+            return staged
         except (EmptyUploadError, UploadTooLargeError):
             raise
         except OSError as error:
@@ -153,7 +164,21 @@ class UploadStorage:
             ) from error
         finally:
             await upload.close()
-            self._cleanup(workspace)
+            if not preserved:
+                self._cleanup(workspace)
+
+    def cleanup(self, staged_path: Path) -> None:
+        workspace = Path(staged_path).resolve().parent
+        self._cleanup(workspace)
+
+    def cleanup_orphans(self, active_paths: set[Path]) -> None:
+        """Remove workspaces antigos que não pertencem a jobs recuperáveis."""
+        if not self.root.is_dir():
+            return
+        active_workspaces = {path.resolve().parent for path in active_paths}
+        for workspace in self.root.iterdir():
+            if workspace.is_dir() and workspace.resolve() not in active_workspaces:
+                self._cleanup(workspace)
 
     def _create_workspace(self) -> Path:
         try:

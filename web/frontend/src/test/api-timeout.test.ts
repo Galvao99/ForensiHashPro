@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { ApiError, authApi, submitAnalysis } from '../lib/api'
+import { ApiError, authApi, createAnalysisJob, submitAnalysis } from '../lib/api'
 import { analysisFixture, authFixture } from './fixtures'
 
 function response(body: unknown, status = 200): Response {
@@ -16,6 +16,15 @@ afterEach(() => {
 })
 
 describe('timeouts do cliente HTTP', () => {
+  it('limita apenas o upload/criação do job a 60 segundos', async () => {
+    const setTimeoutSpy = vi.spyOn(window, 'setTimeout')
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response({ job_id: 'job-1', status: 'QUEUED' })))
+
+    await createAnalysisJob(new File(['fixture'], 'fixture.txt'))
+
+    expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), 60_000)
+  })
+
   it('usa 120 segundos somente para a análise síncrona', async () => {
     const setTimeoutSpy = vi.spyOn(window, 'setTimeout')
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response(analysisFixture)))

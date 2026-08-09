@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import time
+from datetime import datetime, timezone
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile, status
@@ -16,8 +17,8 @@ from app.evidence import (
 )
 from web.backend.app.errors import WebApiError
 from web.backend.app.api.dependencies import current_user, optional_user, require_csrf
-from web.backend.app.database import get_db
-from web.backend.app.models import RetentionMode, StoredAnalysis, User
+from web.backend.app.database import SessionFactory, get_db
+from web.backend.app.models import AnalysisJob, AnalysisJobStatus, RetentionMode, StoredAnalysis, User
 from web.backend.app.presentation import AnalysisPresenter
 from web.backend.app.services import (
     CapabilitiesService,
@@ -27,11 +28,14 @@ from web.backend.app.services import (
     UploadStagingError,
     UploadTooLargeError,
     WebAnalysisService,
+    AnalysisJobExecutor,
+    TERMINAL_JOB_STATUSES,
 )
 
 
 LOGGER = logging.getLogger("forensihash.web")
 router = APIRouter(prefix="/api/v1")
+JOB_EXECUTOR = AnalysisJobExecutor(SessionFactory)
 
 
 def get_web_analysis_service() -> WebAnalysisService:
@@ -40,6 +44,10 @@ def get_web_analysis_service() -> WebAnalysisService:
 
 def get_upload_storage() -> UploadStorage:
     return UploadStorage()
+
+
+def get_analysis_job_executor() -> AnalysisJobExecutor:
+    return JOB_EXECUTOR
 
 
 def get_analysis_presenter() -> AnalysisPresenter:
@@ -52,6 +60,88 @@ def get_capabilities_service() -> CapabilitiesService:
 
 def _error(status_code: int, code: str, message: str, request_id: str) -> WebApiError:
     return WebApiError(status_code, code, message, request_id)
+
+
+def _job_payload(job: AnalysisJob) -> dict[str, object]:
+    return {
+        "job_id": job.id, "status": job.status, "created_at": job.created_at,
+        "started_at": job.started_at, "finished_at": job.finished_at,
+        "current_stage": job.current_stage, "analysis_id": job.result_analysis_id,
+        "error_code": job.error_code, "safe_error_message": job.safe_error_message,
+    }
+
+
+@router.post("/analysis-jobs", status_code=status.HTTP_202_ACCEPTED, response_model=None)
+async def create_analysis_job(
+    request: Request,
+    file: UploadFile = File(...),
+    retention_mode: str | None = Form(default=None),
+    private_session: bool = Form(default=False),
+    storage: UploadStorage = Depends(get_upload_storage),
+    executor: AnalysisJobExecutor = Depends(get_analysis_job_executor),
+    user: User = Depends(current_user),
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    request_id = str(uuid4())
+    require_csrf(request)
+    try:
+        selected = RetentionMode.PRIVATE if private_session else RetentionMode(retention_mode or user.privacy.retention_mode)
+        if selected is RetentionMode.FILE_AND_RESULT:
+            raise ValueError("Retenção de arquivo indisponível.")
+        staged = await storage.store(file)
+        job = AnalysisJob(user_id=user.id, status=AnalysisJobStatus.QUEUED.value,
+            original_filename=staged.display_name, retention_mode=selected.value,
+            staging_path=str(staged.path), staging_sha256=staged.sha256,
+            size_bytes=staged.size_bytes, current_stage="QUEUED")
+        try:
+            db.add(job)
+            db.commit()
+            db.refresh(job)
+        except Exception:
+            storage.cleanup(staged.path)
+            raise
+        executor.wake()
+        LOGGER.info("analysis_job_created", extra={"job_id": job.id, "status": job.status, "request_id": request_id, "size_bytes": staged.size_bytes})
+        return {"job_id": job.id, "status": job.status}
+    except UploadTooLargeError as error:
+        raise _error(status.HTTP_413_CONTENT_TOO_LARGE, "file_too_large", "O arquivo excede o limite de segurança configurado.", request_id) from error
+    except EmptyUploadError as error:
+        raise _error(status.HTTP_400_BAD_REQUEST, "empty_upload", "O arquivo enviado está vazio.", request_id) from error
+    except UploadStagingError as error:
+        raise _error(status.HTTP_500_INTERNAL_SERVER_ERROR, "staging_failed", "O upload não pôde ser preparado para análise.", request_id) from error
+    except ValueError as error:
+        raise _error(status.HTTP_422_UNPROCESSABLE_CONTENT, "analysis_rejected", "A análise não pôde processar a entrada fornecida.", request_id) from error
+
+
+@router.get("/analysis-jobs/{job_id}", response_model=None)
+def analysis_job_status(job_id: str, user: User = Depends(current_user), db: Session = Depends(get_db)) -> dict[str, object]:
+    job = db.scalar(select(AnalysisJob).where(AnalysisJob.id == job_id, AnalysisJob.user_id == user.id))
+    if job is None:
+        raise _error(status.HTTP_404_NOT_FOUND, "job_not_found", "Job de análise não encontrado.", str(uuid4()))
+    return _job_payload(job)
+
+
+@router.get("/analysis-jobs/{job_id}/result", response_model=None)
+def analysis_job_result(job_id: str, user: User = Depends(current_user), db: Session = Depends(get_db)) -> dict[str, object]:
+    job = db.scalar(select(AnalysisJob).where(AnalysisJob.id == job_id, AnalysisJob.user_id == user.id))
+    if job is None:
+        raise _error(status.HTTP_404_NOT_FOUND, "job_not_found", "Job de análise não encontrado.", str(uuid4()))
+    if job.status not in TERMINAL_JOB_STATUSES:
+        raise _error(status.HTTP_409_CONFLICT, "result_not_ready", "O resultado ainda não está disponível.", str(uuid4()))
+    if job.status not in {AnalysisJobStatus.SUCCESS.value, AnalysisJobStatus.PARTIAL.value}:
+        raise _error(status.HTTP_409_CONFLICT, job.error_code or "result_unavailable", job.safe_error_message or "O resultado não está disponível.", str(uuid4()))
+    if job.retention_mode == RetentionMode.RESULT_ONLY.value and job.result_analysis_id:
+        stored = db.get(StoredAnalysis, job.result_analysis_id)
+        if stored is not None and stored.user_id == user.id:
+            return stored.result_json
+    expires = job.result_expires_at
+    if expires is not None and expires.tzinfo is None:
+        expires = expires.replace(tzinfo=timezone.utc)
+    if job.result_json is None or (expires is not None and expires <= datetime.now(timezone.utc)):
+        job.result_json = None
+        db.commit()
+        raise _error(status.HTTP_410_GONE, "result_unavailable", "O resultado privado temporário não está mais disponível.", str(uuid4()))
+    return job.result_json
 
 
 @router.get("/capabilities", response_model=None)

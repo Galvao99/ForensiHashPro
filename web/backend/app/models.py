@@ -26,6 +26,16 @@ class RetentionMode(str, Enum):
     FILE_AND_RESULT = "FILE_AND_RESULT"
 
 
+class AnalysisJobStatus(str, Enum):
+    QUEUED = "QUEUED"
+    PROCESSING = "PROCESSING"
+    SUCCESS = "SUCCESS"
+    PARTIAL = "PARTIAL"
+    FAILED = "FAILED"
+    LIMIT_EXCEEDED = "LIMIT_EXCEEDED"
+    CANCELLED = "CANCELLED"
+
+
 class ConsentType(str, Enum):
     TERMS_OF_USE = "TERMS_OF_USE"
     PRIVACY_POLICY = "PRIVACY_POLICY"
@@ -81,3 +91,26 @@ class StoredAnalysis(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class AnalysisJob(Base):
+    __tablename__ = "analysis_jobs"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    user_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"), index=True)
+    status: Mapped[str] = mapped_column(String(24), default=AnalysisJobStatus.QUEUED.value, index=True)
+    original_filename: Mapped[str] = mapped_column(String(255))
+    retention_mode: Mapped[str] = mapped_column(String(24))
+    staging_path: Mapped[str | None] = mapped_column(Text)
+    staging_sha256: Mapped[str] = mapped_column(String(64))
+    size_bytes: Mapped[int] = mapped_column()
+    current_stage: Mapped[str | None] = mapped_column(String(64))
+    error_code: Mapped[str | None] = mapped_column(String(64))
+    safe_error_message: Mapped[str | None] = mapped_column(String(400))
+    result_analysis_id: Mapped[str | None] = mapped_column(String(36), index=True)
+    result_json: Mapped[dict[str, object] | None] = mapped_column(JSON().with_variant(JSONB, "postgresql"))
+    result_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    worker_token: Mapped[str | None] = mapped_column(String(36))
+    heartbeat_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)

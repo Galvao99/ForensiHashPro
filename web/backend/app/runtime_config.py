@@ -29,6 +29,13 @@ def registration_enabled() -> bool:
     return _boolean("FORENSIHASH_REGISTRATION_ENABLED", configured)
 
 
+def job_worker_enabled() -> bool:
+    configured = os.environ.get("FORENSIHASH_JOB_WORKER_ENABLED")
+    if configured is None:
+        return deployed_environment()
+    return _boolean("FORENSIHASH_JOB_WORKER_ENABLED", configured)
+
+
 def cookie_secure() -> bool:
     configured = os.environ.get("FORENSIHASH_COOKIE_SECURE")
     if configured is None:

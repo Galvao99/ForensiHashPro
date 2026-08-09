@@ -37,6 +37,9 @@ services:
       - key: FORENSIHASH_REGISTRATION_ENABLED
         value: "false"
 
+      - key: FORENSIHASH_JOB_WORKER_ENABLED
+        value: "true"
+
       - key: IP2LOCATION_ENABLED
         value: "false"
 
@@ -61,6 +64,9 @@ services:
 
       - key: VITE_ANALYSIS_TIMEOUT_MS
         value: "120000"
+
+      - key: VITE_JOB_UPLOAD_TIMEOUT_MS
+        value: "60000"
 
       - key: VITE_REGISTRATION_ENABLED
         value: "false"

@@ -94,7 +94,13 @@ describe('overview da sessão', () => {
   })
 
   it('adiciona uma análise real à sessão sem usar armazenamento persistente', async () => {
-    vi.stubGlobal('fetch', vi.fn((input: string) => Promise.resolve(response(String(input).includes('/auth/me') ? authFixture : analysisFixture))))
+    vi.stubGlobal('fetch', vi.fn((input: string) => {
+      const url = String(input)
+      if (url.includes('/auth/me')) return Promise.resolve(response(authFixture))
+      if (url.endsWith('/analysis-jobs')) return Promise.resolve(response({ job_id: 'overview-job', status: 'QUEUED' }))
+      if (url.endsWith('/result')) return Promise.resolve(response(analysisFixture))
+      return Promise.resolve(response({ job_id: 'overview-job', status: 'SUCCESS', analysis_id: analysisFixture.analysis_id }))
+    }))
     window.history.pushState({}, '', '/app/analysis')
     render(<App />)
     await userEvent.upload(await screen.findByLabelText('Selecionar arquivo'), new File(['synthetic'], 'synthetic.txt'))

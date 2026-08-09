@@ -1,4 +1,4 @@
-import type { AnalysisContract, ApiErrorEnvelope, AuthResponse, Capabilities, PrivacyPreferences, WebUser } from '../types/api'
+import type { AnalysisContract, AnalysisJobCreated, AnalysisJobState, ApiErrorEnvelope, AuthResponse, Capabilities, PrivacyPreferences, WebUser } from '../types/api'
 
 const configuredBase = import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, '') ?? ''
 const timeoutFromEnvironment = (value: string | undefined, fallback: number) => {
@@ -7,6 +7,7 @@ const timeoutFromEnvironment = (value: string | undefined, fallback: number) => 
 }
 const requestTimeoutMs = timeoutFromEnvironment(import.meta.env.VITE_API_TIMEOUT_MS, 15_000)
 const analysisTimeoutMs = timeoutFromEnvironment(import.meta.env.VITE_ANALYSIS_TIMEOUT_MS, 120_000)
+const jobUploadTimeoutMs = timeoutFromEnvironment(import.meta.env.VITE_JOB_UPLOAD_TIMEOUT_MS, 60_000)
 
 export class ApiError extends Error {
   constructor(
@@ -20,9 +21,13 @@ export class ApiError extends Error {
 
 async function request<T>(path: string, init?: RequestInit, timeoutMs = requestTimeoutMs): Promise<T> {
   const controller = new AbortController()
+  const externalSignal = init?.signal
+  const abortFromExternal = () => controller.abort()
+  if (externalSignal?.aborted) controller.abort()
+  else externalSignal?.addEventListener('abort', abortFromExternal, { once: true })
   const timeout = window.setTimeout(() => controller.abort(), timeoutMs)
   try {
-    const response = await fetch(`${configuredBase}${path}`, { credentials: 'include', ...init, signal: init?.signal ?? controller.signal })
+    const response = await fetch(`${configuredBase}${path}`, { credentials: 'include', ...init, signal: controller.signal })
     if (!response.ok) {
       let payload: ApiErrorEnvelope = {}
       try {
@@ -48,6 +53,7 @@ async function request<T>(path: string, init?: RequestInit, timeoutMs = requestT
     throw error
   } finally {
     window.clearTimeout(timeout)
+    externalSignal?.removeEventListener('abort', abortFromExternal)
   }
 }
 
@@ -61,6 +67,22 @@ export function submitAnalysis(file: File, options?: { retentionMode?: string; p
   if (options?.retentionMode) body.append('retention_mode', options.retentionMode)
   body.append('private_session', String(Boolean(options?.privateSession)))
   return request<AnalysisContract>('/api/v1/analyses', { method: 'POST', body, headers: options?.csrfToken ? { 'X-CSRF-Token': options.csrfToken } : undefined }, analysisTimeoutMs)
+}
+
+export function createAnalysisJob(file: File, options?: { retentionMode?: string; privateSession?: boolean; csrfToken?: string }): Promise<AnalysisJobCreated> {
+  const body = new FormData()
+  body.append('file', file)
+  if (options?.retentionMode) body.append('retention_mode', options.retentionMode)
+  body.append('private_session', String(Boolean(options?.privateSession)))
+  return request('/api/v1/analysis-jobs', { method: 'POST', body, headers: options?.csrfToken ? { 'X-CSRF-Token': options.csrfToken } : undefined }, jobUploadTimeoutMs)
+}
+
+export function getAnalysisJob(jobId: string, signal?: AbortSignal): Promise<AnalysisJobState> {
+  return request(`/api/v1/analysis-jobs/${encodeURIComponent(jobId)}`, { signal })
+}
+
+export function getAnalysisJobResult(jobId: string, signal?: AbortSignal): Promise<AnalysisContract> {
+  return request(`/api/v1/analysis-jobs/${encodeURIComponent(jobId)}/result`, { signal })
 }
 
 export const authApi = {

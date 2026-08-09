@@ -33,6 +33,24 @@ function folderFile(name: string, relativePath: string): File {
   return file
 }
 
+function completedJobFetch() {
+  let index = 0
+  const results = new Map<string, AnalysisContract>()
+  return vi.fn((input: string | URL | Request, init?: RequestInit) => {
+    const url = String(input)
+    if (url.includes('/auth/me')) return Promise.resolve(response(authFixture))
+    if (url.endsWith('/analysis-jobs')) {
+      const file = (init?.body as FormData).get('file') as File
+      const jobId = `job-${++index}`
+      results.set(jobId, contractFor(file, index))
+      return Promise.resolve(response({ job_id: jobId, status: 'QUEUED' }))
+    }
+    const jobId = url.split('/analysis-jobs/')[1].split('/')[0]
+    if (url.endsWith('/result')) return Promise.resolve(response(results.get(jobId)))
+    return Promise.resolve(response({ job_id: jobId, status: 'SUCCESS', analysis_id: results.get(jobId)?.analysis_id }))
+  })
+}
+
 function Harness({ files, children }: { files: File[]; children?: ReactNode }) {
   const { workspace, analyses, persistedAnalyses, enqueueFiles, closeAnalysis } = useAnalysisSession()
   return <div>
@@ -54,13 +72,7 @@ describe('workspace de análises individuais', () => {
   })
 
   it('seleciona pasta, cria requests independentes e nunca mistura contratos entre abas', async () => {
-    let index = 0
-    const fetchMock = vi.fn((input: string | URL | Request, init?: RequestInit) => {
-      if (String(input).includes('/auth/me')) return Promise.resolve(response(authFixture))
-      const file = (init?.body as FormData).get('file') as File
-      index += 1
-      return Promise.resolve(response(contractFor(file, index)))
-    })
+    const fetchMock = completedJobFetch()
     vi.stubGlobal('fetch', fetchMock)
     window.history.pushState({}, '', '/app/analysis')
     render(<App />)
@@ -74,8 +86,8 @@ describe('workspace de análises individuais', () => {
 
     const tablist = await screen.findByRole('tablist', { name: 'Análises abertas' })
     await waitFor(() => expect(within(tablist).getAllByRole('tab')).toHaveLength(3))
-    await waitFor(() => expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith('/api/v1/analyses'))).toHaveLength(3))
-    const analysisCalls = fetchMock.mock.calls.filter(([url]) => String(url).endsWith('/api/v1/analyses'))
+    await waitFor(() => expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith('/api/v1/analysis-jobs'))).toHaveLength(3))
+    const analysisCalls = fetchMock.mock.calls.filter(([url]) => String(url).endsWith('/api/v1/analysis-jobs'))
     for (const [, init] of analysisCalls) {
       const body = init?.body as FormData
       expect(body.get('file')).toBeInstanceOf(File)
@@ -99,7 +111,14 @@ describe('workspace de análises individuais', () => {
     const pending: Array<{ file: File; resolve: (value: Response) => void }> = []
     let active = 0
     let maximum = 0
-    vi.stubGlobal('fetch', vi.fn((_input: string | URL | Request, init?: RequestInit) => {
+    const results = new Map<string, AnalysisContract>()
+    vi.stubGlobal('fetch', vi.fn((input: string | URL | Request, init?: RequestInit) => {
+      const url = String(input)
+      if (!url.endsWith('/analysis-jobs')) {
+        const jobId = url.split('/analysis-jobs/')[1].split('/')[0]
+        if (url.endsWith('/result')) return Promise.resolve(response(results.get(jobId)))
+        return Promise.resolve(response({ job_id: jobId, status: 'SUCCESS', analysis_id: results.get(jobId)?.analysis_id }))
+      }
       const file = (init?.body as FormData).get('file') as File
       active += 1
       maximum = Math.max(maximum, active)
@@ -112,22 +131,29 @@ describe('workspace de análises individuais', () => {
     await waitFor(() => expect(pending).toHaveLength(ANALYSIS_CONCURRENCY))
     expect(screen.getByText('three.txt:QUEUED')).toBeInTheDocument()
 
-    pending[0].resolve(response(contractFor(pending[0].file, 1)))
+    results.set('job-1', contractFor(pending[0].file, 1)); pending[0].resolve(response({ job_id: 'job-1', status: 'QUEUED' }))
     await waitFor(() => expect(pending).toHaveLength(3))
     expect(maximum).toBe(ANALYSIS_CONCURRENCY)
-    pending[1].resolve(response(contractFor(pending[1].file, 2)))
-    pending[2].resolve(response(contractFor(pending[2].file, 3)))
+    results.set('job-2', contractFor(pending[1].file, 2)); pending[1].resolve(response({ job_id: 'job-2', status: 'QUEUED' }))
+    results.set('job-3', contractFor(pending[2].file, 3)); pending[2].resolve(response({ job_id: 'job-3', status: 'QUEUED' }))
     await waitFor(() => expect(screen.getAllByText(/:SUCCESS$/)).toHaveLength(3))
   })
 
   it('falha individual não interrompe a fila restante', async () => {
-    let call = 0
-    vi.stubGlobal('fetch', vi.fn((_input: string | URL | Request, init?: RequestInit) => {
-      call += 1
-      const file = (init?.body as FormData).get('file') as File
-      return Promise.resolve(call === 1
-        ? response({ error: { code: 'analysis_failed', message: 'Falha técnica segura.' } }, 422)
-        : response(contractFor(file, call)))
+    let creation = 0
+    const results = new Map<string, AnalysisContract>()
+    vi.stubGlobal('fetch', vi.fn((input: string | URL | Request, init?: RequestInit) => {
+      const url = String(input)
+      if (url.endsWith('/analysis-jobs')) {
+        creation += 1
+        if (creation === 1) return Promise.resolve(response({ error: { code: 'analysis_failed', message: 'Falha técnica segura.' } }, 422))
+        const file = (init?.body as FormData).get('file') as File
+        const jobId = `job-${creation}`; results.set(jobId, contractFor(file, creation))
+        return Promise.resolve(response({ job_id: jobId, status: 'QUEUED' }))
+      }
+      const jobId = url.split('/analysis-jobs/')[1].split('/')[0]
+      if (url.endsWith('/result')) return Promise.resolve(response(results.get(jobId)))
+      return Promise.resolve(response({ job_id: jobId, status: 'SUCCESS', analysis_id: results.get(jobId)?.analysis_id }))
     }))
     const files = [new File(['1'], 'failed.txt'), new File(['2'], 'ok-1.txt'), new File(['3'], 'ok-2.txt')]
     render(<AnalysisSessionProvider><Harness files={files} /></AnalysisSessionProvider>)
@@ -141,7 +167,7 @@ describe('workspace de análises individuais', () => {
 
   it('fechar PRIVATE remove da sessão e um novo provider não recupera o resultado', async () => {
     const file = new File(['private'], 'private.txt')
-    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(response(contractFor(file, 1)))))
+    vi.stubGlobal('fetch', completedJobFetch())
     const rendered = render(<AnalysisSessionProvider><Harness files={[file]} /></AnalysisSessionProvider>)
     await userEvent.click(screen.getByRole('button', { name: 'Enfileirar privado' }))
     await screen.findByText('private.txt:SUCCESS')
@@ -159,7 +185,7 @@ describe('workspace de análises individuais', () => {
 
   it('fechar RESULT_ONLY remove apenas a aba e preserva o catálogo histórico', async () => {
     const file = new File(['retained'], 'retained.txt')
-    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(response(contractFor(file, 1)))))
+    vi.stubGlobal('fetch', completedJobFetch())
     render(<AnalysisSessionProvider><Harness files={[file]} /></AnalysisSessionProvider>)
     await userEvent.click(screen.getByRole('button', { name: 'Enfileirar persistido' }))
     await screen.findByText('retained.txt:SUCCESS')

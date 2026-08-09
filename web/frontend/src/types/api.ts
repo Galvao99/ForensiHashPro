@@ -76,3 +76,15 @@ export interface ApiErrorEnvelope {
 export interface WebUser { id: string; name: string; email: string; role: 'USER' | 'ADMIN'; is_active: boolean; created_at: string; last_login_at: string | null }
 export interface PrivacyPreferences { retention_mode: 'PRIVATE' | 'RESULT_ONLY' | 'FILE_AND_RESULT'; retain_analysis_results: boolean; retain_original_files: boolean; allow_external_services: boolean; updated_at: string }
 export interface AuthResponse { user: WebUser; privacy: PrivacyPreferences; csrf_token: string }
+
+export type AnalysisJobStatus = 'QUEUED' | 'PROCESSING' | 'SUCCESS' | 'PARTIAL' | 'FAILED' | 'LIMIT_EXCEEDED' | 'CANCELLED'
+export interface AnalysisJobCreated { job_id: string; status: AnalysisJobStatus }
+export interface AnalysisJobState extends AnalysisJobCreated {
+  created_at: string
+  started_at: string | null
+  finished_at: string | null
+  current_stage: string | null
+  analysis_id: string | null
+  error_code: string | null
+  safe_error_message: string | null
+}
