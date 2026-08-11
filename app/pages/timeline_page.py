@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from collections import Counter
 from datetime import datetime
 from PySide6.QtWidgets import QLabel, QHBoxLayout, QVBoxLayout, QWidget
 
@@ -46,7 +45,11 @@ class TimelinePage(QWidget):
 
         events = sorted(
             events,
-            key=lambda e: self._parse_date(e.get("timestamp")) or datetime.max,
+            key=lambda event: (
+                event.get("temporal_status") == "structural_only",
+                str(event.get("timestamp") or ""),
+                int(event.get("structural_sequence") or 0),
+            ),
         )
 
         self.timeline.update_events(events)
@@ -211,13 +214,18 @@ class TimelinePage(QWidget):
                 getattr(event, "description", None)
                 or getattr(event, "message", "")
             ),
-            "details": str(getattr(event, "details", "")),
+            "details": str(
+                getattr(event, "attributes", None)
+                or getattr(event, "details", "")
+            ),
             "category": str(
                 getattr(event, "category", None)
                 or getattr(event, "event_type", "Evento")
             ),
             "event_type": str(getattr(event, "event_type", "info")),
             "source": str(getattr(event, "source", "ForensiHash")),
+            "temporal_status": str(getattr(event, "temporal_status", "timestamped")),
+            "structural_sequence": getattr(event, "structural_sequence", None),
         }
 
     def _metadata_to_dict(self, metadata) -> dict:

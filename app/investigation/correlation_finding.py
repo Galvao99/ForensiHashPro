@@ -4,6 +4,30 @@ from typing import Any
 from app.models.badge import Badge
 
 
+@dataclass(frozen=True, slots=True)
+class CorrelationEvidence:
+    evidence_ref: str
+    filename: str
+    role: str | None = None
+    source_type: str | None = None
+    page: int | None = None
+    start: int | None = None
+    end: int | None = None
+    field_path: str | None = None
+    context: str = ""
+    raw_value: str | None = None
+    normalized_value: str | None = None
+    extractor: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class CorrelationEntityRef:
+    entity_type: str
+    normalized_value: str
+    confidence: float
+    role: str | None = None
+
+
 @dataclass(slots=True)
 class CorrelationFinding:
     """
@@ -45,3 +69,13 @@ class CorrelationFinding:
 
     # Dados técnicos completos
     metadata: dict[str, Any] = field(default_factory=dict)
+
+    # Extensão V2. Todos os campos possuem defaults para preservar os
+    # construtores e widgets legados.
+    finding_id: str = ""
+    category: str = "correlation"
+    evidence: list[CorrelationEvidence] = field(default_factory=list)
+    entities: list[CorrelationEntityRef] = field(default_factory=list)
+    source_engine: str = "correlation_engine_v2"
+    confidence: float | None = None
+    limitations: list[str] = field(default_factory=list)

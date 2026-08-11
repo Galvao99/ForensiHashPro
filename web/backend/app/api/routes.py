@@ -1,12 +1,14 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 from datetime import datetime, timezone
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile, status
-from sqlalchemy import select
+from pydantic import BaseModel, Field
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.application.analysis_coordinator import AnalysisCancelledError
@@ -18,7 +20,7 @@ from app.evidence import (
 from web.backend.app.errors import WebApiError
 from web.backend.app.api.dependencies import current_user, optional_user, require_csrf
 from web.backend.app.database import SessionFactory, get_db
-from web.backend.app.models import AnalysisJob, AnalysisJobStatus, RetentionMode, StoredAnalysis, User
+from web.backend.app.models import AnalysisJob, AnalysisJobStatus, AnalysisSetRecord, RetentionMode, StoredAnalysis, User
 from web.backend.app.presentation import AnalysisPresenter
 from web.backend.app.services import (
     CapabilitiesService,
@@ -30,7 +32,9 @@ from web.backend.app.services import (
     WebAnalysisService,
     AnalysisJobExecutor,
     TERMINAL_JOB_STATUSES,
+    AnalysisSetService,
 )
+from web.backend.app.runtime_config import analysis_queue_capacity
 
 
 LOGGER = logging.getLogger("forensihash.web")
@@ -58,15 +62,31 @@ def get_capabilities_service() -> CapabilitiesService:
     return CapabilitiesService()
 
 
+def get_analysis_set_service() -> AnalysisSetService:
+    return AnalysisSetService()
+
+
+class AnalysisSetRequest(BaseModel):
+    job_ids: list[str] = Field(min_length=1, max_length=50)
+
+
 def _error(status_code: int, code: str, message: str, request_id: str) -> WebApiError:
     return WebApiError(status_code, code, message, request_id)
 
 
 def _job_payload(job: AnalysisJob) -> dict[str, object]:
+    public_state = {
+        AnalysisJobStatus.QUEUED.value: "queued",
+        AnalysisJobStatus.PROCESSING.value: "running",
+        AnalysisJobStatus.SUCCESS.value: "completed",
+        AnalysisJobStatus.PARTIAL.value: "partial",
+    }.get(job.status, "failed")
     return {
-        "job_id": job.id, "status": job.status, "created_at": job.created_at,
+        "job_id": job.id, "analysis_id": job.result_analysis_id or job.id,
+        "status": job.status,
+        "state": public_state, "created_at": job.created_at,
         "started_at": job.started_at, "finished_at": job.finished_at,
-        "current_stage": job.current_stage, "analysis_id": job.result_analysis_id,
+        "current_stage": job.current_stage, "result_analysis_id": job.result_analysis_id,
         "error_code": job.error_code, "safe_error_message": job.safe_error_message,
     }
 
@@ -85,11 +105,26 @@ async def create_analysis_job(
     request_id = str(uuid4())
     require_csrf(request)
     try:
+        outstanding = db.scalar(
+            select(func.count(AnalysisJob.id)).where(
+                AnalysisJob.status.in_(
+                    (AnalysisJobStatus.QUEUED.value, AnalysisJobStatus.PROCESSING.value)
+                )
+            )
+        ) or 0
+        if outstanding >= analysis_queue_capacity():
+            raise _error(
+                status.HTTP_429_TOO_MANY_REQUESTS,
+                "analysis_capacity_reached",
+                "A capacidade temporária de análises foi atingida; tente novamente mais tarde.",
+                request_id,
+            )
         selected = RetentionMode.PRIVATE if private_session else RetentionMode(retention_mode or user.privacy.retention_mode)
         if selected is RetentionMode.FILE_AND_RESULT:
             raise ValueError("Retenção de arquivo indisponível.")
         staged = await storage.store(file)
-        job = AnalysisJob(user_id=user.id, status=AnalysisJobStatus.QUEUED.value,
+        analysis_id = str(uuid4())
+        job = AnalysisJob(id=analysis_id, user_id=user.id, status=AnalysisJobStatus.QUEUED.value,
             original_filename=staged.display_name, retention_mode=selected.value,
             staging_path=str(staged.path), staging_sha256=staged.sha256,
             size_bytes=staged.size_bytes, current_stage="QUEUED")
@@ -101,8 +136,15 @@ async def create_analysis_job(
             storage.cleanup(staged.path)
             raise
         executor.wake()
-        LOGGER.info("analysis_job_created", extra={"job_id": job.id, "status": job.status, "request_id": request_id, "size_bytes": staged.size_bytes})
-        return {"job_id": job.id, "status": job.status}
+        LOGGER.info("analysis_job_created", extra={"job_id": job.id, "analysis_id": job.id, "stage": "queued", "engine": "job_executor", "status": job.status, "request_id": request_id, "size_bytes": staged.size_bytes})
+        return {
+            "job_id": job.id,
+            "analysis_id": job.id,
+            "status": job.status,
+            "state": "queued",
+        }
+    except WebApiError:
+        raise
     except UploadTooLargeError as error:
         raise _error(status.HTTP_413_CONTENT_TOO_LARGE, "file_too_large", "O arquivo excede o limite de segurança configurado.", request_id) from error
     except EmptyUploadError as error:
@@ -144,6 +186,37 @@ def analysis_job_result(job_id: str, user: User = Depends(current_user), db: Ses
     return job.result_json
 
 
+@router.post("/analysis-sets", status_code=status.HTTP_201_CREATED, response_model=None)
+def create_analysis_set(
+    payload: AnalysisSetRequest,
+    request: Request,
+    user: User = Depends(current_user),
+    db: Session = Depends(get_db),
+    service: AnalysisSetService = Depends(get_analysis_set_service),
+) -> dict[str, object]:
+    require_csrf(request)
+    return service.create(db, user, payload.job_ids).result_json
+
+
+@router.get("/analysis-sets/{set_id}", response_model=None)
+def get_analysis_set(
+    set_id: str,
+    user: User = Depends(current_user),
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    record = db.scalar(select(AnalysisSetRecord).where(
+        AnalysisSetRecord.id == set_id, AnalysisSetRecord.user_id == user.id
+    ))
+    if record is None:
+        raise _error(status.HTTP_404_NOT_FOUND, "analysis_set_not_found", "Analysis Set não encontrado.", str(uuid4()))
+    expires = record.expires_at
+    if expires is not None and expires.tzinfo is None:
+        expires = expires.replace(tzinfo=timezone.utc)
+    if expires is not None and expires <= datetime.now(timezone.utc):
+        raise _error(status.HTTP_410_GONE, "analysis_set_expired", "O resultado do Analysis Set expirou.", str(uuid4()))
+    return record.result_json
+
+
 @router.get("/capabilities", response_model=None)
 def capabilities(
     service: CapabilitiesService = Depends(get_capabilities_service),
@@ -179,7 +252,9 @@ async def create_analysis(
             raise ValueError("Retenção permanente do arquivo ainda não está disponível.")
         async with storage.stage(file) as staged:
             size_bytes = staged.size_bytes
-            contract = service.analyze(staged.path, staging_sha256=staged.sha256)
+            contract = await asyncio.to_thread(
+                service.analyze, staged.path, staging_sha256=staged.sha256
+            )
             payload = presenter.present(contract, display_name=staged.display_name)
             if user is not None and selected_retention is RetentionMode.RESULT_ONLY:
                 db.add(
@@ -235,7 +310,6 @@ async def create_analysis(
                 "component": "upload_storage",
                 "error_type": error.cause_type,
                 "operation": error.operation,
-                "technical_path": str(error.path),
             },
         )
         raise _error(

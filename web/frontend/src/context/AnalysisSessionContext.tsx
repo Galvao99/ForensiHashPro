@@ -1,6 +1,6 @@
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
-import { ApiError, createAnalysisJob, getAnalysisJob, getAnalysisJobResult } from '../lib/api'
-import type { AnalysisContract, AnalysisSummary } from '../types/api'
+import { ApiError, createAnalysisJob, createAnalysisSet, getAnalysisJob, getAnalysisJobResult } from '../lib/api'
+import type { AnalysisContract, AnalysisSetResult, AnalysisSummary } from '../types/api'
 
 export const ANALYSIS_CONCURRENCY = 2
 export const MAX_WORKSPACE_FILES = 50
@@ -62,6 +62,7 @@ interface AnalysisSessionValue {
   analyses: SessionEntry[]
   persistedAnalyses: SessionEntry[]
   workspace: AnalysisWorkspace
+  analysisSetResult: AnalysisSetResult | null
   addAnalysis: (result: AnalysisContract, options?: { persisted?: boolean; openInWorkspace?: boolean }) => void
   openAnalysis: (result: AnalysisContract, persisted?: boolean) => void
   enqueueFiles: (files: File[], options: EnqueueOptions) => { accepted: number; rejected: number; message?: string }
@@ -134,6 +135,8 @@ export function AnalysisSessionProvider({ children, initialResults = [] }: { chi
     analyses: [],
     activeAnalysisId: null,
   }))
+  const [analysisSetResult, setAnalysisSetResult] = useState<AnalysisSetResult | null>(null)
+  const correlatedWorkspace = useRef<string | null>(null)
   const workspaceRef = useRef(internalWorkspace)
   const running = useRef(new Set<string>())
   const dismissed = useRef(new Set<string>())
@@ -254,6 +257,24 @@ export function AnalysisSessionProvider({ children, initialResults = [] }: { chi
     next.forEach((item) => { void runAnalysis(item) })
   }, [internalWorkspace, runAnalysis])
 
+  useEffect(() => {
+    const items = internalWorkspace.analyses
+    const terminal = new Set<WorkspaceAnalysisStatus>(['SUCCESS', 'PARTIAL', 'FAILED', 'LIMIT_EXCEEDED', 'CANCELLED'])
+    if (!items.length || correlatedWorkspace.current === internalWorkspace.workspaceId) return
+    if (!items.every((item) => item.jobId && terminal.has(item.status))) return
+    correlatedWorkspace.current = internalWorkspace.workspaceId
+    const csrfToken = items.find((item) => item.request.csrfToken)?.request.csrfToken
+    void createAnalysisSet(items.map((item) => item.jobId!), csrfToken)
+      .then((result) => {
+        if (result?.correlation_result && Array.isArray(result.correlation_result.findings)) {
+          setAnalysisSetResult(result)
+        }
+      })
+      .catch(() => {
+        correlatedWorkspace.current = null
+      })
+  }, [internalWorkspace])
+
   const addAnalysis = useCallback((result: AnalysisContract, options?: { persisted?: boolean; openInWorkspace?: boolean }) => {
     const persisted = options?.persisted ?? false
     storeResult(result, persisted)
@@ -301,6 +322,8 @@ export function AnalysisSessionProvider({ children, initialResults = [] }: { chi
       })
     }
     if (accepted.length) {
+      setAnalysisSetResult(null)
+      correlatedWorkspace.current = null
       const folder = accepted[0].relativePath?.split('/')[0]
       const sharedFolder = folder && accepted.every((item) => item.relativePath?.startsWith(`${folder}/`)) ? folder : undefined
       updateWorkspace((current) => ({
@@ -374,6 +397,7 @@ export function AnalysisSessionProvider({ children, initialResults = [] }: { chi
     analyses,
     persistedAnalyses: analyses.filter((entry) => entry.persisted),
     workspace,
+    analysisSetResult,
     addAnalysis,
     openAnalysis,
     enqueueFiles,
@@ -386,7 +410,7 @@ export function AnalysisSessionProvider({ children, initialResults = [] }: { chi
     isPersisted(analysisId) {
       return analyses.find(({ summary }) => summary.analysisId === analysisId)?.persisted ?? false
     },
-  }), [addAnalysis, analyses, closeAllAnalyses, closeAnalysis, enqueueFiles, openAnalysis, setActiveAnalysis, workspace])
+  }), [addAnalysis, analyses, analysisSetResult, closeAllAnalyses, closeAnalysis, enqueueFiles, openAnalysis, setActiveAnalysis, workspace])
 
   return <AnalysisSessionContext.Provider value={value}>{children}</AnalysisSessionContext.Provider>
 }

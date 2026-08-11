@@ -1,4 +1,4 @@
-import type { AnalysisContract, AnalysisJobCreated, AnalysisJobState, ApiErrorEnvelope, AuthResponse, Capabilities, PrivacyPreferences, WebUser } from '../types/api'
+import type { AnalysisContract, AnalysisJobCreated, AnalysisJobState, AnalysisSetResult, ApiErrorEnvelope, AuthResponse, Capabilities, PrivacyPreferences, WebUser } from '../types/api'
 
 const configuredBase = import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, '') ?? ''
 const timeoutFromEnvironment = (value: string | undefined, fallback: number) => {
@@ -83,6 +83,18 @@ export function getAnalysisJob(jobId: string, signal?: AbortSignal): Promise<Ana
 
 export function getAnalysisJobResult(jobId: string, signal?: AbortSignal): Promise<AnalysisContract> {
   return request(`/api/v1/analysis-jobs/${encodeURIComponent(jobId)}/result`, { signal })
+}
+
+export function createAnalysisSet(jobIds: string[], csrfToken?: string): Promise<AnalysisSetResult> {
+  return request('/api/v1/analysis-sets', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}) },
+    body: JSON.stringify({ job_ids: jobIds }),
+  })
+}
+
+export function getAnalysisSet(setId: string): Promise<AnalysisSetResult> {
+  return request(`/api/v1/analysis-sets/${encodeURIComponent(setId)}`)
 }
 
 export const authApi = {

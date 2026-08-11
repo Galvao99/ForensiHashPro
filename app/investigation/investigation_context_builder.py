@@ -16,6 +16,8 @@ from app.models.detected_ip import (
 from app.services.ip_extraction_service import (
     IpExtractionService,
 )
+from app.entities.service import EntityExtractionService
+from app.investigation.declared_hash import DeclaredHashExtractor
 
 
 class InvestigationContextBuilder:
@@ -59,6 +61,8 @@ class InvestigationContextBuilder:
         contract_date_extractor: ContractDateExtractor | None = None,
         contract_date_selector: ContractDateSelector | None = None,
         ip_extraction_service: IpExtractionService | None = None,
+        entity_extraction_service: EntityExtractionService | None = None,
+        declared_hash_extractor: DeclaredHashExtractor | None = None,
     ) -> None:
         self.contract_date_extractor = (
             contract_date_extractor
@@ -74,6 +78,10 @@ class InvestigationContextBuilder:
             ip_extraction_service
             or IpExtractionService()
         )
+        self.entity_extraction_service = (
+            entity_extraction_service or EntityExtractionService()
+        )
+        self.declared_hash_extractor = declared_hash_extractor or DeclaredHashExtractor()
 
     def build(
         self,
@@ -98,7 +106,19 @@ class InvestigationContextBuilder:
                 file_name=evidence_key,
             )
 
+            self._populate_entities(
+                context=context,
+                result=result,
+                file_name=evidence_key,
+            )
+
             self._populate_hashes(
+                context=context,
+                result=result,
+                file_name=evidence_key,
+            )
+
+            self._populate_declared_hashes(
                 context=context,
                 result=result,
                 file_name=evidence_key,
@@ -200,6 +220,25 @@ class InvestigationContextBuilder:
 
         return ""
 
+    def _populate_entities(
+        self,
+        *,
+        context: InvestigationContext,
+        result: AnalysisResult,
+        file_name: str,
+    ) -> None:
+        entities = list(getattr(result, "resolved_entities", ()) or ())
+        if not entities:
+            text = self._extract_text(result)
+            if text:
+                entities = list(
+                    self.entity_extraction_service.resolve_legacy_text(
+                        text, source_file=file_name
+                    ).entities
+                )
+        if entities:
+            context.resolved_entities[file_name] = entities
+
     # ==============================================================
     # HASHES
     # ==============================================================
@@ -271,6 +310,53 @@ class InvestigationContextBuilder:
                 )
 
         return hashes
+
+    def _populate_declared_hashes(
+        self,
+        *,
+        context: InvestigationContext,
+        result: AnalysisResult,
+        file_name: str,
+    ) -> None:
+        evidence_source = getattr(result, "evidence_source", None)
+        evidence_ref = evidence_source.evidence_id if evidence_source is not None else file_name
+        filename = result.file_info.name
+        occurrences = []
+        text_step = next(
+            (step for step in reversed(getattr(result, "processing_steps", ()) or ()) if step.code == "text_extraction"),
+            None,
+        )
+        text_result = getattr(text_step, "value", None)
+        segments = list(getattr(text_result, "segments", ()) or ())
+        if segments:
+            for segment in segments:
+                occurrences.extend(self.declared_hash_extractor.extract_text(
+                    segment.text,
+                    evidence_ref=evidence_ref,
+                    filename=filename,
+                    source_type=segment.source,
+                    page=segment.page,
+                ))
+        else:
+            text = self._extract_text(result)
+            if text:
+                occurrences.extend(self.declared_hash_extractor.extract_text(
+                    text,
+                    evidence_ref=evidence_ref,
+                    filename=filename,
+                    source_type="legacy_text",
+                ))
+        json_analysis = getattr(result, "json_analysis", None)
+        if json_analysis is not None:
+            for field in (getattr(json_analysis, "fields", ()) or ()):
+                occurrences.extend(self.declared_hash_extractor.extract_json_field(
+                    field.value,
+                    evidence_ref=evidence_ref,
+                    filename=filename,
+                    field_path=field.path,
+                ))
+        if occurrences:
+            context.declared_hashes[file_name] = occurrences
 
     # ==============================================================
     # DATA CONTRATUAL

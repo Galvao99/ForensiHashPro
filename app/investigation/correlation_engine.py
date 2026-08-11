@@ -3,6 +3,7 @@ from app.investigation.correlation_result import CorrelationResult
 from app.investigation.investigation_context import InvestigationContext
 from app.investigation.rules.base_correlation_rule import BaseCorrelationRule
 from app.models.badge import Badge
+from uuid import NAMESPACE_URL, uuid5
 
 
 class CorrelationEngine:
@@ -30,6 +31,7 @@ class CorrelationEngine:
             )
 
         self._remove_duplicates(result)
+        self._assign_ids(result)
         self._prepare_for_display(
             result=result,
             context=context,
@@ -66,16 +68,32 @@ class CorrelationEngine:
         result.add_finding(
             CorrelationFinding(
                 title=f"Falha na regra '{rule.name}'",
-                description=str(exception),
+                description="A regra não pôde ser concluída; as demais correlações foram preservadas.",
                 severity="warning",
                 rule_id=rule.rule_id,
                 icon="error",
                 metadata={
                     "regra": rule.rule_id,
-                    "erro": str(exception),
+                    "error_type": type(exception).__name__,
                 },
+                category="rule_limitation",
+                limitations=["A regra falhou sem produzir resultado técnico."],
             )
         )
+
+    @staticmethod
+    def _assign_ids(result: CorrelationResult) -> None:
+        for finding in result.findings:
+            if finding.finding_id:
+                continue
+            evidence = "|".join(
+                sorted(
+                    f"{item.evidence_ref}:{item.page}:{item.start}:{item.normalized_value}"
+                    for item in finding.evidence
+                )
+            )
+            seed = f"{finding.rule_id}|{finding.category}|{evidence}|{finding.source_file}|{finding.target_file}"
+            finding.finding_id = str(uuid5(NAMESPACE_URL, seed))
 
     def _remove_duplicates(
         self,
@@ -196,6 +214,8 @@ class CorrelationEngine:
         )
 
         for evidence_key, display_name in display_names:
+            if len(evidence_key) < 4:
+                continue
             translated = translated.replace(
                 evidence_key,
                 display_name,

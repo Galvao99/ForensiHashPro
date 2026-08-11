@@ -215,7 +215,7 @@ def test_staging_permission_error_is_logged_and_http_response_remains_safe(
     assert record.component == "upload_storage"
     assert record.error_type == "PermissionError"
     assert record.operation == "create_request_directory"
-    assert record.technical_path == str(storage.root)
+    assert not hasattr(record, "technical_path")
 
 
 def test_upload_above_limit_is_rejected_and_removed(api_client) -> None:

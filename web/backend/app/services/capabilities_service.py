@@ -33,11 +33,13 @@ class CapabilitiesService:
             "signature": {"available": signature_available},
             "rust_json": {"available": rust.available},
             "biometrics": {"available": True, "formats": ["aware_knomi"]},
+            "parser_registry": {"available": True, "specialized_formats": ["zip"]},
+            "archive_inspection": {"available": True, "formats": ["zip"]},
             "ip": {
                 "available": settings.ip_lookup_enabled and bool(settings.ip_api_key),
                 "automatic_in_individual_analysis": False,
             },
-            "timeline": {"available_in_individual_analysis": False},
+            "timeline": {"available_in_individual_analysis": True},
             "comparison": {"available_in_individual_analysis": False},
             "correlation": {"available_in_individual_analysis": False},
         }

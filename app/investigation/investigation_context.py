@@ -7,6 +7,8 @@ from app.models.detected_ip import DetectedIp
 from app.models.json_analysis_result import (
     JsonAnalysisResult,
 )
+from app.entities.models import NormalizedEntity
+from app.investigation.declared_hash import DeclaredHashOccurrence
 
 
 @dataclass(slots=True)
@@ -27,10 +29,16 @@ class InvestigationContext:
         default_factory=dict
     )
 
+    resolved_entities: dict[str, list[NormalizedEntity]] = field(
+        default_factory=dict
+    )
+
     calculated_hashes: dict[
         str,
         dict[str, str],
     ] = field(default_factory=dict)
+
+    declared_hashes: dict[str, list[DeclaredHashOccurrence]] = field(default_factory=dict)
 
     contract_dates: dict[str, datetime] = field(
         default_factory=dict

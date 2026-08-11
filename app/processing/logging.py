@@ -19,6 +19,8 @@ def log_step(
             "analysis_id": analysis_id,
             "evidence_id": evidence_id,
             "component": step.component,
+            "engine": step.component,
+            "stage": step.code,
             "step_code": step.code,
             "status": step.status.value,
             "duration_ms": step.duration_ms,

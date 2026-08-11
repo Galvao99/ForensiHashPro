@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import asdict, is_dataclass
 from typing import Any
 
 from PySide6.QtCore import QEvent, Qt, Signal
@@ -319,7 +320,16 @@ class FindingCard(QFrame):
         )
 
         if isinstance(metadata, dict):
-            return metadata
+            details = dict(metadata)
+            for field_name in ("finding_id", "category", "source_engine", "confidence", "evidence", "entities", "limitations"):
+                value = getattr(self.finding, field_name, None)
+                if value in (None, "", [], ()):
+                    continue
+                if isinstance(value, (list, tuple)):
+                    details[field_name] = [asdict(item) if is_dataclass(item) else item for item in value]
+                else:
+                    details[field_name] = value
+            return details
 
         return {}
 

@@ -19,12 +19,20 @@ from app.settings.tooling import ToolDetector, ToolStatus, ToolUnavailableError
 
 
 @dataclass(slots=True)
+class TextSegment:
+    text: str
+    source: str
+    page: int | None = None
+
+
+@dataclass(slots=True)
 class TextExtractionResult:
     text: str = ""
     source: str = "none"
     pages_processed: int = 0
     total_pages: int | None = None
     issues: list[ProcessingIssue] = field(default_factory=list)
+    segments: list[TextSegment] = field(default_factory=list)
 
 
 class TextExtractionService:
@@ -66,6 +74,7 @@ class TextExtractionService:
     ) -> StepResult[TextExtractionResult]:
         issues: list[ProcessingIssue] = []
         native_parts: list[str] = []
+        native_segments: list[TextSegment] = []
         try:
             with fitz.open(path) as document:
                 total_pages = document.page_count
@@ -84,8 +93,11 @@ class TextExtractionService:
                         "O PDF excede o número máximo de páginas.",
                         {"pages": total_pages, "limit": self.limits.max_pdf_pages},
                     )
-                for page in document:
-                    native_parts.append(page.get_text("text") or "")
+                for page_number, page in enumerate(document, start=1):
+                    page_text = page.get_text("text") or ""
+                    native_parts.append(page_text)
+                    if page_text.strip():
+                        native_segments.append(TextSegment(page_text.strip(), "native_text", page_number))
         except Exception as error:
             return self._failed_step(
                 started,
@@ -106,10 +118,13 @@ class TextExtractionService:
                     source="native",
                     pages_processed=total_pages,
                     total_pages=total_pages,
+                    segments=native_segments,
                 ),
             )
 
-        unavailable = self._ocr_unavailable(started, native_text, total_pages)
+        unavailable = self._ocr_unavailable(
+            started, native_text, total_pages, native_segments
+        )
         if unavailable is not None:
             return unavailable
 
@@ -118,6 +133,7 @@ class TextExtractionService:
             source="ocr",
             total_pages=total_pages,
             issues=issues,
+            segments=list(native_segments),
         )
         started_clock = time.monotonic()
         for page_number in range(1, total_pages + 1):
@@ -157,6 +173,7 @@ class TextExtractionService:
                     result.text = "\n".join(
                         part for part in (result.text, page_text) if part
                     )
+                    result.segments.append(TextSegment(page_text, "ocr", page_number))
                 result.pages_processed += 1
             except Exception as error:
                 result.issues.append(
@@ -225,11 +242,20 @@ class TextExtractionService:
             "Texto extraído com sucesso."
             if text
             else "O OCR foi executado corretamente e nenhum texto foi identificado.",
-            TextExtractionResult(text=text, source="ocr", pages_processed=1),
+            TextExtractionResult(
+                text=text,
+                source="ocr",
+                pages_processed=1,
+                segments=[TextSegment(text, "ocr", 1)] if text else [],
+            ),
         )
 
     def _ocr_unavailable(
-        self, started: datetime, native_text: str, total_pages: int
+        self,
+        started: datetime,
+        native_text: str,
+        total_pages: int,
+        native_segments: list[TextSegment],
     ) -> StepResult[TextExtractionResult] | None:
         for status in (self.tesseract_status, self.poppler_status):
             if not status.available:
@@ -237,6 +263,7 @@ class TextExtractionService:
                 step.value.text = native_text
                 step.value.source = "native_partial" if native_text else "unavailable"
                 step.value.total_pages = total_pages
+                step.value.segments = list(native_segments)
                 if native_text:
                     step.status = ProcessingStatus.PARTIAL
                     step.user_message += " O texto nativo parcial foi preservado."

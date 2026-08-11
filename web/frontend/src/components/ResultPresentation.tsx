@@ -1,9 +1,9 @@
-import type { ReactNode } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { JsonView } from './JsonView'
 import { StatusBadge } from './StatusBadge'
 import { TechnicalValue } from './ui'
 import { TechnicalTree } from './TechnicalTree'
-import type { AnalysisContract, ProcessingStatus } from '../types/api'
+import type { AnalysisContract, AnalysisSetResult, ProcessingStatus } from '../types/api'
 
 const PROCESSING_STATUSES = new Set<ProcessingStatus>(['success', 'no_findings', 'partial', 'skipped', 'unavailable', 'failed', 'cancelled', 'limit_exceeded'])
 
@@ -127,6 +127,57 @@ export function FactsResultView({ facts }: { facts: Array<Record<string, unknown
 export function FindingsResultView({ findings }: { findings: Array<Record<string, unknown>> }) {
   if (!findings.length) return <EmptyState>Nenhum finding foi reportado.</EmptyState>
   return <div className="technical-card-list">{findings.map((finding, index) => <article className="technical-card finding-card" key={String(finding.finding_id ?? finding.id ?? index)}><header><h3>{String(finding.title ?? finding.kind ?? `Finding ${index + 1}`)}</h3>{present(finding.severity) && <span className="technical-state">{String(finding.severity)}</span>}</header><KeyValueGrid value={finding} /></article>)}</div>
+}
+
+export function ArchiveResultView({ archive }: { archive: Record<string, unknown> | null }) {
+  if (!archive || !present(archive)) return <EmptyState>Nenhum arquivo compactado aplicável foi identificado.</EmptyState>
+  const metadata = (archive.metadata && typeof archive.metadata === 'object' ? archive.metadata : {}) as Record<string, unknown>
+  const entries = Array.isArray(archive.embedded_artifacts) ? archive.embedded_artifacts as Array<Record<string, unknown>> : []
+  const warnings = Array.isArray(archive.warnings) ? archive.warnings as Array<Record<string, unknown>> : []
+  return <div className="archive-inspection">
+    <div className="archive-summary"><div><span>Formato</span><strong>{String(metadata.archive_type ?? archive.detected_type ?? 'ZIP')}</strong></div><div><span>Entradas</span><strong>{String(metadata.total_entries ?? entries.length)}</strong></div><div><span>Diretórios</span><strong>{String(metadata.directory_entries ?? 0)}</strong></div><div><span>Warnings</span><strong>{warnings.length}</strong></div></div>
+    {warnings.length > 0 && <div className="archive-warnings" aria-label="Warnings do archive">{warnings.map((warning, index) => <article key={`${String(warning.code ?? 'warning')}-${index}`}><strong>⚠ {String(warning.code ?? 'warning técnico')}</strong><p>{String(warning.message ?? '')}</p></article>)}</div>}
+    <details className="archive-tree"><summary>Explorar conteúdo</summary><TechnicalTree value={{ entries }} /></details>
+    <details className="technical-details"><summary>Ver detalhes da inspeção</summary><KeyValueGrid value={archive} /></details>
+  </div>
+}
+
+export function CorrelationResultView({ result }: { result: AnalysisSetResult }) {
+  const findings = result.correlation_result.findings
+  if (!findings.length) return <EmptyState>Nenhuma correlação técnica aplicável foi identificada.</EmptyState>
+  return <div className="technical-card-list">{findings.map((finding) => <article className="technical-card finding-card" key={finding.finding_id}><header><h3>{finding.summary}</h3><span className="technical-state">{finding.severity}</span></header><p>{finding.description}</p><details className="technical-details"><summary>Ver detalhes</summary><ul>{finding.evidence.map((item, index) => <li key={`${String(item.evidence_ref ?? item.filename ?? index)}-${index}`}><strong>{String(item.filename ?? item.evidence_ref ?? 'Evidência')}</strong>{item.page ? ` · página ${String(item.page)}` : ''}{item.context ? ` · ${String(item.context)}` : ''}</li>)}</ul><KeyValueGrid value={{ category: finding.category, rule_id: finding.rule_id, source_engine: finding.source_engine, confidence: finding.confidence, evidence: finding.evidence, entities: finding.entities, limitations: finding.limitations, metadata: finding.metadata }} /></details></article>)}</div>
+}
+
+export function TimelineResultView({ timeline, aggregate }: { timeline: AnalysisContract['timeline']; aggregate?: AnalysisSetResult['timeline_result'] }) {
+  const records = aggregate?.events ?? (timeline ?? []).filter((item) => item.record_type === 'event' || item.record_type === undefined)
+  const warnings = aggregate?.warnings ?? (timeline ?? []).filter((item) => item.record_type === 'warning')
+  const limitations = aggregate?.limitations ?? (timeline ?? []).filter((item) => item.record_type === 'limitation').map((item) => String(item.message ?? '')).filter(Boolean)
+  const [file, setFile] = useState('all')
+  const [category, setCategory] = useState('all')
+  const [kind, setKind] = useState('all')
+  const files = useMemo(() => Array.from(new Set(records.map((item) => String(item.filename ?? '')).filter(Boolean))), [records])
+  const categories = useMemo(() => Array.from(new Set(records.map((item) => String(item.category ?? '')).filter(Boolean))), [records])
+  const visible = records.filter((item) => {
+    const structural = item.temporal_status === 'structural_only'
+    return (file === 'all' || item.filename === file)
+      && (category === 'all' || item.category === category)
+      && (kind === 'all' || (kind === 'structural' ? structural : !structural))
+  })
+  if (!records.length && !warnings.length) return <EmptyState>Nenhum evento temporal ou estrutural foi reportado.</EmptyState>
+  return <div className="timeline-view">
+    <div className="timeline-filters" aria-label="Filtros da Timeline">
+      <label>Arquivo<select aria-label="Filtrar por arquivo" value={file} onChange={(event) => setFile(event.target.value)}><option value="all">Todos</option>{files.map((name) => <option key={name}>{name}</option>)}</select></label>
+      <label>Categoria<select aria-label="Filtrar por categoria" value={category} onChange={(event) => setCategory(event.target.value)}><option value="all">Todas</option>{categories.map((name) => <option key={name} value={name}>{label(name)}</option>)}</select></label>
+      <label>Tipo<select aria-label="Filtrar por tipo" value={kind} onChange={(event) => setKind(event.target.value)}><option value="all">Todos</option><option value="temporal">Temporal</option><option value="structural">Estrutural</option></select></label>
+    </div>
+    {warnings.length > 0 && <section className="timeline-warnings" aria-label="Warnings da Timeline"><h3>Warnings técnicos</h3>{warnings.map((warning, index) => <article key={String(warning.warning_id ?? index)}><strong>⚠ {String(warning.title ?? 'Warning temporal')}</strong><p>{String(warning.description ?? '')}</p><details><summary>Ver detalhes</summary><KeyValueGrid value={warning} /></details></article>)}</section>}
+    <ol className="timeline-list">{visible.map((event, index) => {
+      const structural = event.temporal_status === 'structural_only'
+      return <li key={String(event.event_id ?? index)} className={structural ? 'structural' : 'temporal'}><span className="timeline-marker" aria-hidden="true">{structural ? '◆' : '●'}</span><article><time>{structural ? 'Data não determinada' : String(event.timestamp ?? event.raw_timestamp ?? 'Data não determinada')}</time><h3>{String(event.title ?? 'Evento técnico')}</h3><p>{String(event.description ?? '')}</p><small>{String(event.source_type ?? 'fonte não informada')} · {String(event.filename ?? event.evidence_ref ?? 'evidência')}</small><details className="technical-details"><summary>Ver detalhes</summary><KeyValueGrid value={event} /></details></article></li>
+    })}</ol>
+    {!visible.length && <EmptyState>Nenhum evento corresponde aos filtros selecionados.</EmptyState>}
+    {limitations.length ? <div className="timeline-limitations"><h3>Limitações</h3><ul>{limitations.map((item) => <li key={item}>{item}</li>)}</ul></div> : null}
+  </div>
 }
 
 export function LimitationsResultView({ limitations }: { limitations: Array<Record<string, unknown>> }) {

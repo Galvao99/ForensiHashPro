@@ -53,16 +53,20 @@ class AnalysisCoordinator:
         evidence_path: Path,
         *,
         cancellation: CancellationToken | None = None,
+        analysis_id: str | None = None,
     ) -> AnalysisContract:
-        return self.execute(evidence_path, cancellation=cancellation).contract
+        return self.execute(
+            evidence_path, cancellation=cancellation, analysis_id=analysis_id
+        ).contract
 
     def execute(
         self,
         evidence_path: Path,
         *,
         cancellation: CancellationToken | None = None,
+        analysis_id: str | None = None,
     ) -> AnalysisExecution:
-        analysis_id = str(uuid4())
+        analysis_id = analysis_id or str(uuid4())
         token = cancellation or CancellationToken()
         self._emit(analysis_id, "analysis", ProgressStatus.STARTED, "Análise iniciada.", 0)
         if token.cancelled:

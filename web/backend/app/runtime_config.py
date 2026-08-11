@@ -7,6 +7,9 @@ from urllib.parse import urlsplit
 ENVIRONMENTS = frozenset({"development", "test", "staging", "production"})
 DEPLOYED_ENVIRONMENTS = frozenset({"staging", "production"})
 DEFAULT_DEVELOPMENT_ORIGINS = ("http://localhost:5173", "http://127.0.0.1:5173")
+DEFAULT_ANALYSIS_CONCURRENCY = 1
+DEFAULT_ANALYSIS_QUEUE_CAPACITY = 20
+DEFAULT_ANALYSIS_TIMEOUT_SECONDS = 300
 
 
 def environment() -> str:
@@ -34,6 +37,42 @@ def job_worker_enabled() -> bool:
     if configured is None:
         return deployed_environment()
     return _boolean("FORENSIHASH_JOB_WORKER_ENABLED", configured)
+
+
+def analysis_concurrency() -> int:
+    return _bounded_integer(
+        "FORENSIHASH_ANALYSIS_CONCURRENCY",
+        DEFAULT_ANALYSIS_CONCURRENCY,
+        minimum=1,
+        maximum=16,
+    )
+
+
+def analysis_queue_capacity() -> int:
+    return _bounded_integer(
+        "FORENSIHASH_ANALYSIS_QUEUE_CAPACITY",
+        DEFAULT_ANALYSIS_QUEUE_CAPACITY,
+        minimum=1,
+        maximum=10_000,
+    )
+
+
+def analysis_timeout_seconds() -> int:
+    return _bounded_integer(
+        "FORENSIHASH_ANALYSIS_TIMEOUT_SECONDS",
+        DEFAULT_ANALYSIS_TIMEOUT_SECONDS,
+        minimum=1,
+        maximum=86_400,
+    )
+
+
+def archive_limits():
+    from app.parsers.archive import ArchiveLimits
+
+    try:
+        return ArchiveLimits.from_env()
+    except ValueError as error:
+        raise RuntimeError(str(error)) from error
 
 
 def cookie_secure() -> bool:
@@ -77,6 +116,7 @@ def validate_runtime_configuration() -> None:
     current_environment = environment()
     allowed_origins()
     cookie_samesite()
+    archive_limits()
     if current_environment in DEPLOYED_ENVIRONMENTS:
         secret = os.environ.get("FORENSIHASH_SESSION_SECRET", "")
         if len(secret) < 32:
@@ -98,3 +138,16 @@ def _boolean(name: str, value: str) -> bool:
     if normalized in {"0", "false", "no", "off"}:
         return False
     raise RuntimeError(f"{name} deve ser true ou false.")
+
+
+def _bounded_integer(
+    name: str, default: int, *, minimum: int, maximum: int
+) -> int:
+    raw = os.environ.get(name, str(default)).strip()
+    try:
+        value = int(raw)
+    except ValueError as error:
+        raise RuntimeError(f"{name} deve ser um número inteiro.") from error
+    if not minimum <= value <= maximum:
+        raise RuntimeError(f"{name} deve estar entre {minimum} e {maximum}.")
+    return value
