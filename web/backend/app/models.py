@@ -114,3 +114,15 @@ class AnalysisJob(Base):
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     worker_token: Mapped[str | None] = mapped_column(String(36))
     heartbeat_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
+
+
+class AnalysisSetRecord(Base):
+    __tablename__ = "analysis_sets"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    state: Mapped[str] = mapped_column(String(24), index=True)
+    job_ids: Mapped[list[str]] = mapped_column(JSON().with_variant(JSONB, "postgresql"))
+    result_json: Mapped[dict[str, object]] = mapped_column(JSON().with_variant(JSONB, "postgresql"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)

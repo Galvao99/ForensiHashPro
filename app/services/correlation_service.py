@@ -15,6 +15,7 @@ from app.investigation.rules.embedded_hash_match_rule import (
 from app.investigation.rules.embedded_hash_unmatched_rule import (
     EmbeddedHashUnmatchedRule,
 )
+from app.investigation.rules.entity_correlation_rule import EntityCorrelationRule
 from app.investigation.rules.ip_context_rule import (
     IpContextRule,
 )
@@ -53,6 +54,7 @@ class CorrelationService:
                 ProducerContextRule(),
                 OcrContextRule(),
                 JsonContextRule(),
+                EntityCorrelationRule(),
                 EmbeddedHashMatchRule(),
                 EmbeddedHashUnmatchedRule(),
                 IpContextRule(),

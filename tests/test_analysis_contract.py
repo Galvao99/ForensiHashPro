@@ -36,6 +36,7 @@ from app.processing import (
 )
 from app.services.export_service import ExportService
 from app.workers.analysis_worker import AnalysisWorker
+from app.entities import EntitySource, EntitySourceType, EntityType, NormalizedEntity
 
 
 UTC_NOW = datetime(2026, 8, 5, 12, 0, tzinfo=timezone.utc)
@@ -124,6 +125,38 @@ def test_contract_is_versioned_json_safe_and_deterministic() -> None:
     assert json_safe(Path("folder/file.bin")) == "folder/file.bin"
     assert json_safe(PurePosixPath("folder/file.bin")) == "folder/file.bin"
     assert json_safe(PureWindowsPath("folder/file.bin")) == "folder/file.bin"
+
+
+def test_resolved_entity_is_exposed_as_traceable_fact_without_internal_path() -> None:
+    result = _legacy_result()
+    result.resolved_entities = [
+        NormalizedEntity(
+            entity_type=EntityType.PHONE,
+            normalized_value="+5521986967225",
+            confidence=0.9,
+            raw_values=("(21) 98696-7225",),
+            sources=(
+                EntitySource(
+                    source_type=EntitySourceType.NATIVE_TEXT,
+                    source_file="C:/private/evidência.pdf",
+                    page=4,
+                    start=12,
+                    end=28,
+                    context_before="Telefone: ",
+                    extractor="entity_resolver_v2",
+                ),
+            ),
+        )
+    ]
+
+    contract = LegacyAnalysisAdapter().convert(result)
+    entity_fact = next(fact for fact in contract.facts if fact.kind == "entity")
+    serialized = AnalysisContractJson.dumps(contract)
+
+    assert entity_fact.data["type"] == "phone"
+    assert entity_fact.data["provenance"][0]["page"] == 4
+    assert entity_fact.data["provenance"][0]["evidence_ref"] == contract.evidence_id
+    assert "C:/private" not in serialized
 
 
 def test_contract_round_trip_preserves_sections_and_external_results() -> None:

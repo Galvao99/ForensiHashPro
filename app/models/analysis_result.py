@@ -1,9 +1,10 @@
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
 from app.enum.severity import Severity
+from app.models.timeline_event import TimelineEvent, TimelineWarning
 from app.models.digital_signature_result import DigitalSignatureResult
 from app.models.integrity_result import IntegrityResult
 from app.models.json_analysis_result import JsonAnalysisResult
@@ -14,6 +15,10 @@ from app.models.binary_analysis_result import BinaryAnalysisResult
 from app.models.biometric_report import BiometricReport
 from app.evidence.models import EvidenceSource
 from app.processing import StepResult
+
+if TYPE_CHECKING:
+    from app.entities.models import NormalizedEntity
+    from app.parsers.models import ParsedArtifact
 
 
 @dataclass(frozen=True)
@@ -64,26 +69,6 @@ class Finding:
 
 
 @dataclass
-class TimelineEvent:
-    title: str
-    date: datetime | None
-    source: str
-    description: str
-    severity: Severity = Severity.INFO
-    color: str = "#60A5FA"
-    needs_confirmation: bool = False
-    confirmed: bool = True
-
-    def formatted_date(self) -> str:
-        if not self.date:
-            return "Data não identificada"
-
-        return self.date.strftime(
-            "%d/%m/%Y %H:%M:%S"
-        )
-
-
-@dataclass
 class AnalysisResult:
     file_info: FileInfo
     hashes: HashResult
@@ -104,6 +89,8 @@ class AnalysisResult:
     timeline_events: list[TimelineEvent] = field(
         default_factory=list
     )
+    timeline_warnings: list[TimelineWarning] = field(default_factory=list)
+    timeline_limitations: list[str] = field(default_factory=list)
 
     extracted_text: str = ""
 
@@ -118,6 +105,9 @@ class AnalysisResult:
     evidence_source: EvidenceSource | None = None
 
     processing_steps: list[StepResult[Any]] = field(default_factory=list)
+
+    resolved_entities: list["NormalizedEntity"] = field(default_factory=list)
+    parsed_artifact: "ParsedArtifact | None" = None
 
     @property
     def has_extracted_text(self) -> bool:

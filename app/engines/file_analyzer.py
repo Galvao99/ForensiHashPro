@@ -8,6 +8,11 @@ from app.engines.magic_number_engine import MagicNumberEngine
 from app.engines.metadata_engine import MetadataEngine
 from app.engines.pdf_structure_engine import PDFStructureEngine
 from app.models import AnalysisResult, FileInfo, MetadataResult
+from app.models.digital_signature_result import (
+    DigitalSignatureResult,
+    SignatureAnalysisStatus,
+)
+from app.models.magic_number_result import MagicNumberResult
 from app.models.integrity_result import IntegrityResult
 from app.models.json_analysis_result import JsonAnalysisResult
 from app.models.biometric_report import BiometricReport
@@ -22,6 +27,8 @@ from app.engines.binary_structure_engine import BinaryStructureEngine
 from app.processing import ProcessingIssue, ProcessingStatus, StepResult
 from app.processing import ProcessingImpact
 from app.evidence.models import CaptureState, EvidenceSource
+from app.parsers import ParserRegistry, identify_artifact
+from app.parsers.models import ParsedArtifact
 
 
 class UnacquiredEvidenceError(RuntimeError):
@@ -53,6 +60,7 @@ class FileAnalyzer:
         json_parser_service: JsonParserService | None = None,
         binary_structure_engine: BinaryStructureEngine | None = None,
         biometric_report_service: BiometricReportService | None = None,
+        parser_registry: ParserRegistry | None = None,
     ) -> None:
         self.hash_engine = hash_engine
         self.metadata_engine = metadata_engine
@@ -62,6 +70,7 @@ class FileAnalyzer:
         self.pdf_structure_engine = pdf_structure_engine
         self.binary_structure_engine = binary_structure_engine
         self.biometric_report_service = biometric_report_service
+        self.parser_registry = parser_registry or ParserRegistry()
 
         self.json_parser_service = (
             json_parser_service
@@ -128,23 +137,80 @@ class FileAnalyzer:
         processing_steps = []
         extract_step = getattr(self.metadata_engine, "extract_step", None)
         if callable(extract_step):
-            metadata_step = extract_step(file_path)
+            try:
+                metadata_step = extract_step(file_path)
+            except Exception as error:
+                issue = self._processing_issue(
+                    "metadata_failed", "metadata", ProcessingStatus.FAILED,
+                    "A extração de metadados não pôde ser concluída.", error,
+                )
+                metadata_step = self._processing_step(
+                    "metadata_extraction", "metadata", ProcessingStatus.FAILED,
+                    issue.user_message, issues=[issue],
+                )
             processing_steps.append(metadata_step)
             metadata = metadata_step.value or MetadataResult(raw={})
         else:
             metadata = self.metadata_engine.extract(file_path)
 
-        magic_numbers = (
-            self.magic_number_engine.analyze(
-                file_path
+        try:
+            magic_numbers = self.magic_number_engine.analyze(file_path)
+        except Exception as error:
+            issue = self._processing_issue(
+                "magic_number_failed", "magic_number", ProcessingStatus.FAILED,
+                "A identificação do tipo real não pôde ser concluída.", error,
             )
-        )
+            processing_steps.append(self._processing_step(
+                "magic_number", "magic_number", ProcessingStatus.FAILED,
+                issue.user_message, issues=[issue],
+            ))
+            magic_numbers = MagicNumberResult(
+                detected_type="UNKNOWN", signature="", extension_matches=False
+            )
 
-        digital_signature = (
-            self.digital_signature_engine.analyze(
-                file_path
+        try:
+            digital_signature = self.digital_signature_engine.analyze(file_path)
+        except Exception as error:
+            issue = self._processing_issue(
+                "digital_signature_failed", "digital_signature",
+                ProcessingStatus.FAILED,
+                "A análise de assinatura digital não pôde ser concluída.", error,
             )
-        )
+            processing_steps.append(self._processing_step(
+                "digital_signature", "digital_signature", ProcessingStatus.FAILED,
+                issue.user_message, issues=[issue],
+            ))
+            digital_signature = DigitalSignatureResult(
+                has_signature=None,
+                technical_status=issue.user_message,
+                analysis_status=SignatureAnalysisStatus.ERROR,
+                error_code=issue.code,
+                error_message=issue.user_message,
+            )
+
+        parsed_artifact: ParsedArtifact | None = None
+        identification = identify_artifact(file_path, magic_numbers)
+        try:
+            parsed_artifact = self.parser_registry.parse(file_path, identification)
+            parser_status = (
+                ProcessingStatus.PARTIAL
+                if parsed_artifact.state == "partial" or parsed_artifact.warnings
+                else ProcessingStatus.SUCCESS
+            )
+            processing_steps.append(self._processing_step(
+                "artifact_parsing", "parser_registry", parser_status,
+                f"Parser {parsed_artifact.parser_id} aplicado ao tipo identificado.",
+                value=parsed_artifact,
+            ))
+        except Exception as error:
+            issue = self._processing_issue(
+                "artifact_parser_failed", "parser_registry", ProcessingStatus.PARTIAL,
+                "O parser especializado não pôde concluir a inspeção.", error,
+            )
+            processing_steps.append(self._processing_step(
+                "artifact_parsing", "parser_registry", ProcessingStatus.PARTIAL,
+                issue.user_message, issues=[issue],
+            ))
 
         pdf_structure = None
 
@@ -204,11 +270,22 @@ class FileAnalyzer:
         processing_steps.append(biometric_step)
         biometric_report = biometric_step.value
 
-        findings = self.findings_engine.analyze(
-            metadata=metadata,
-            integrity=integrity,
-            biometric_report=biometric_report,
-        )
+        try:
+            findings = self.findings_engine.analyze(
+                metadata=metadata,
+                integrity=integrity,
+                biometric_report=biometric_report,
+            )
+        except Exception as error:
+            issue = self._processing_issue(
+                "findings_failed", "findings", ProcessingStatus.FAILED,
+                "A correlação de vestígios não pôde ser concluída.", error,
+            )
+            processing_steps.append(self._processing_step(
+                "findings", "findings", ProcessingStatus.FAILED,
+                issue.user_message, issues=[issue],
+            ))
+            findings = []
 
         binary_analysis = None
         if self.binary_structure_engine is not None:
@@ -252,6 +329,7 @@ class FileAnalyzer:
             pdf_structure=pdf_structure,
             biometric_report=biometric_report,
             processing_steps=processing_steps,
+            parsed_artifact=parsed_artifact,
         )
 
     def _analyze_biometric_report(

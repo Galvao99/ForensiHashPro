@@ -29,7 +29,7 @@ function itemLabel(parent: string, item: unknown, index: number): string {
   const singular = parent.replace(/s$/i, '') || 'Item'
   if (item && typeof item === 'object' && !Array.isArray(item)) {
     const record = item as Record<string, unknown>
-    const descriptor = ['type', 'kind', 'encoding', 'category', 'format', 'name']
+    const descriptor = ['filename', 'type', 'kind', 'encoding', 'category', 'format', 'name']
       .map((key) => record[key])
       .find((value) => typeof value === 'string' && value.length <= 40)
     return `${displayLabel(singular)} ${index + 1}${descriptor ? ` — ${descriptor}` : ''}`

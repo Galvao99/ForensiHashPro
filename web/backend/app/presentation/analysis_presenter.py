@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from pathlib import PurePosixPath
 from collections.abc import Mapping
 from typing import Any
 
@@ -68,7 +69,28 @@ class AnalysisPresenter:
             raise TypeError("A apresentação de AnalysisContract deve ser um objeto JSON.")
         if display_name is not None and isinstance(value.get("file"), dict):
             value["file"]["name"] = display_name
+        if display_name is not None and isinstance(value.get("timeline"), list):
+            for record in value["timeline"]:
+                if isinstance(record, dict) and record.get("record_type") == "event":
+                    record["filename"] = display_name
+        raw = json_safe(contract)
+        if isinstance(raw, dict):
+            self._restore_archive_entry_names(value, raw)
         return value
+
+    @classmethod
+    def _restore_archive_entry_names(cls, public: Any, raw: Any) -> None:
+        if isinstance(public, dict) and isinstance(raw, Mapping):
+            if "embedded_artifact_ref" in public and isinstance(raw.get("filename"), str):
+                public["filename"] = PurePosixPath(
+                    raw["filename"].replace("\\", "/")
+                ).name[:255]
+            for key, child in public.items():
+                if key in raw:
+                    cls._restore_archive_entry_names(child, raw[key])
+        elif isinstance(public, list) and isinstance(raw, list):
+            for child, raw_child in zip(public, raw):
+                cls._restore_archive_entry_names(child, raw_child)
 
     def _sanitize(self, value: Any) -> Any:
         if isinstance(value, Mapping):

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import multiprocessing
 import threading
 import time
 from collections.abc import Callable
@@ -16,6 +17,7 @@ from app.evidence import EvidenceAcquisitionError, EvidenceIntegrityError, Evide
 from web.backend.app.models import AnalysisJob, AnalysisJobStatus, RetentionMode, StoredAnalysis
 from web.backend.app.presentation import AnalysisPresenter
 from web.backend.app.services.analysis_service import UploadIntegrityError, UploadStorage, WebAnalysisService
+from web.backend.app.runtime_config import analysis_concurrency, analysis_timeout_seconds
 
 LOGGER = logging.getLogger("forensihash.web.jobs")
 PRIVATE_RESULT_TTL = timedelta(hours=1)
@@ -31,39 +33,105 @@ def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 
+class AnalysisGlobalTimeoutError(TimeoutError):
+    """O processo isolado excedeu o prazo global do job."""
+
+
+def _isolated_analysis_target(
+    connection: object,
+    staged_path: str,
+    staging_sha256: str,
+    analysis_id: str,
+) -> None:
+    """Entry point picklable do processo; nunca envia detalhes da evidência."""
+    try:
+        contract = WebAnalysisService().analyze(
+            Path(staged_path),
+            staging_sha256=staging_sha256,
+            analysis_id=analysis_id,
+        )
+        connection.send(("ok", contract))  # type: ignore[attr-defined]
+    except BaseException as error:
+        category = (
+            "limit"
+            if isinstance(error, EvidenceSizeLimitError)
+            else "cancelled"
+            if isinstance(error, AnalysisCancelledError)
+            else "evidence"
+            if isinstance(
+                error,
+                (UploadIntegrityError, EvidenceIntegrityError, EvidenceAcquisitionError, ValueError),
+            )
+            else "internal"
+        )
+        connection.send(("error", category, type(error).__name__))  # type: ignore[attr-defined]
+    finally:
+        connection.close()  # type: ignore[attr-defined]
+
+
 class AnalysisJobExecutor:
-    """Fila interna V1 com estado persistente e concorrência unitária."""
+    """Fila interna V1 persistente com concorrência e isolamento configuráveis."""
 
     def __init__(self, session_factory: sessionmaker[Session], *, storage: UploadStorage | None = None,
                  analysis_service_factory: Callable[[], WebAnalysisService] = WebAnalysisService,
                  presenter_factory: Callable[[], AnalysisPresenter] = AnalysisPresenter,
-                 poll_interval: float = 1.0) -> None:
+                 poll_interval: float = 1.0,
+                 max_concurrency: int | None = None,
+                 timeout_seconds: float | None = None,
+                 isolate_process: bool | None = None) -> None:
         self._session_factory = session_factory
         self._storage = storage or UploadStorage()
         self._analysis_service_factory = analysis_service_factory
         self._presenter_factory = presenter_factory
         self._poll_interval = poll_interval
+        self._max_concurrency = max_concurrency or analysis_concurrency()
+        self._timeout_seconds = timeout_seconds or analysis_timeout_seconds()
+        if self._max_concurrency <= 0 or self._timeout_seconds <= 0:
+            raise ValueError("Concorrência e timeout devem ser maiores que zero.")
+        self._isolate_process = (
+            analysis_service_factory is WebAnalysisService
+            if isolate_process is None
+            else isolate_process
+        )
         self._wake = threading.Event()
         self._stop = threading.Event()
-        self._thread: threading.Thread | None = None
+        self._threads: list[threading.Thread] = []
+        self._processes: set[multiprocessing.Process] = set()
+        self._process_lock = threading.Lock()
+        self._lifecycle_lock = threading.RLock()
         self._worker_token = str(uuid4())
 
     def start(self) -> None:
-        if self._thread and self._thread.is_alive():
-            return
-        self.recover()
-        self._stop.clear()
-        self._thread = threading.Thread(target=self._run, name="analysis-job-worker", daemon=True)
-        self._thread.start()
+        with self._lifecycle_lock:
+            if any(thread.is_alive() for thread in self._threads):
+                return
+            self.recover()
+            self._stop.clear()
+            self._threads = [
+                threading.Thread(
+                    target=self._run,
+                    name=f"analysis-job-worker-{index + 1}",
+                    daemon=True,
+                )
+                for index in range(self._max_concurrency)
+            ]
+            for thread in self._threads:
+                thread.start()
 
     def stop(self) -> None:
-        self._stop.set()
-        self._wake.set()
-        if self._thread:
-            self._thread.join(timeout=5)
+        with self._lifecycle_lock:
+            self._stop.set()
+            self._wake.set()
+            with self._process_lock:
+                processes = tuple(self._processes)
+            for process in processes:
+                self._terminate_process(process)
+            for thread in self._threads:
+                thread.join(timeout=5)
+            self._threads.clear()
 
     def wake(self) -> None:
-        if not self._thread or not self._thread.is_alive():
+        if not any(thread.is_alive() for thread in self._threads):
             self.start()
         self._wake.set()
 
@@ -74,7 +142,7 @@ class AnalysisJobExecutor:
                     self._wake.wait(self._poll_interval)
                     self._wake.clear()
             except Exception as error:
-                LOGGER.error("analysis_job_worker_error", extra={"error_type": type(error).__name__})
+                LOGGER.error("analysis_job_worker_error", extra={"status": "failed", "stage": "worker_loop", "engine": "job_executor", "error_type": type(error).__name__})
                 time.sleep(self._poll_interval)
 
     def recover(self) -> None:
@@ -147,7 +215,7 @@ class AnalysisJobExecutor:
                 heartbeat_stop = threading.Event()
                 heartbeat = threading.Thread(target=self._heartbeat, args=(job.id, heartbeat_stop), daemon=True)
                 heartbeat.start()
-                contract = self._analysis_service_factory().analyze(staged_path, staging_sha256=job.staging_sha256)
+                contract = self._execute_analysis(job, staged_path)
                 job.current_stage = "CONSOLIDATING"
                 payload = self._presenter_factory().present(contract, display_name=job.original_filename)
                 job.result_analysis_id = contract.analysis_id
@@ -164,6 +232,8 @@ class AnalysisJobExecutor:
                 self._fail(job, AnalysisJobStatus.LIMIT_EXCEEDED, "limit_exceeded", "O arquivo excede o limite de segurança configurado.", error)
             except AnalysisCancelledError as error:
                 self._fail(job, AnalysisJobStatus.CANCELLED, "analysis_cancelled", "A análise foi cancelada.", error)
+            except AnalysisGlobalTimeoutError as error:
+                self._fail(job, AnalysisJobStatus.FAILED, "analysis_timeout", "A análise excedeu o tempo máximo configurado.", error)
             except (UploadIntegrityError, EvidenceIntegrityError, EvidenceAcquisitionError, ValueError) as error:
                 self._fail(job, AnalysisJobStatus.FAILED, "processing_failed", "A análise não pôde processar a evidência enviada.", error)
             except Exception as error:
@@ -178,9 +248,83 @@ class AnalysisJobExecutor:
                 try:
                     self._storage.cleanup(staged_path)
                 except (OSError, RuntimeError) as cleanup_error:
-                    LOGGER.error("analysis_job_cleanup_failed", extra={"job_id": job.id, "error_type": type(cleanup_error).__name__})
+                    LOGGER.error("analysis_job_cleanup_failed", extra={"job_id": job.id, "analysis_id": job.id, "stage": "cleanup", "engine": "upload_storage", "status": "failed", "error_type": type(cleanup_error).__name__})
                 db.commit()
-                LOGGER.info("analysis_job_finished", extra={"job_id": job.id, "analysis_id": job.result_analysis_id, "status": job.status, "duration_ms": int((time.monotonic() - started) * 1000)})
+                LOGGER.info("analysis_job_finished", extra={"job_id": job.id, "analysis_id": job.id, "stage": "finished", "engine": "analysis_coordinator", "status": job.status, "duration_ms": int((time.monotonic() - started) * 1000)})
+
+    def _execute_analysis(self, job: AnalysisJob, staged_path: Path):
+        if not self._isolate_process:
+            return self._analysis_service_factory().analyze(
+                staged_path,
+                staging_sha256=job.staging_sha256,
+                analysis_id=job.id,
+            )
+
+        context = multiprocessing.get_context("spawn")
+        receive, send = context.Pipe(duplex=False)
+        process = context.Process(
+            target=_isolated_analysis_target,
+            args=(send, str(staged_path), job.staging_sha256, job.id),
+            name=f"analysis-{job.id}",
+        )
+        started = False
+        try:
+            process.start()
+            started = True
+            with self._process_lock:
+                self._processes.add(process)
+            send.close()
+            deadline = time.monotonic() + self._timeout_seconds
+            message = None
+            while process.is_alive() or receive.poll():
+                if receive.poll(0.05):
+                    message = receive.recv()
+                    break
+                if self._stop.is_set():
+                    self._terminate_process(process)
+                    raise AnalysisCancelledError("Executor encerrado durante a análise.")
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    self._terminate_process(process)
+                    raise AnalysisGlobalTimeoutError(
+                        "O processo da análise excedeu o prazo global."
+                    )
+                process.join(timeout=min(0.15, remaining))
+            process.join(timeout=1)
+            if message is None and receive.poll():
+                message = receive.recv()
+            if message is None:
+                raise RuntimeError("O processo de análise terminou sem resultado.")
+            if message[0] == "ok":
+                return message[1]
+            category = message[1]
+            if category == "limit":
+                raise EvidenceSizeLimitError("Limite excedido no processo isolado.")
+            if category == "cancelled":
+                raise AnalysisCancelledError("Análise cancelada no processo isolado.")
+            if category == "evidence":
+                raise ValueError("A evidência foi rejeitada no processo isolado.")
+            raise RuntimeError(f"Falha interna isolada: {message[2]}")
+        finally:
+            receive.close()
+            send.close()
+            if started and process.is_alive():
+                self._terminate_process(process)
+            if started:
+                process.join(timeout=1)
+            process.close()
+            with self._process_lock:
+                self._processes.discard(process)
+
+    @staticmethod
+    def _terminate_process(process: multiprocessing.Process) -> None:
+        if not process.is_alive():
+            return
+        process.terminate()
+        process.join(timeout=2)
+        if process.is_alive() and hasattr(process, "kill"):
+            process.kill()
+            process.join(timeout=2)
 
     @staticmethod
     def _fail(job: AnalysisJob, status: AnalysisJobStatus, code: str, message: str, error: BaseException) -> None:
@@ -188,7 +332,7 @@ class AnalysisJobExecutor:
         job.error_code = code
         job.safe_error_message = message
         job.current_stage = "FINISHED"
-        LOGGER.warning("analysis_job_failed", extra={"job_id": job.id, "status": job.status, "error_type": type(error).__name__, "code": code})
+        LOGGER.warning("analysis_job_failed", extra={"job_id": job.id, "analysis_id": job.id, "stage": job.current_stage, "engine": "analysis_coordinator", "status": job.status, "error_type": type(error).__name__, "code": code})
 
     @staticmethod
     def _fail_staging_lost(job: AnalysisJob) -> None:

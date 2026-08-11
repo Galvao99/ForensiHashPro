@@ -1,171 +1,95 @@
-import re
+from __future__ import annotations
 
-from app.investigation.correlation_finding import CorrelationFinding
+from itertools import combinations
+from pathlib import Path
+
+from app.investigation.correlation_finding import CorrelationEvidence, CorrelationFinding
 from app.investigation.investigation_context import InvestigationContext
 from app.investigation.rules.base_correlation_rule import BaseCorrelationRule
-from app.models.badge import (
-    info_badge,
-    neutral_badge,
-    success_badge,
-)
 
 
 class EmbeddedHashMatchRule(BaseCorrelationRule):
-    """
-    Correlaciona hashes presentes no corpo textual de um documento
-    com os hashes calculados dos arquivos analisados.
-    """
-
     rule_id = "embedded_hash_match"
-    name = "Hash textual compatível com arquivo analisado"
+    name = "Hash declarado correspondente"
 
-    HASH_PATTERN = re.compile(
-        r"(?<![a-fA-F0-9])"
-        r"("
-        r"[a-fA-F0-9]{32}"
-        r"|[a-fA-F0-9]{40}"
-        r"|[a-fA-F0-9]{56}"
-        r"|[a-fA-F0-9]{64}"
-        r"|[a-fA-F0-9]{96}"
-        r"|[a-fA-F0-9]{128}"
-        r")"
-        r"(?![a-fA-F0-9])"
-    )
-
-    ALGORITHM_BY_LENGTH = {
-        32: "MD5",
-        40: "SHA-1",
-        56: "SHA-224",
-        64: "SHA-256",
-        96: "SHA-384",
-        128: "SHA-512",
-    }
-
-    def evaluate(
-        self,
-        context: InvestigationContext,
-    ) -> list[CorrelationFinding]:
+    def evaluate(self, context: InvestigationContext) -> list[CorrelationFinding]:
         findings: list[CorrelationFinding] = []
-
-        normalized_hashes = self._build_hash_lookup(
-            context.calculated_hashes
-        )
-
-        for source_file, text in context.extracted_texts.items():
-            embedded_hashes = self._extract_hashes(text)
-
-            for embedded_hash in embedded_hashes:
-                matches = normalized_hashes.get(
-                    embedded_hash,
-                    [],
-                )
-
-                for target_file, algorithm in matches:
-                    if target_file == source_file:
-                        continue
-
-                    self.add_ok(
-                        findings,
-                        title="Hash correspondente entre arquivos",
-                        description=(
-                            f"O hash presente no corpo de {source_file} "
-                            f"corresponde ao hash calculado de {target_file}."
+        lookup = {
+            value.lower(): (key, algorithm)
+            for key, hashes in context.calculated_hashes.items()
+            for algorithm, value in hashes.items()
+        }
+        for source_key, occurrences in context.declared_hashes.items():
+            for occurrence in occurrences:
+                if not occurrence.declared:
+                    continue
+                match = lookup.get(occurrence.value)
+                if match is None or match[0] == source_key:
+                    continue
+                target_key, algorithm = match
+                findings.append(CorrelationFinding(
+                    title="Hash declarado correspondente",
+                    description=(
+                        f"Hash {algorithm} declarado em {occurrence.filename} corresponde "
+                        f"ao conteúdo calculado de {context.display_name_for(target_key)}."
+                    ),
+                    severity="ok",
+                    rule_id=self.rule_id,
+                    category="embedded_hash_match",
+                    source_file=source_key,
+                    target_file=target_key,
+                    evidence=[
+                        CorrelationEvidence(
+                            occurrence.evidence_ref, occurrence.filename,
+                            source_type=occurrence.source_type, page=occurrence.page,
+                            start=occurrence.start, end=occurrence.end,
+                            field_path=occurrence.field_path, context=occurrence.context,
+                            raw_value=occurrence.value, normalized_value=occurrence.value,
+                            extractor=occurrence.extractor,
                         ),
-                        icon="hash",
-                        source_file=source_file,
-                        target_file=target_file,
-                        badges=[
-                            info_badge(algorithm),
-                            success_badge("Correspondência"),
-                            neutral_badge(source_file),
-                            neutral_badge(target_file),
-                        ],
-                        metadata={
-                            "arquivo_origem": source_file,
-                            "arquivo_correspondente": target_file,
-                            "algoritmo": algorithm,
-                            "hash": embedded_hash,
-                        },
-                    )
-
+                        CorrelationEvidence(
+                            target_key, context.display_name_for(target_key),
+                            role="calculated_hash", normalized_value=occurrence.value,
+                            extractor="hash_engine",
+                        ),
+                    ],
+                    confidence=1.0,
+                    metadata={"algorithm": algorithm, "hash": occurrence.value},
+                ))
+        findings.extend(self._cross_file_matches(context))
         return findings
 
-    def _build_hash_lookup(
-        self,
-        calculated_hashes: dict[str, dict[str, str]],
-    ) -> dict[str, list[tuple[str, str]]]:
-        lookup: dict[str, list[tuple[str, str]]] = {}
-
-        for file_name, hashes in calculated_hashes.items():
-            for algorithm, hash_value in hashes.items():
-                normalized_hash = self._normalize_hash(
-                    hash_value
-                )
-
-                if not normalized_hash:
-                    continue
-
-                lookup.setdefault(
-                    normalized_hash,
-                    [],
-                ).append(
-                    (
-                        file_name,
-                        self._format_algorithm(
-                            algorithm
-                        ),
-                    )
-                )
-
-        return lookup
-
-    def _extract_hashes(
-        self,
-        text: str,
-    ) -> set[str]:
-        hashes: set[str] = set()
-
-        for match in self.HASH_PATTERN.finditer(
-            text or ""
+    def _cross_file_matches(self, context: InvestigationContext) -> list[CorrelationFinding]:
+        findings: list[CorrelationFinding] = []
+        for (left_key, left), (right_key, right) in combinations(
+            context.calculated_hashes.items(), 2
         ):
-            hashes.add(
-                self._normalize_hash(
-                    match.group(1)
-                )
-            )
-
-        return hashes
+            left_sha = left.get("SHA-256")
+            right_sha = right.get("SHA-256")
+            if not left_sha or left_sha.lower() != str(right_sha).lower():
+                continue
+            findings.append(CorrelationFinding(
+                title="Conteúdo binário idêntico entre artefatos",
+                description=(
+                    f"Os artefatos {context.display_name_for(left_key)} e "
+                    f"{context.display_name_for(right_key)} possuem o mesmo SHA-256 calculado."
+                ),
+                severity="info",
+                rule_id="cross_file_match",
+                category="cross_file_match",
+                source_file=left_key,
+                target_file=right_key,
+                evidence=[
+                    CorrelationEvidence(left_key, context.display_name_for(left_key), role="calculated_hash", normalized_value=left_sha, extractor="hash_engine"),
+                    CorrelationEvidence(right_key, context.display_name_for(right_key), role="calculated_hash", normalized_value=left_sha, extractor="hash_engine"),
+                ],
+                confidence=1.0,
+                metadata={"algorithm": "SHA-256", "hash": left_sha},
+            ))
+        return findings
 
     @staticmethod
-    def _normalize_hash(
-        value: str,
-    ) -> str:
-        return "".join(
-            character
-            for character in str(value).strip().lower()
-            if character.isalnum()
-        )
-
-    @staticmethod
-    def _format_algorithm(
-        algorithm: str,
-    ) -> str:
-        normalized = str(
-            algorithm
-        ).strip().upper().replace(
-            "_",
-            "-",
-        )
-
-        aliases = {
-            "SHA1": "SHA-1",
-            "SHA224": "SHA-224",
-            "SHA256": "SHA-256",
-            "SHA384": "SHA-384",
-            "SHA512": "SHA-512",
-        }
-
-        return aliases.get(
-            normalized,
-            normalized,
-        )
+    def artifact_matches_hint(hint: str, filename: str) -> bool:
+        normalized_hint = "".join(ch.lower() for ch in hint if ch.isalnum())
+        stem = "".join(ch.lower() for ch in Path(filename).stem if ch.isalnum())
+        return bool(normalized_hint and stem and (stem in normalized_hint or normalized_hint in stem))

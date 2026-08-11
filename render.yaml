@@ -40,6 +40,33 @@ services:
       - key: FORENSIHASH_JOB_WORKER_ENABLED
         value: "true"
 
+      - key: FORENSIHASH_ANALYSIS_CONCURRENCY
+        value: "1"
+
+      - key: FORENSIHASH_ANALYSIS_QUEUE_CAPACITY
+        value: "20"
+
+      - key: FORENSIHASH_ANALYSIS_TIMEOUT_SECONDS
+        value: "300"
+
+      - key: FORENSIHASH_ARCHIVE_MAX_ENTRIES
+        value: "1000"
+
+      - key: FORENSIHASH_ARCHIVE_MAX_TOTAL_UNCOMPRESSED_BYTES
+        value: "1073741824"
+
+      - key: FORENSIHASH_ARCHIVE_MAX_ENTRY_UNCOMPRESSED_BYTES
+        value: "268435456"
+
+      - key: FORENSIHASH_ARCHIVE_MAX_COMPRESSION_RATIO
+        value: "200"
+
+      - key: FORENSIHASH_ARCHIVE_MAX_NESTING_DEPTH
+        value: "3"
+
+      - key: FORENSIHASH_ARCHIVE_INSPECTION_TIMEOUT_SECONDS
+        value: "30"
+
       - key: IP2LOCATION_ENABLED
         value: "false"
 

@@ -85,6 +85,26 @@ class MagicNumberEngine:
             "description": "ZIP Local File Header",
         },
         {
+            "name": "ZIP Container",
+            "format": "ZIP",
+            "mime": "application/zip",
+            "extensions": {".zip"},
+            "magic": b"PK\x05\x06",
+            "offset": 0,
+            "confidence": 90,
+            "description": "ZIP Empty Archive End Record",
+        },
+        {
+            "name": "ZIP Container",
+            "format": "ZIP",
+            "mime": "application/zip",
+            "extensions": {".zip"},
+            "magic": b"PK\x07\x08",
+            "offset": 0,
+            "confidence": 85,
+            "description": "ZIP Spanned Data Descriptor",
+        },
+        {
             "name": "RAR Archive",
             "format": "RAR",
             "mime": "application/vnd.rar",
@@ -140,7 +160,6 @@ class MagicNumberEngine:
         header = self._read_header(file_path)
         sample = self._read_sample(file_path)
 
-        extension = file_path.suffix.lower()
         file_size = file_path.stat().st_size
 
         detected = self._detect_primary_signature(header)

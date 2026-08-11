@@ -17,6 +17,7 @@ from app.services.text_extraction_service import TextExtractionService
 from app.evidence import EvidenceManager
 from app.binary.parsers import PdfRawParser
 from app.application import AnalysisCoordinator
+from app.parsers import ArchiveInspectionEngine, ArchiveLimits, ParserRegistry, ZipArtifactParser
 
 
 class ApplicationFactory:
@@ -49,6 +50,10 @@ class ApplicationFactory:
         biometric_report_service = BiometricReportService(
             biometric_registry
         )
+        archive_limits = ArchiveLimits.from_env()
+        parser_registry = ParserRegistry([
+            ZipArtifactParser(ArchiveInspectionEngine(archive_limits))
+        ])
 
         analyzer = FileAnalyzer(
             hash_engine=hash_engine,
@@ -59,6 +64,7 @@ class ApplicationFactory:
             pdf_structure_engine=pdf_structure_engine,
             binary_structure_engine=binary_structure_engine,
             biometric_report_service=biometric_report_service,
+            parser_registry=parser_registry,
         )
 
         text_extraction_service = TextExtractionService(

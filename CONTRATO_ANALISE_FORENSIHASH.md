@@ -56,6 +56,13 @@ individual. Timeline é `null` quando não foi construída nesse fluxo.
 Fatos não possuem severidade ou conclusão investigativa. Exemplos: hashes,
 magic number, metadados retornados e presença de objeto de assinatura.
 
+Desde a Entity Extraction V2, cada entidade resolvida também é publicada como
+`Fact(kind="entity", source="entity_resolver_v2")`. O data contém tipo, raw
+values, valor normalizado, confidence auditável, componentes, atributos,
+hipóteses e proveniência. A proveniência referencia `evidence_id`; paths internos
+não entram no contrato público. Isso é uma extensão compatível do conjunto de
+facts e não altera a versão `1.0.0`.
+
 ### Findings
 
 `FindingContract` contém interpretação de regra interna: `finding_id`,
@@ -185,9 +192,30 @@ O `AnalysisWorker` emite um contrato por evidência antes da correlação do lot
 O `CorrelationResult` posterior continua sendo emitido separadamente e não
 altera retroativamente contratos individuais já produzidos.
 
+Desde a Sprint 3.5, a web formaliza também `AnalysisSetResult`, um contrato
+separado que referencia jobs/contratos individuais e contém correlações,
+artefatos, timestamps e limitações. Isso não adiciona seção ao
+`AnalysisContract`, que permanece na versão `1.0.0`. Segmentos opcionais no
+payload textual preservam fonte e página para correlação de hashes.
+
 ## Extensibilidade futura
 
 O contrato permite futura API, fila ou persistência, mas não implementa nenhum
 desses recursos. Antes de exposição remota ainda são necessários contratos de
 requisição, autorização, retenção, isolamento, quotas, storage, idempotência e
 sandbox de parsers.
+# Timeline V2 (Sprint 4)
+
+O campo opcional `timeline` permanece compatível com o schema 1.0.0 e pode conter
+registros estruturados com `record_type=event` ou `record_type=warning`. Eventos
+preservam proveniência, valor bruto, timezone/precisão e `temporal_status`.
+Eventos PDF sem data usam `timestamp=null` e `temporal_status=structural_only`.
+Nenhum registro de Timeline representa conclusão sobre fraude ou causalidade.
+# Parsed artifacts e archives (Sprint 5)
+
+Sem alterar a versão 1.0.0, `technical_structure.parsed_artifact` pode conter o
+resultado normalizado do ParserRegistry. Para ZIP,
+`technical_structure.archive` expõe metadados, árvore de embedded artifacts,
+warnings factuais e limitações. Cada entry possui `embedded_artifact_ref`; nenhuma
+entry representa AnalysisJob independente e paths absolutos do servidor não são
+serializados.

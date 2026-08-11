@@ -37,6 +37,7 @@ from app.models.pdf_raw_analysis_result import (
     PdfRawObject,
     PdfStartXref,
 )
+from app.models.timeline_event import TimelineEvent, TimelineResult, TimelineWarning
 from app.models.biometric_report import (
     BiometricAlgorithmResult,
     BiometricConstraint,
@@ -77,6 +78,9 @@ __all__ = [
     "PdfRawAnalysisResult",
     "PdfRawObject",
     "PdfStartXref",
+    "TimelineEvent",
+    "TimelineResult",
+    "TimelineWarning",
     "BiometricAlgorithmResult",
     "BiometricConstraint",
     "BiometricConstraintEvaluation",

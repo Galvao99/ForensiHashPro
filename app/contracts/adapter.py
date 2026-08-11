@@ -59,7 +59,7 @@ class LegacyAnalysisAdapter:
             uuid5(NAMESPACE_URL, f"forensihash:evidence:{result.hashes.sha256}")
         )
 
-        facts = self._facts(result, analysis_id)
+        facts = self._facts(result, analysis_id, evidence_id)
         findings = [
             FindingContract(
                 finding_id=_id(analysis_id, "finding", finding.category, index),
@@ -87,7 +87,11 @@ class LegacyAnalysisAdapter:
             else AnalysisState.COMPLETED
         )
         text_source = self._text_source(result)
-        text_payload = {"text": result.extracted_text, "source": text_source}
+        text_payload = {
+            "text": result.extracted_text,
+            "source": text_source,
+            "segments": self._text_segments(result),
+        }
 
         return AnalysisContract(
             schema_version=SCHEMA_VERSION,
@@ -115,13 +119,31 @@ class LegacyAnalysisAdapter:
                 "pdf": _plain(result.pdf_structure),
                 "binary": _plain(result.binary_analysis),
                 "json": _plain(result.json_analysis),
+                "parsed_artifact": _plain(result.parsed_artifact),
+                "archive": (
+                    _plain(result.parsed_artifact)
+                    if result.parsed_artifact is not None
+                    and result.parsed_artifact.parser_id == "archive_zip_v1"
+                    else None
+                ),
             },
             native_text=text_payload if text_source.startswith("native") else None,
             ocr=text_payload if text_source == "ocr" else None,
             signatures=[_plain(result.digital_signature)],
             ip_addresses=None,
             timeline=(
-                [_plain(event) for event in result.timeline_events]
+                [
+                    {"record_type": "event", **_plain(event)}
+                    for event in result.timeline_events
+                ]
+                + [
+                    {"record_type": "warning", **_plain(warning)}
+                    for warning in result.timeline_warnings
+                ]
+                + [
+                    {"record_type": "limitation", "message": limitation}
+                    for limitation in result.timeline_limitations
+                ]
                 if result.timeline_events
                 else None
             ),
@@ -146,7 +168,9 @@ class LegacyAnalysisAdapter:
             },
         )
 
-    def _facts(self, result: AnalysisResult, analysis_id: str) -> list[Fact]:
+    def _facts(
+        self, result: AnalysisResult, analysis_id: str, evidence_id: str
+    ) -> list[Fact]:
         values = [
             ("file_identification", "filesystem", _plain(result.file_info)),
             ("hashes", "hash_engine", _plain(result.hashes)),
@@ -158,10 +182,42 @@ class LegacyAnalysisAdapter:
             values.append(("binary_structure", "binary_structure_engine", _plain(result.binary_analysis)))
         if result.pdf_structure is not None:
             values.append(("pdf_structure", "pdf_structure_engine", _plain(result.pdf_structure)))
-        return [
+        facts = [
             Fact(_id(analysis_id, "fact", kind, index), kind, source, data)
             for index, (kind, source, data) in enumerate(values)
         ]
+        for index, entity in enumerate(result.resolved_entities, start=len(facts)):
+            facts.append(
+                Fact(
+                    _id(analysis_id, "fact", f"entity.{entity.entity_type.value}", index),
+                    "entity",
+                    "entity_resolver_v2",
+                    {
+                        "type": entity.entity_type.value,
+                        "raw_values": list(entity.raw_values),
+                        "normalized_value": entity.normalized_value,
+                        "confidence": entity.confidence,
+                        "confidence_components": _plain(entity.confidence_components),
+                        "attributes": _plain(entity.attributes),
+                        "hypotheses": _plain(entity.hypotheses),
+                        "provenance": [
+                            {
+                                "source_type": source.source_type.value,
+                                "evidence_ref": evidence_id,
+                                "page": source.page,
+                                "start": source.start,
+                                "end": source.end,
+                                "context_before": source.context_before,
+                                "context_after": source.context_after,
+                                "extractor": source.extractor,
+                                "field_path": source.field_path,
+                            }
+                            for source in entity.sources
+                        ],
+                    },
+                )
+            )
+        return facts
 
     def _issues(
         self, result: AnalysisResult, analysis_id: str
@@ -222,6 +278,17 @@ class LegacyAnalysisAdapter:
             if step.code == "text_extraction" and step.value is not None:
                 return str(getattr(step.value, "source", "unknown"))
         return "legacy_unknown" if result.extracted_text else "none"
+
+    @staticmethod
+    def _text_segments(result: AnalysisResult) -> list[dict[str, Any]]:
+        for step in reversed(result.processing_steps):
+            if step.code != "text_extraction" or step.value is None:
+                continue
+            return [
+                {"text": segment.text, "source": segment.source, "page": segment.page}
+                for segment in (getattr(step.value, "segments", ()) or ())
+            ]
+        return []
 
     @staticmethod
     def _scope_steps(result: AnalysisResult, analysis_id: str) -> list[dict[str, Any]]:

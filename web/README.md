@@ -72,6 +72,8 @@ docker build --target test -t forensihash-api-test .
 Variáveis aceitas em runtime incluem `FORENSIHASH_TEMP_DIR`,
 `FORENSIHASH_CONFIG_DIR`, `FORENSIHASH_EXIFTOOL_PATH`,
 `FORENSIHASH_TESSERACT_PATH`, `FORENSIHASH_POPPLER_PATH`,
+`FORENSIHASH_ANALYSIS_CONCURRENCY`, `FORENSIHASH_ANALYSIS_QUEUE_CAPACITY`,
+`FORENSIHASH_ANALYSIS_TIMEOUT_SECONDS`,
 `IP2LOCATION_ENABLED` e `IP2LOCATION_API_KEY`. Segredos devem ser fornecidos
 somente em runtime; arquivos `.env` não entram no contexto da imagem.
 
@@ -80,8 +82,18 @@ somente em runtime; arquivos `.env` não entram no contexto da imagem.
 - `GET /health`: estado do serviço;
 - `GET /api/v1/capabilities`: módulos e integrações disponíveis no ambiente,
   sem paths ou configuração sensível;
-- `POST /api/v1/analyses`: recebe um arquivo no campo multipart `file`, executa
-  uma análise individual síncrona e retorna o `AnalysisContract 1.0.0`.
+- `POST /api/v1/analysis-jobs`: cria `analysis_id`/`job_id`, persiste o estado
+  inicial e retorna `202` sem aguardar as engines;
+- `GET /api/v1/analysis-jobs/{analysis_id}`: retorna estado, timestamps,
+  estágio e erro seguro;
+- `GET /api/v1/analysis-jobs/{analysis_id}/result`: retorna o
+  `AnalysisContract 1.0.0` quando disponível;
+- `POST /api/v1/analysis-sets`: correlaciona de 1 a 50 jobs terminais do mesmo
+  usuário sem reabrir arquivos ou reexecutar engines;
+- `GET /api/v1/analysis-sets/{set_id}`: retorna o resultado separado de
+  correlação enquanto sua retenção temporária estiver válida;
+- `POST /api/v1/analyses`: endpoint legado compatível; ainda aguarda o
+  resultado, mas retira o processamento síncrono do event loop.
 - `POST /api/v1/auth/register`, `login` e `logout`: conta e sessão por cookie
   HttpOnly;
 - `GET/PATCH /api/v1/auth/me`: perfil e preferências do usuário autenticado;
@@ -92,6 +104,11 @@ O resultado de análise mantém o formato do contrato central, sem criar um DTO
 paralelo. Seções opcionais usam `null` quando não foram executadas, enquanto
 `processing_steps` registra `success`, `no_findings`, `partial`, `skipped`,
 `unavailable`, `failed`, `cancelled` ou `limit_exceeded`, conforme aplicável.
+
+Entidades resolvidas na Sprint 2 são expostas como facts técnicos com valor
+bruto, normalização, confidence determinística e proveniência. A API não expõe
+o path local da fonte; cada ocorrência referencia a evidência do contrato. Não
+há conclusão automática sobre fraude, autoria ou autenticidade.
 
 Erros HTTP usam o envelope:
 
@@ -155,15 +172,37 @@ engines, modificar findings ou recalcular severidade. Ela deverá citar os campo
 que fundamentam interpretações e não poderá enviar documentos a serviços
 externos sem consentimento explícito. Nenhuma IA foi implementada nesta fase.
 
+## Execução e estados
+
+O worker interno usa PostgreSQL para claim atômico e estado operacional. Threads
+supervisoras limitam a concorrência; cada job padrão roda em processo filho
+isolado. Se o timeout global expirar, o processo é encerrado antes do cleanup.
+Os estados públicos são `queued`, `running`, `completed`, `partial` e `failed`;
+os códigos operacionais legados em maiúsculas permanecem por compatibilidade.
+`AnalysisContract.state` continua sendo a fonte oficial do estado final.
+
+Os padrões são concorrência 1, capacidade 20 e timeout 300 segundos. Os valores
+são configuráveis pelas três variáveis `FORENSIHASH_ANALYSIS_*` listadas acima.
+
 ## Limitações atuais
 
-A execução é local e síncrona. Não há fila, polling, comparação web, correlação
-web, object storage ou deploy. Exportação de dados e exclusão de conta são fluxos
+A fila interna pressupõe uma única instância. Não há fila distribuída,
+comparação web, correlação web ou object storage. Exportação de dados e exclusão de conta são fluxos
 futuros explicitamente indicados na interface. O healthcheck confirma
 somente que a API está viva; ele não valida integrações externas. A imagem não
 é uma configuração de produção nem substitui sandbox para arquivos hostis.
 Timeline, IP automático, comparação e correlação não integram o contrato
 individual normal.
+
+Correlation V2 é exposta como `AnalysisSetResult` separado. O workspace cria o
+set após os jobs terminais e apresenta correlações explicáveis com proveniência.
+Resultados de set expiram após uma hora; não constituem storage de caso ou
+escala distribuída.
+
+Engines sem callback incremental só aparecem individualmente nos logs e em
+`processing_steps` depois de retornarem. A capacidade é protegida no processo
+da API; escala horizontal exige lease distribuído. O endpoint legado
+`/analyses` não recebe o isolamento global do job e deve migrar para polling.
 
 ## Integração contínua
 
@@ -194,3 +233,15 @@ revisão anterior. Após o primeiro push, o pacote aparecerá em **GitHub →
 Packages**, onde visibilidade e acesso podem ser revisados manualmente.
 
 Essa publicação não realiza deploy e não inclui o build do frontend.
+# Timeline Web V2
+
+Resultados individuais exibem `AnalysisContract.timeline`; resultados de Analysis
+Set podem incluir `timeline_result` agregado. A construção ocorre no job individual
+e não reexecuta engines. O frontend oferece filtros por arquivo, categoria e tipo,
+mantendo warnings separados de eventos.
+# Archive Inspection
+
+ZIPs identificados por conteúdo recebem inspeção estática no job existente. O
+frontend lê `technical_structure.archive`, mostra resumo, flags e árvore expandível.
+Entries não são abertas nem executadas no navegador. Limites são configurados pelas
+variáveis `FORENSIHASH_ARCHIVE_*` documentadas no arquivo de Sprint 5.

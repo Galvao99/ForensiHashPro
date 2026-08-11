@@ -23,6 +23,9 @@ from app.processing import (
     StepResult,
 )
 from app.processing.logging import log_step
+from app.entities.service import EntityExtractionService
+from app.services.text_extraction_service import TextExtractionResult
+from app.services.timeline_service import TimelineService
 
 
 LOGGER = logging.getLogger("forensihash.processing")
@@ -40,6 +43,8 @@ class AnalysisService:
         correlation_service: CorrelationService | None = None,
         text_extraction_service: TextExtractionService | None = None,
         evidence_manager: EvidenceManager | None = None,
+        entity_extraction_service: EntityExtractionService | None = None,
+        timeline_service: TimelineService | None = None,
     ) -> None:
         self.analyzer = analyzer
 
@@ -56,6 +61,10 @@ class AnalysisService:
         )
 
         self.evidence_manager = evidence_manager or EvidenceManager()
+        self.entity_extraction_service = (
+            entity_extraction_service or EntityExtractionService()
+        )
+        self.timeline_service = timeline_service or TimelineService()
 
     def analyze(
         self,
@@ -156,12 +165,104 @@ class AnalysisService:
                 ),
             )
 
+            try:
+                text_result = (
+                    text_step.value
+                    if isinstance(text_step.value, TextExtractionResult)
+                    else None
+                )
+                resolution = self.entity_extraction_service.resolve_analysis(
+                    result,
+                    text_result=text_result,
+                )
+                result.resolved_entities = list(resolution.entities)
+                result.processing_steps.append(
+                    StepResult(
+                        code="entity_resolution",
+                        component="entity_extraction",
+                        status=(
+                            ProcessingStatus.SUCCESS
+                            if resolution.entities
+                            else ProcessingStatus.NO_FINDINGS
+                        ),
+                        technical_message="Candidatos de entidade avaliados pelo resolver V2.",
+                        user_message="Extração de entidades concluída.",
+                        value=resolution,
+                        safe_details={
+                            "candidate_count": len(resolution.candidates),
+                            "entity_count": len(resolution.entities),
+                        },
+                    )
+                )
+            except Exception as error:
+                issue = ProcessingIssue(
+                    code="entity_resolution_failed",
+                    status=ProcessingStatus.FAILED,
+                    technical_message="O Entity Resolver V2 não concluiu o processamento.",
+                    user_message="A extração estruturada de entidades não pôde ser concluída.",
+                    component="entity_extraction",
+                    details={"error_type": type(error).__name__},
+                    impact=ProcessingImpact.ANALYSIS_PARTIAL,
+                    original_exception=error,
+                )
+                result.processing_steps.append(
+                    StepResult(
+                        code="entity_resolution",
+                        component="entity_extraction",
+                        status=ProcessingStatus.FAILED,
+                        technical_message=issue.technical_message,
+                        user_message=issue.user_message,
+                        issues=[issue],
+                    )
+                )
+
             if evidence.capture_state is CaptureState.COMPROMISED:
                 raise EvidenceIntegrityError(
                     "A evidência mudou durante a análise; resultados parciais "
                     "não podem ser correlacionados.",
                     evidence=evidence,
                     partial_result=result,
+                )
+
+            result.completed_at = datetime.now(timezone.utc)
+            try:
+                timeline = self.timeline_service.build(result)
+                result.timeline_events = timeline.events
+                result.timeline_warnings = timeline.warnings
+                result.timeline_limitations = timeline.limitations
+                result.processing_steps.append(
+                    StepResult(
+                        code="timeline",
+                        component="timeline",
+                        status=(
+                            ProcessingStatus.SUCCESS
+                            if timeline.events
+                            else ProcessingStatus.NO_FINDINGS
+                        ),
+                        technical_message="Timeline V2 construída sobre resultados existentes.",
+                        user_message="Linha do tempo técnica construída.",
+                        value=timeline,
+                        safe_details=timeline.summary,
+                    )
+                )
+            except Exception as error:
+                issue = ProcessingIssue(
+                    code="timeline_failed",
+                    status=ProcessingStatus.PARTIAL,
+                    technical_message="A Timeline V2 não pôde ser construída.",
+                    user_message="A linha do tempo técnica ficou indisponível.",
+                    component="timeline",
+                    details={"error_type": type(error).__name__},
+                    impact=ProcessingImpact.ANALYSIS_PARTIAL,
+                    original_exception=error,
+                )
+                result.processing_steps.append(
+                    StepResult(
+                        code="timeline", component="timeline",
+                        status=ProcessingStatus.PARTIAL,
+                        technical_message=issue.technical_message,
+                        user_message=issue.user_message, issues=[issue],
+                    )
                 )
 
             for step in result.processing_steps:
@@ -172,7 +273,6 @@ class AnalysisService:
                     evidence_id=evidence.evidence_id,
                 )
 
-            result.completed_at = datetime.now(timezone.utc)
             return result
 
     def correlate(

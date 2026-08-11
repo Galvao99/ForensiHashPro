@@ -84,6 +84,9 @@ FORENSIHASH_COOKIE_SAMESITE=none
 FORENSIHASH_ALLOWED_ORIGINS=https://<frontend>.onrender.com
 FORENSIHASH_REGISTRATION_ENABLED=false
 FORENSIHASH_JOB_WORKER_ENABLED=true
+FORENSIHASH_ANALYSIS_CONCURRENCY=1
+FORENSIHASH_ANALYSIS_QUEUE_CAPACITY=20
+FORENSIHASH_ANALYSIS_TIMEOUT_SECONDS=300
 FORENSIHASH_TEMP_DIR=/tmp/forensihash
 IP2LOCATION_ENABLED=false
 PORT=<fornecido pelo Render>
@@ -140,8 +143,9 @@ job de um plano que ofereça o recurso; nenhum upgrade é feito pelo repositóri
 ## Uploads e retenção
 
 Uploads criam `AnalysisJob` persistente no PostgreSQL e usam um staging local
-temporário até o worker interno concluir. O worker tem concorrência 1, reutiliza
-o pipeline forense normal e sempre tenta remover o staging ao finalizar. Arquivos
+temporário até o worker interno concluir. O staging gratuito mantém concorrência
+1. Cada job roda em processo isolado, tem timeout global de 300 segundos,
+reutiliza o pipeline forense normal e sempre tenta remover o staging ao finalizar. Arquivos
 brutos não são gravados no PostgreSQL. Se um restart perder o staging, o job
 termina com `staging_lost`, sem expor o path interno.
 

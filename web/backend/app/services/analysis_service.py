@@ -61,8 +61,19 @@ class WebAnalysisService:
             coordinator_factory or ApplicationFactory.create_analysis_coordinator
         )
 
-    def analyze(self, path: Path, *, staging_sha256: str | None = None) -> AnalysisContract:
-        execution = self.coordinator_factory().execute(Path(path))
+    def analyze(
+        self,
+        path: Path,
+        *,
+        staging_sha256: str | None = None,
+        analysis_id: str | None = None,
+    ) -> AnalysisContract:
+        coordinator = self.coordinator_factory()
+        execution = (
+            coordinator.execute(Path(path), analysis_id=analysis_id)
+            if analysis_id is not None
+            else coordinator.execute(Path(path))
+        )
         if staging_sha256 is not None:
             evidence = execution.legacy_result.evidence_source
             acquired_sha256 = evidence.initial_sha256 if evidence is not None else None

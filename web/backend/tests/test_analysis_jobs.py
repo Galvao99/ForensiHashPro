@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -120,6 +121,7 @@ def test_result_only_partial_is_persisted_and_jobs_are_independent(platform) -> 
     app.dependency_overrides[get_analysis_job_executor] = WakeOnly
     first = create_job(client, auth["csrf_token"], retention="RESULT_ONLY").json()["job_id"]
     second = create_job(client, auth["csrf_token"], retention="RESULT_ONLY").json()["job_id"]
+    assert first != second
     sequence = iter([contract(AnalysisState.PARTIAL, "partial-analysis"), contract(AnalysisState.COMPLETED, "second-analysis")])
     class Service:
         def analyze(self, *_args, **_kwargs): return next(sequence)
@@ -179,3 +181,75 @@ def test_limit_exceeded_is_terminal_and_does_not_persist_result(platform) -> Non
     assert payload["error_code"] == "limit_exceeded"
     assert client.get(f"/api/v1/analysis-jobs/{job_id}/result").status_code == 409
     assert list(storage.root.iterdir()) == []
+
+
+def test_analysis_set_uses_completed_jobs_without_reopening_files(platform) -> None:
+    client, factory, tmp_path = platform
+    auth = client.post("/api/v1/auth/register", json={"name": "Set", "email": "set@example.test", "password": "correct-horse-42", "accept_terms": True, "accept_privacy": True}).json()
+    storage = UploadStorage(root=tmp_path / "jobs", max_file_size_bytes=32)
+    app.dependency_overrides[get_upload_storage] = lambda: storage
+    app.dependency_overrides[get_analysis_job_executor] = WakeOnly
+    first = create_job(client, auth["csrf_token"]).json()["job_id"]
+    second = create_job(client, auth["csrf_token"]).json()["job_id"]
+    values = iter([
+        replace(contract(analysis_id="a"), evidence_id="ev-a", file={"name": "a.bin"}, hashes={"sha256": "d" * 64}),
+        replace(contract(analysis_id="b"), evidence_id="ev-b", file={"name": "b.bin"}, hashes={"sha256": "d" * 64}),
+    ])
+    class Service:
+        def analyze(self, *_args, **_kwargs):
+            return next(values)
+    executor = AnalysisJobExecutor(factory, storage=storage, analysis_service_factory=Service)
+    executor.process_next()
+    executor.process_next()
+    assert list(storage.root.iterdir()) == []
+
+    response = client.post(
+        "/api/v1/analysis-sets", json={"job_ids": [first, second]},
+        headers={"X-CSRF-Token": auth["csrf_token"]},
+    )
+    assert response.status_code == 201
+    payload = response.json()
+    assert payload["state"] == "completed"
+    assert payload["correlation_result"]["findings"][0]["category"] == "cross_file_match"
+    assert "\\" not in str(payload)
+    assert client.get(f"/api/v1/analysis-sets/{payload['set_id']}").json() == payload
+
+
+def test_failed_job_is_analysis_set_limitation(platform) -> None:
+    client, factory, tmp_path = platform
+    auth = client.post("/api/v1/auth/register", json={"name": "Partial", "email": "partial-set@example.test", "password": "correct-horse-42", "accept_terms": True, "accept_privacy": True}).json()
+    storage = UploadStorage(root=tmp_path / "jobs", max_file_size_bytes=32)
+    app.dependency_overrides[get_upload_storage] = lambda: storage
+    app.dependency_overrides[get_analysis_job_executor] = WakeOnly
+    good = create_job(client, auth["csrf_token"]).json()["job_id"]
+    bad = create_job(client, auth["csrf_token"]).json()["job_id"]
+    calls = 0
+    class Sequence:
+        def analyze(self, *_args, **_kwargs):
+            nonlocal calls
+            calls += 1
+            if calls == 2:
+                raise RuntimeError("internal")
+            return replace(contract(), evidence_id="ev-good")
+    executor = AnalysisJobExecutor(factory, storage=storage, analysis_service_factory=Sequence)
+    executor.process_next()
+    executor.process_next()
+    response = client.post("/api/v1/analysis-sets", json={"job_ids": [good, bad]}, headers={"X-CSRF-Token": auth["csrf_token"]})
+    assert response.status_code == 201
+    assert response.json()["state"] == "partial"
+    assert len(response.json()["limitations"]) == 1
+
+
+def test_analysis_set_rejects_foreign_or_running_jobs(platform) -> None:
+    client, _factory, tmp_path = platform
+    owner = client.post("/api/v1/auth/register", json={"name": "Owner Set", "email": "owner-set@example.test", "password": "correct-horse-42", "accept_terms": True, "accept_privacy": True}).json()
+    storage = UploadStorage(root=tmp_path / "jobs", max_file_size_bytes=32)
+    app.dependency_overrides[get_upload_storage] = lambda: storage
+    app.dependency_overrides[get_analysis_job_executor] = WakeOnly
+    job = create_job(client, owner["csrf_token"]).json()["job_id"]
+    not_ready = client.post("/api/v1/analysis-sets", json={"job_ids": [job]}, headers={"X-CSRF-Token": owner["csrf_token"]})
+    assert not_ready.status_code == 409
+    client.cookies.clear()
+    other = client.post("/api/v1/auth/register", json={"name": "Other Set", "email": "other-set@example.test", "password": "correct-horse-42", "accept_terms": True, "accept_privacy": True}).json()
+    foreign = client.post("/api/v1/analysis-sets", json={"job_ids": [job]}, headers={"X-CSRF-Token": other["csrf_token"]})
+    assert foreign.status_code == 404

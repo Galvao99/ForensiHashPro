@@ -116,3 +116,36 @@ Novos limites arquiteturais:
 O contrato central não elimina as duplicações históricas. Dois modelos de
 timeline, findings comuns/correlacionados, badges no modelo investigativo e
 enums divergentes continuam candidatos à migração posterior.
+
+## Atualização — Entity Extraction V2
+
+`app/entities` centraliza candidatos, validadores, resolução de conflito,
+confidence e deduplicação para CPF, telefone, IP, moeda, data/hora e e-mail.
+`AnalysisService` executa a resolução após texto/OCR e fontes estruturadas;
+`AnalysisResult` preserva as entidades e `LegacyAnalysisAdapter` as converte em
+facts versionados. `InvestigationContextBuilder` e `OcrContextRule` mantêm a
+correlação legada por adapter, sem classificar novamente por regex.
+
+## Atualização — Correlation Engine V2 e Analysis Sets
+
+`app/investigation` agora contém comparabilidade semântica de
+`NormalizedEntity`, source divergence e extração central de hash declarado. O
+desktop mantém `CorrelationService`/`CorrelationResult`; a web converte
+contratos concluídos em `AnalysisSetResult` separado. A tabela `analysis_sets`
+persiste por tempo limitado somente resultado leve e referências a jobs, nunca
+arquivos brutos.
+# Atualização Sprint 4 — Timeline Web V2
+
+A Timeline técnica passou a integrar o pipeline oficial após a produção do
+`AnalysisResult`. `TimelineService` consome somente resultados existentes e publica
+eventos temporais/estruturais no campo opcional `AnalysisContract.timeline` 1.0.0.
+O Analysis Set agrega essas listas sem reabrir artefatos. Revisões PDF preservam
+ordem estrutural e offsets sem atribuição de timestamp.
+# Atualização Sprint 5 — Parser Registry e Archive Inspection
+
+Após o MagicNumberEngine, `ArtifactIdentification` alimenta o `ParserRegistry`.
+ZIP é inspecionado estaticamente por `ZipArtifactParser` e
+`ArchiveInspectionEngine`; formatos sem parser usam `BinaryFallbackParser`. O
+resultado normalizado entra em `AnalysisResult.parsed_artifact` e no
+`technical_structure` do AnalysisContract 1.0.0. Entries são embedded artifacts,
+não jobs, e nunca controlam paths no filesystem.

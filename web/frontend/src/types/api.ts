@@ -78,13 +78,60 @@ export interface PrivacyPreferences { retention_mode: 'PRIVATE' | 'RESULT_ONLY' 
 export interface AuthResponse { user: WebUser; privacy: PrivacyPreferences; csrf_token: string }
 
 export type AnalysisJobStatus = 'QUEUED' | 'PROCESSING' | 'SUCCESS' | 'PARTIAL' | 'FAILED' | 'LIMIT_EXCEEDED' | 'CANCELLED'
-export interface AnalysisJobCreated { job_id: string; status: AnalysisJobStatus }
+export type AnalysisJobPublicState = 'queued' | 'running' | 'completed' | 'partial' | 'failed'
+export interface AnalysisJobCreated {
+  job_id: string
+  analysis_id: string
+  status: AnalysisJobStatus
+  state: AnalysisJobPublicState
+}
 export interface AnalysisJobState extends AnalysisJobCreated {
   created_at: string
   started_at: string | null
   finished_at: string | null
   current_stage: string | null
-  analysis_id: string | null
+  result_analysis_id: string | null
   error_code: string | null
   safe_error_message: string | null
+}
+
+export interface CorrelationFindingV2 {
+  finding_id: string
+  category: string
+  severity: 'ok' | 'info' | 'warning' | 'critical'
+  summary: string
+  description: string
+  rule_id: string
+  source_engine: string
+  confidence: number | null
+  source_file?: string | null
+  target_file?: string | null
+  evidence: Array<Record<string, unknown>>
+  entities: Array<Record<string, unknown>>
+  limitations: string[]
+  metadata: Record<string, unknown>
+}
+
+export interface AnalysisSetResult {
+  set_id: string
+  state: 'completed' | 'partial' | 'failed'
+  created_at: string
+  finished_at: string
+  artifacts: Array<Record<string, unknown>>
+  correlation_result: {
+    summary: Record<string, number>
+    findings: CorrelationFindingV2[]
+  }
+  timeline_result?: TimelineResult
+  limitations: string[]
+}
+
+export interface TimelineResult {
+  set_id?: string
+  events: Array<Record<string, unknown>>
+  temporal_events?: Array<Record<string, unknown>>
+  structural_events?: Array<Record<string, unknown>>
+  warnings: Array<Record<string, unknown>>
+  limitations: string[]
+  summary: Record<string, number>
 }
