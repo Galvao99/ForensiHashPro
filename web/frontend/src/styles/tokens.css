@@ -1,4 +1,20 @@
 :root {
+  --arqen-black: #050505;
+  --arqen-white: #ffffff;
+  --arqen-surface: #f3f2ee;
+  --arqen-surface-dark: #0b0b0b;
+  --arqen-border: #d7d6d1;
+  --arqen-border-dark: #292929;
+  --arqen-muted: #74736e;
+  --arqen-text: #101010;
+  --arqen-spacing-1: 0.5rem;
+  --arqen-spacing-2: 1rem;
+  --arqen-spacing-3: 1.5rem;
+  --arqen-spacing-4: 2.5rem;
+  --arqen-spacing-5: 4rem;
+  --arqen-spacing-6: 7rem;
+  --arqen-radius-sm: 2px;
+  --arqen-radius-md: 6px;
   --background: #ffffff;
   --surface: #ffffff;
   --surface-secondary: #f7f7f7;

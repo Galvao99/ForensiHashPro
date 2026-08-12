@@ -14,16 +14,16 @@ describe('navegação pública', () => {
 
   it('o logo navega para a página inicial', async () => {
     renderAt('/ddna')
-    await userEvent.click(screen.getByRole('link', { name: /forensihash.*página inicial/i }))
+    await userEvent.click(screen.getAllByRole('link', { name: /arqen.*página inicial/i })[0])
     expect(window.location.pathname).toBe('/')
-    expect(screen.getByRole('heading', { name: /análise e rastreabilidade/i })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /proveniência.*integridade.*rastreabilidade/i })).toBeInTheDocument()
   })
 
   it('a navbar expõe as áreas institucionais e a análise', () => {
     renderAt('/')
-    expect(screen.getByRole('link', { name: 'Produto' })).toHaveAttribute('href', '/forensihash')
-    expect(screen.getByRole('link', { name: 'DDNA' })).toHaveAttribute('href', '/ddna')
-    expect(screen.getByRole('link', { name: 'Começar análise' })).toHaveAttribute('href', '/app/analysis')
+    expect(screen.getAllByRole('link', { name: 'ForensiHash' })[0]).toHaveAttribute('href', '/forensihash')
+    expect(screen.getAllByRole('link', { name: 'DDNA' })[0]).toHaveAttribute('href', '/ddna')
+    expect(screen.getByRole('link', { name: 'Acessar plataforma' })).toHaveAttribute('href', '/app/analysis')
   })
 
   it('a rota DDNA informa que a tecnologia está em desenvolvimento', () => {
