@@ -22,10 +22,12 @@ describe('homepage institucional ARQEN', () => {
   it('mantém CTAs e navegação em rotas existentes', () => {
     renderHome()
     expect(screen.getByRole('link', { name: /conheça nossas soluções/i })).toHaveAttribute('href', '#solutions')
-    expect(screen.getByRole('link', { name: /explorar tecnologia/i })).toHaveAttribute('href', '/technology')
+    expect(screen.getByRole('link', { name: /entender uma análise/i })).toHaveAttribute('href', '/forensihash')
     const navigation = screen.getByRole('navigation', { name: /navegação principal/i })
     const localRoutes = within(navigation).getAllByRole('link').map(link => link.getAttribute('href'))
-    expect(localRoutes).toEqual(['/#solutions', '/technology', '/ddna', '/forensihash', '/references', '/app/analysis'])
+    expect(localRoutes).toEqual(['/#solutions', '/ddna', '/forensihash', '/references', '/app/analysis'])
+    expect(within(navigation).queryByRole('link', { name: 'Tecnologia' })).not.toBeInTheDocument()
+    expect(screen.getByRole('contentinfo')).not.toHaveTextContent('Tecnologia')
   })
 
   it('oferece menu mobile acessível', async () => {
