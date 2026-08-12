@@ -9,17 +9,22 @@ export function Section({
   eyebrow,
   title,
   className = '',
+  id,
+  headingLevel = 'h2',
 }: {
   children: ReactNode
   eyebrow?: string
   title?: string
   className?: string
+  id?: string
+  headingLevel?: 'h1' | 'h2'
 }) {
+  const Heading = headingLevel
   return (
-    <section className={`section ${className}`.trim()}>
+    <section id={id} className={`section ${className}`.trim()}>
       <Container>
         {eyebrow && <p className="eyebrow">{eyebrow}</p>}
-        {title && <h2>{title}</h2>}
+        {title && <Heading>{title}</Heading>}
         {children}
       </Container>
     </section>
