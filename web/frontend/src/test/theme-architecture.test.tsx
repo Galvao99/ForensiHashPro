@@ -54,7 +54,7 @@ describe('fronteira pública e autenticada do tema', () => {
     window.history.pushState({}, '', '/')
     render(<App />)
     await waitFor(() => expect(document.documentElement.dataset.theme).toBe('light'))
-    expect(screen.getAllByAltText('ARQEN')[0]).toHaveAttribute('src', expect.stringContaining('arqen_logo_preta.png'))
+    expect(screen.getAllByAltText('ARQEN')[0]).toHaveAttribute('src', expect.stringContaining('arqen_logo_branca.png'))
   })
 
   it.each(['/login', '/register'])('mantém %s exclusivamente light', async (route) => {

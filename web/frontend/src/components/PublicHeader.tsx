@@ -25,7 +25,7 @@ export function PublicHeader() {
   return (
     <header className={`public-header ${hasDarkHero ? 'on-dark-hero' : ''} ${scrolled ? 'is-scrolled' : ''}`}>
       <Container className="header-inner">
-        <ArqenBrand inverted />
+        <ArqenBrand theme="dark" />
         <button className="menu-button" type="button" aria-expanded={open} aria-controls="public-navigation" aria-label={open ? 'Fechar menu' : 'Abrir menu'} onClick={() => setOpen(!open)}>
           <span aria-hidden="true">{open ? '×' : '☰'}</span><span>Menu</span>
         </button>

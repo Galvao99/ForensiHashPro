@@ -1,10 +1,14 @@
 import { Link } from 'react-router-dom'
 
-export function ArqenBrand({ inverted = false }: { inverted?: boolean }) {
+interface ArqenBrandProps {
+  theme: 'dark' | 'light'
+}
+
+export function ArqenBrand({ theme }: ArqenBrandProps) {
   return (
     <Link to="/" className="arqen-brand" aria-label="ARQEN — página inicial">
       <img
-        src={inverted ? '/assets/arqen_logo_preta.png' : '/assets/arqen_logo_branca.png'}
+        src={theme === 'dark' ? '/assets/arqen_logo_branca.png' : '/assets/arqen_logo_preta.png'}
         alt="ARQEN"
       />
     </Link>
