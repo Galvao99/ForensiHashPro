@@ -47,14 +47,14 @@ function systemTheme(initialDark: boolean) {
 }
 
 describe('fronteira pública e autenticada do tema', () => {
-  it('mantém Home e logo públicos claros com preferência e OS escuros', async () => {
+  it('mantém Home pública com marca ARQEN independentemente do tema da plataforma', async () => {
     localStorage.setItem('forensihash-theme', 'DARK')
     systemTheme(true)
     vi.stubGlobal('fetch', visitorFetch())
     window.history.pushState({}, '', '/')
     render(<App />)
     await waitFor(() => expect(document.documentElement.dataset.theme).toBe('light'))
-    expect(screen.getByAltText('ForensiHash')).toHaveAttribute('src', expect.stringContaining(LIGHT_LOGO))
+    expect(screen.getAllByAltText('ARQEN')[0]).toHaveAttribute('src', expect.stringContaining('arqen_logo_preta.png'))
   })
 
   it.each(['/login', '/register'])('mantém %s exclusivamente light', async (route) => {

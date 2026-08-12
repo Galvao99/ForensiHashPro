@@ -1,63 +1,83 @@
+import { useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { ReferenceLink } from '../components/ReferenceLink'
-import { Section, TechnicalValue } from '../components/ui'
-import { affectedContexts, analysisLayers } from '../content/institutional'
+import { ArtifactGraph } from '../components/ArtifactGraph'
+import { EvidenceExplorer } from '../components/EvidenceExplorer'
+import { Section } from '../components/ui'
+import { ddnaReferences } from '../content/ddnaReferences'
+
+const principles = [
+  ['01', 'Integridade', 'Identidade verificável dos artefatos.'],
+  ['02', 'Proveniência', 'Origem e contexto preservados quando disponíveis.'],
+  ['03', 'Rastreabilidade', 'Relações e eventos tecnicamente documentados.'],
+  ['04', 'Custódia', 'Histórico do artefato ao longo do tempo.'],
+  ['05', 'Reprodutibilidade', 'Resultados técnicos passíveis de verificação.'],
+  ['06', 'Interoperabilidade', 'Arquitetura independente de um único fornecedor.'],
+]
+
+const sectors = ['Instituições financeiras', 'Seguradoras', 'Jurídico', 'Tecnologia', 'Compliance', 'Auditoria', 'Órgãos públicos', 'Perícia / investigação']
 
 export function HomePage() {
+  useEffect(() => {
+    document.title = 'ARQEN | Infraestrutura para Evidências Digitais'
+    const description = document.querySelector<HTMLMetaElement>('meta[name="description"]')
+    const ogTitle = document.querySelector<HTMLMetaElement>('meta[property="og:title"]')
+    const ogDescription = document.querySelector<HTMLMetaElement>('meta[property="og:description"]')
+    const summary = 'Tecnologia para proveniência, integridade, custódia e análise de artefatos digitais.'
+    if (description) description.content = summary
+    if (ogTitle) ogTitle.content = document.title
+    if (ogDescription) ogDescription.content = summary
+  }, [])
+
   return (
     <>
-      <Section className="hero">
-        <div className="hero-grid">
-          <div>
-            <p className="eyebrow">ENGENHARIA FORENSE DIGITAL</p>
-            <h1>ANÁLISE E RASTREABILIDADE<br />DE EVIDÊNCIAS DIGITAIS.</h1>
-            <p className="hero-copy">O ForensiHash centraliza verificações técnicas de documentos e arquivos digitais, permitindo examinar integridade, metadados, estrutura, assinaturas e outros vestígios em um único ambiente.</p>
-            <div className="hero-actions">
-              <Link className="button-link" to="/app/analysis">Iniciar análise</Link>
-              <Link className="text-link" to="/ddna">Conhecer o DDNA →</Link>
-            </div>
+      <section className="arqen-hero">
+        <div className="container arqen-hero__grid">
+          <div className="arqen-hero__copy">
+            <p className="eyebrow">INFRAESTRUTURA PARA EVIDÊNCIAS DIGITAIS</p>
+            <h1>Proveniência.<br />Integridade.<br />Rastreabilidade.</h1>
+            <p>A ARQEN desenvolve infraestrutura para preservar, relacionar, analisar e tornar verificáveis artefatos digitais ao longo de seu ciclo de vida.</p>
+            <div className="hero-actions"><a className="button-link button-light" href="#solutions">Conheça nossas soluções</a><Link className="text-link text-link--light" to="/technology">Explorar tecnologia <span aria-hidden="true">↗</span></Link></div>
           </div>
-          <div className="technical-demo" aria-label="Demonstração fictícia de saída técnica">
-            <span className="demo-label">DEMO · DADOS FICTÍCIOS</span>
-            <dl>
-              <div><dt>FILE</dt><dd>document-demo.pdf</dd></div>
-              <div><dt>TYPE</dt><dd>PDF / 1.7</dd></div>
-              <div><dt>SHA-256</dt><dd><TechnicalValue>8F21A0C4…D71E</TechnicalValue></dd></div>
-              <div><dt>SIGNATURE</dt><dd>DETECTED</dd></div>
-              <div><dt>STATUS</dt><dd>ANALYZED</dd></div>
-            </dl>
-          </div>
+          <ArtifactGraph />
+        </div>
+        <p className="hero-coordinate" aria-hidden="true">23°S / DIGITAL EVIDENCE INFRASTRUCTURE / 2026</p>
+      </section>
+
+      <section className="principles-strip" aria-label="Princípios de arquitetura ARQEN"><div className="container principles-grid">{principles.map(([number, title, text]) => <article key={number}><span>{number}</span><h2>{title}</h2><p>{text}</p></article>)}</div></section>
+
+      <Section id="solutions" className="arqen-section solutions-section" eyebrow="SOLUÇÕES ARQEN" title="Do registro à análise técnica.">
+        <p className="lead">Produtos distintos para etapas complementares do ciclo de evidências digitais, sob uma única arquitetura de marca.</p>
+        <div className="solution-grid">
+          <article className="solution-card solution-card--ddna"><span className="solution-index">01 / DIGITAL CUSTODY · PROVENANCE</span><div><h3>DDNA</h3><p>Infraestrutura proposta para registrar o estado de artefatos digitais, contexto, relações e histórico de custódia a partir de um marco T0, permitindo verificações posteriores.</p></div><Link to="/ddna">Conhecer DDNA <span aria-hidden="true">↗</span></Link><small>RESEARCH / DEVELOPMENT</small></article>
+          <article className="solution-card solution-card--forensi"><span className="solution-index">02 / DIGITAL ANALYSIS</span><div><h3>ForensiHash</h3><p>Ferramenta de análise técnica de artefatos digitais, hashes, metadados, estrutura, timeline, correlações e outros elementos disponíveis no produto.</p></div><Link to="/forensihash">Conhecer ForensiHash <span aria-hidden="true">↗</span></Link><small>PRODUTO EM DESENVOLVIMENTO</small></article>
         </div>
       </Section>
 
-      <Section eyebrow="CONTEXTO" title="DOCUMENTOS DIGITAIS MOVIMENTAM RELAÇÕES REAIS." className="surface-section">
-        <p className="lead">Documentos eletrônicos participam de contratos, operações financeiras, seguros, telecomunicações, relações jurídicas, processos administrativos e rotinas corporativas. Quando um arquivo é contestado, integridade, origem técnica e rastreabilidade precisam ser examinadas sem presumir fraude.</p>
-        <div className="border-grid three-columns">
-          {affectedContexts.map(([title, description]) => <article key={title}><h3>{title}</h3><p>{description}</p></article>)}
+      <Section className="arqen-section evidence-cycle-section" eyebrow="CICLO DA EVIDÊNCIA DIGITAL" title="Preservar e analisar são papéis distintos.">
+        <div className="evidence-cycle" role="img" aria-label="Um artefato digital pode ser preservado pelo DDNA e analisado pelo ForensiHash, contribuindo para evidência técnica">
+          <strong>ARTEFATO DIGITAL</strong><div className="cycle-stem" aria-hidden="true" /><div className="cycle-products"><article><span>DDNA</span><b>Preservar</b><small>proveniência · custódia</small></article><article><span>FORENSIHASH</span><b>Analisar</b><small>inspeção · correlação</small></article></div><div className="cycle-output">EVIDÊNCIA TÉCNICA</div>
         </div>
+        <p className="cycle-note">O DDNA atua na preservação, proveniência e custódia propostas. O ForensiHash atua na inspeção e análise técnica. Um artefato não precisa, necessariamente, passar pelos dois produtos.</p>
       </Section>
 
-      <Section eyebrow="FORENSIHASH" title="UMA EVIDÊNCIA. MÚLTIPLAS CAMADAS DE ANÁLISE.">
-        <div className="border-grid three-columns analysis-grid">
-          {analysisLayers.map(([number, title, description]) => (
-            <article key={number}><span className="item-number">{number}</span><h3>{title}</h3><p>{description}</p></article>
-          ))}
-        </div>
-        <p className="institutional-note">O ForensiHash é uma ferramenta de apoio à análise técnica. Os resultados devem ser interpretados em conjunto com os demais elementos disponíveis no caso analisado.</p>
+      <Section className="arqen-section problem-section" eyebrow="CONTEXTO" title="Arquivos digitais não carregam, por si só, toda a sua história.">
+        <div className="problem-grid"><div><p className="lead">Ao longo de uma operação, arquivo, metadados, logs, eventos, contexto de sessão, hashes, sistemas produtores, timestamps e versões podem permanecer distribuídos em fontes diferentes.</p><p>Quando esses elementos não são preservados e relacionados de maneira adequada, a reconstrução posterior pode se tornar limitada.</p></div><div className="fragment-map" role="img" aria-label="Elementos de uma transação digital podem se fragmentar ao longo do tempo"><strong>TRANSAÇÃO</strong>{['arquivo', 'logs', 'eventos', 'contexto', 'identidade', 'metadados'].map(item => <span key={item}>{item}</span>)}<b>↓ TEMPO</b><em>fragmentação / perda de contexto</em></div></div>
       </Section>
 
-      <Section eyebrow="ASSINATURAS ELETRÔNICAS" title="CONTEXTO TÉCNICO, SEM CONCLUSÕES AUTOMÁTICAS." className="surface-section">
-        <div className="split-copy">
-          <div><p>A legislação brasileira diferencia modalidades de assinatura eletrônica e estabelece contextos próprios de utilização. A análise técnica de um arquivo não substitui essa avaliação jurídica nem presume validade ou invalidade.</p><ReferenceLink id="lei-14063" /></div>
-          <div><p>A ICP-Brasil é descrita pelo ITI como uma cadeia hierárquica de confiança para emissão de certificados digitais. O ForensiHash não é autoridade certificadora e não afirma homologação institucional.</p><ReferenceLink id="iti-icp-brasil" /></div>
-        </div>
+      <Section className="arqen-section explorer-section" eyebrow="EXEMPLO DIDÁTICO" title="Um artefato. Diferentes camadas de informação.">
+        <p className="lead">Selecione uma categoria para compreender o papel técnico de cada registro — e os limites do que ele permite afirmar.</p>
+        <EvidenceExplorer />
       </Section>
 
-      <Section eyebrow="ECOSSISTEMA" title="ANÁLISE HOJE. RASTREABILIDADE EM DESENVOLVIMENTO.">
-        <div className="product-comparison">
-          <article><span>FORENSIHASH</span><h3>Plataforma de análise técnica</h3><p>Examina uma evidência e organiza fatos, estruturas, estados, limitações e findings.</p><Link to="/forensihash">Conhecer a plataforma →</Link></article>
-          <article><span>DDNA · EM DESENVOLVIMENTO</span><h3>Identidade e registro técnico</h3><p>Proposta para apoiar identidade, integridade, rastreabilidade e custódia verificável.</p><Link to="/ddna">Conhecer a visão →</Link></article>
-        </div>
+      <Section className="arqen-section applications-section" eyebrow="APLICAÇÕES" title="Setores com desafios de evidência digital.">
+        <div className="sector-grid">{sectors.map((sector, index) => <div key={sector}><span>{String(index + 1).padStart(2, '0')}</span><strong>{sector}</strong></div>)}</div>
+        <p className="institutional-note">Áreas em que infraestrutura de evidência digital pode ser aplicável. Esta lista não representa clientes, parceiros ou implantações da ARQEN.</p>
+      </Section>
+
+      <Section className="arqen-section foundations-section" eyebrow="FUNDAMENTOS" title="Engenharia orientada por referências técnicas e jurídicas.">
+        <p className="lead">Cadeia de custódia, evidência digital, integridade, preservação, auditabilidade e proteção de dados formam o contexto de pesquisa dos produtos. As referências não certificam ou homologam a ARQEN.</p>
+        <div className="foundation-links">{ddnaReferences.filter(item => ['cpp-158', 'stj-inf-811', 'iso-27037', 'lgpd', 'icp-brasil'].includes(item.id)).map(item => <Link key={item.id} to={`/ddna#${item.id}`}><span>{item.institution} · {item.date}</span><strong>{item.title}</strong><i aria-hidden="true">↗</i></Link>)}</div>
+        <Link className="button-link button-dark" to="/ddna#como-funciona">Explorar fundamentos técnicos e jurídicos</Link>
       </Section>
     </>
   )
