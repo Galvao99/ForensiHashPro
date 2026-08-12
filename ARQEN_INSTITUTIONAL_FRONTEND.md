@@ -53,7 +53,7 @@ somente soluções, recursos e páginas legais existentes.
 
 ## 8. Páginas migradas visualmente
 
-As rotas `/`, `/forensihash`, `/ddna`, `/technology`, `/references`, `/login`,
+As rotas `/`, `/forensihash`, `/ddna`, `/references`, `/login`,
 `/register`, `/terms` e `/privacy` recebem o shell ARQEN. A área `/app` e suas
 funcionalidades permanecem no shell ForensiHash existente.
 
@@ -121,3 +121,39 @@ marca pública. DDNA continua coberta por sua suíte específica.
 Realizar revisão visual com a equipe em 375, 430, 768, 1024, 1440 e 1920 px;
 validar recortes reais dos logos; pesquisar estatísticas apenas em fontes
 primárias; e, após aprovação institucional, produzir imagem Open Graph própria.
+
+## 18. Navigation & ForensiHash Product Story
+
+### Navegação institucional
+
+A rota pública `/technology` e todos os seus links foram removidos do router,
+header, menu mobile, footer e homepage. A documentação técnica interna e os
+componentes funcionais da plataforma não foram alterados. `ScrollToTop`, montado
+no `PublicLayout`, observa `pathname` e `hash`: rotas comuns iniciam em `(0, 0)`;
+âncoras existentes recebem `scrollIntoView`, sem timeout arbitrário.
+
+### Narrativa ForensiHash
+
+A página `/forensihash` passou de uma apresentação curta para uma história de
+produto orientada a uso técnico. O conteúdo apresenta:
+
+- peritos, advogados, auditoria/compliance e equipes técnicas como públicos;
+- capacidades agrupadas em identidade, estrutura, conteúdo, contexto, relações
+  e tempo, limitadas ao que já está implementado/documentado;
+- fluxo didático de identificação a resultado técnico;
+- exemplo fictício com PDF, imagem e logs;
+- warning expansível com regra, valores, origem, contexto e limitação;
+- distinção entre eventos temporais e estruturais na timeline;
+- Analysis Sets/Correlation V2 e condição de comparabilidade semântica;
+- aplicação em contratação eletrônica e material efetivamente disponibilizado;
+- limites explícitos sobre autoria, fraude, intenção, autenticidade material,
+  validade jurídica, biometria e fontes ausentes;
+- relação opcional entre preservação DDNA e análise ForensiHash.
+
+### Arquivos e testes desta rodada
+
+Foram criados `ScrollToTop.tsx`, `scroll-to-top.test.tsx` e
+`forensihash-product.test.tsx`. Foram modificados o router, `PublicHeader`,
+`PublicLayout`, `HomePage`, `ProductPage`, estilos globais e testes de navegação,
+homepage e metadata. `TechnologyPage.tsx` foi removido por não possuir consumidor
+após a retirada da rota pública.

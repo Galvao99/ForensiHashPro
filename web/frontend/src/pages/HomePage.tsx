@@ -26,7 +26,7 @@ export function HomePage() {
             <p className="eyebrow">INFRAESTRUTURA PARA EVIDÊNCIAS DIGITAIS</p>
             <h1>Proveniência.<br />Integridade.<br />Rastreabilidade.</h1>
             <p>A ARQEN desenvolve infraestrutura para preservar, relacionar, analisar e tornar verificáveis artefatos digitais ao longo de seu ciclo de vida.</p>
-            <div className="hero-actions"><a className="button-link button-light" href="#solutions">Conheça nossas soluções</a><Link className="text-link text-link--light" to="/technology">Explorar tecnologia <span aria-hidden="true">↗</span></Link></div>
+            <div className="hero-actions"><a className="button-link button-light" href="#solutions">Conheça nossas soluções</a><Link className="text-link text-link--light" to="/forensihash">Entender uma análise <span aria-hidden="true">↗</span></Link></div>
           </div>
           <ArtifactGraph />
         </div>

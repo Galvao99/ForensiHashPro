@@ -11,7 +11,6 @@ import { PlaceholderPage } from './pages/PlaceholderPage'
 import { ProductPage } from './pages/ProductPage'
 import { ReferencesPage } from './pages/ReferencesPage'
 import { ResultPage } from './pages/ResultPage'
-import { TechnologyPage } from './pages/TechnologyPage'
 import { AuthProvider } from './context/AuthContext'
 import { ThemeProvider } from './context/ThemeContext'
 import { ProtectedRoute } from './components/ProtectedRoute'
@@ -28,7 +27,6 @@ export function App() {
           <Route path="/" element={<HomePage />} />
           <Route path="/forensihash" element={<ProductPage />} />
           <Route path="/ddna" element={<DdnaPage />} />
-          <Route path="/technology" element={<TechnologyPage />} />
           <Route path="/references" element={<ReferencesPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />

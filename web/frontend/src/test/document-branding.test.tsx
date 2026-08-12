@@ -7,7 +7,6 @@ const routeTitles: Array<[string, string]> = [
   ['/', 'ARQEN | Infraestrutura para Evidências Digitais'],
   ['/ddna', 'DDNA | Custódia e Proveniência Digital — ARQEN'],
   ['/forensihash', 'ForensiHash | Análise de Artefatos Digitais — ARQEN'],
-  ['/technology', 'Tecnologia | ARQEN'],
   ['/references', 'Referências Técnicas e Jurídicas | ARQEN'],
   ['/login', 'Acessar plataforma | ARQEN'],
   ['/register', 'Criar conta | ARQEN'],
@@ -39,9 +38,9 @@ describe('branding do documento público', () => {
   })
 
   it('sincroniza Open Graph com a rota atual', async () => {
-    window.history.pushState({}, '', '/technology')
+    window.history.pushState({}, '', '/references')
     render(<App />)
-    await waitFor(() => expect(document.querySelector('meta[property="og:title"]')).toHaveAttribute('content', 'Tecnologia | ARQEN'))
+    await waitFor(() => expect(document.querySelector('meta[property="og:title"]')).toHaveAttribute('content', 'Referências Técnicas e Jurídicas | ARQEN'))
     expect(document.querySelector('meta[property="og:site_name"]')).toHaveAttribute('content', 'ARQEN')
   })
 })

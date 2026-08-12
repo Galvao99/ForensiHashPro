@@ -24,6 +24,8 @@ describe('navegação pública', () => {
     expect(screen.getAllByRole('link', { name: 'ForensiHash' })[0]).toHaveAttribute('href', '/forensihash')
     expect(screen.getAllByRole('link', { name: 'DDNA' })[0]).toHaveAttribute('href', '/ddna')
     expect(screen.getByRole('link', { name: 'Acessar plataforma' })).toHaveAttribute('href', '/app/analysis')
+    expect(screen.queryByRole('link', { name: 'Tecnologia' })).not.toBeInTheDocument()
+    expect(document.querySelector('a[href="/technology"]')).not.toBeInTheDocument()
   })
 
   it('a rota DDNA informa que a tecnologia está em desenvolvimento', () => {

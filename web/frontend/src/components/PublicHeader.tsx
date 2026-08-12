@@ -5,7 +5,6 @@ import { Container } from './ui'
 
 const links = [
   ['/#solutions', 'Soluções'],
-  ['/technology', 'Tecnologia'],
   ['/ddna', 'DDNA'],
   ['/forensihash', 'ForensiHash'],
   ['/references', 'Recursos'],
