@@ -13,7 +13,7 @@ describe('homepage institucional ARQEN', () => {
 
   it('apresenta ARQEN como marca-mãe e os dois produtos', () => {
     renderHome()
-    expect(screen.getAllByAltText('ARQEN')[0]).toHaveAttribute('src', '/assets/arqen_logo_preta.png')
+    expect(screen.getAllByAltText('ARQEN')[0]).toHaveAttribute('src', '/assets/arqen_logo_branca.png')
     expect(screen.getByRole('heading', { level: 1, name: /proveniência.*integridade.*rastreabilidade/i })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /conhecer DDNA/i })).toHaveAttribute('href', '/ddna')
     expect(screen.getByRole('link', { name: /conhecer ForensiHash/i })).toHaveAttribute('href', '/forensihash')
