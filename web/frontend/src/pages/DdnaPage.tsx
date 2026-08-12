@@ -1,5 +1,5 @@
-import { useEffect } from 'react'
 import { Link } from 'react-router-dom'
+import { DocumentMetadata } from '../components/DocumentMetadata'
 import { BranchDiagram, FlowDiagram, LedgerDiagram } from '../components/DdnaDiagram'
 import { Section } from '../components/ui'
 import { ddnaReferences } from '../content/ddnaReferences'
@@ -14,29 +14,8 @@ function ExternalLink({ href }: { href: string }) {
 }
 
 export function DdnaPage() {
-  useEffect(() => {
-    const previousTitle = document.title
-    const description = document.querySelector<HTMLMetaElement>('meta[name="description"]')
-    const previousDescription = description?.content
-    const ogTitle = document.querySelector<HTMLMetaElement>('meta[property="og:title"]')
-    const ogDescription = document.querySelector<HTMLMetaElement>('meta[property="og:description"]')
-    const previousOgTitle = ogTitle?.content
-    const previousOgDescription = ogDescription?.content
-    const title = 'DDNA — Cadeia de custódia e integridade de arquivos digitais'
-    const summary = 'Conheça a arquitetura DDNA em desenvolvimento para preservação, rastreabilidade e verificação de artefatos digitais.'
-    document.title = title
-    if (description) description.content = summary
-    if (ogTitle) ogTitle.content = title
-    if (ogDescription) ogDescription.content = summary
-    return () => {
-      document.title = previousTitle
-      if (description && previousDescription) description.content = previousDescription
-      if (ogTitle && previousOgTitle) ogTitle.content = previousOgTitle
-      if (ogDescription && previousOgDescription) ogDescription.content = previousOgDescription
-    }
-  }, [])
-
   return <article className="ddna-page">
+    <DocumentMetadata title="DDNA | Custódia e Proveniência Digital — ARQEN" description="Conheça a arquitetura DDNA em desenvolvimento para preservação, rastreabilidade e verificação de artefatos digitais." />
     <Section className="ddna-hero" eyebrow="DDNA · RESEARCH / DEVELOPMENT" title="CUSTÓDIA VERIFICÁVEL PARA ARTEFATOS DIGITAIS." headingLevel="h1">
       <span className="development-flag">PRODUTO EM DESENVOLVIMENTO</span>
       <p className="lead">Uma arquitetura em desenvolvimento para registrar, preservar e posteriormente verificar o estado técnico de arquivos digitais a partir de um marco de custódia.</p>
