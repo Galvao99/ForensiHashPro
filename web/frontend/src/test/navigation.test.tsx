@@ -28,8 +28,8 @@ describe('navegação pública', () => {
 
   it('a rota DDNA informa que a tecnologia está em desenvolvimento', () => {
     renderAt('/ddna')
-    expect(screen.getAllByText('EM DESENVOLVIMENTO').length).toBeGreaterThan(0)
-    expect(screen.getByText(/nenhum registro DDNA/i)).toBeInTheDocument()
+    expect(screen.getByText('PRODUTO EM DESENVOLVIMENTO')).toBeInTheDocument()
+    expect(screen.getByText(/não um serviço de custódia disponível/i)).toBeInTheDocument()
   })
 
   it('login funciona sem persistir credenciais', async () => {

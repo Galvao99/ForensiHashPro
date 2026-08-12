@@ -342,3 +342,65 @@ p { color: var(--color-text-secondary); line-height: 1.7; }
 .archive-tree { margin: 1rem 0; padding: 1rem; border: 1px solid var(--color-border); }
 .archive-tree > summary { cursor: pointer; font-weight: 700; }
 @media (max-width: 640px) { .archive-summary { grid-template-columns: repeat(2, 1fr); } .archive-summary > div:nth-child(2) { border-right: 0; } }
+
+/* DDNA institutional — diagrams use semantic HTML and do not depend on color. */
+.ddna-page { --ddna-accent: var(--color-accent); }
+.ddna-page strong { color: var(--color-text); }
+.ddna-hero { min-height: calc(88vh - var(--header-height)); display: grid; align-items: center; background: linear-gradient(90deg, color-mix(in srgb, var(--color-accent) 7%, transparent) 1px, transparent 1px), linear-gradient(color-mix(in srgb, var(--color-accent) 7%, transparent) 1px, transparent 1px); background-size: 32px 32px; }
+.ddna-hero h1 { max-width: 1020px; font-size: clamp(2.5rem, 6vw, 5.6rem); letter-spacing: -.055em; }
+.ddna-diagram { margin: var(--space-6) 0; padding: var(--space-5); border: 1px solid var(--color-border); background: var(--surface-elevated); font-family: var(--font-mono); font-size: .74rem; }
+.ddna-flow { width: min(760px, 100%); margin-inline: auto; }
+.ddna-flow-step { display: grid; justify-items: center; }
+.ddna-node { width: min(100%, 520px); padding: var(--space-4); border: 1px solid var(--color-border-strong); background: var(--color-surface); text-align: center; overflow-wrap: anywhere; }
+.ddna-node small { color: var(--color-text-secondary); }
+.ddna-arrow { display: block; padding: var(--space-2); color: var(--ddna-accent); font-size: 1.2rem; text-align: center; }
+.ddna-flow.compact .ddna-node { padding: var(--space-3); }
+.ddna-question-grid, .ddna-format-grid, .ddna-foundation-grid, .ddna-iso-grid { display: grid; grid-template-columns: repeat(3, 1fr); margin: var(--space-6) 0; border-top: 1px solid var(--color-border); border-left: 1px solid var(--color-border); }
+.ddna-question-grid blockquote, .ddna-format-grid article, .ddna-foundation-grid article, .ddna-iso-grid article { margin: 0; min-width: 0; padding: var(--space-5); border-right: 1px solid var(--color-border); border-bottom: 1px solid var(--color-border); }
+.ddna-question-grid blockquote { min-height: 110px; font-size: 1rem; line-height: 1.55; }
+.ddna-foundation-grid article > span, .ddna-iso-grid article > span { color: var(--color-accent); font-family: var(--font-mono); font-size: .66rem; text-transform: uppercase; }
+.ddna-hash-comparison, .ddna-t0-grid, .ddna-original-grid, .ddna-verify-grid, .ddna-two-cards { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-5); align-items: start; }
+.ddna-manifest-map { display: grid; grid-template-columns: repeat(2, 1fr); margin: var(--space-6) 0; border: 1px solid var(--color-border-strong); }
+.ddna-manifest-map strong { grid-column: 1 / -1; padding: var(--space-4); border-bottom: 1px solid var(--color-border-strong); background: var(--color-accent); color: var(--accent-contrast); font-family: var(--font-mono); text-align: center; }
+.ddna-manifest-map span { padding: var(--space-3); border-right: 1px solid var(--color-border); border-bottom: 1px solid var(--color-border); font-family: var(--font-mono); font-size: .72rem; }
+.ddna-boundary { margin-top: var(--space-6); padding: var(--space-5); border: 2px solid var(--color-warning); color: var(--color-text); font-weight: 700; line-height: 1.5; }
+.t0-node { color: var(--color-accent) !important; }
+.ddna-time-example { display: grid; grid-template-columns: auto 1fr; width: min(560px, 100%); margin: var(--space-5) auto; border: 1px solid var(--color-border); }
+.ddna-time-example > * { padding: var(--space-3); border-bottom: 1px solid var(--color-border); }
+.ddna-time-example strong { grid-column: 1 / -1; text-align: center; }
+.ddna-branch { display: grid; justify-items: center; width: min(820px, 100%); margin-inline: auto; }
+.ddna-branch-line { white-space: pre; color: var(--color-border-strong); font-size: clamp(.65rem, 2vw, 1rem); }
+.ddna-branch-columns { width: 100%; display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-5); }
+.ddna-branch-columns article { display: grid; gap: var(--space-2); padding: var(--space-4); border: 1px solid var(--color-border); }
+.ddna-branch-columns strong { padding-bottom: var(--space-3); border-bottom: 1px solid var(--color-border); color: var(--color-accent); }
+.ddna-format-grid article { min-height: 145px; display: grid; align-content: start; gap: var(--space-2); }
+.ddna-format-grid article > span { color: var(--color-accent); }
+.ddna-file-stack { display: grid; margin: var(--space-6) 0; border: 1px solid var(--color-border); }
+.ddna-file-stack code { padding: var(--space-4); border-bottom: 1px solid var(--color-border); }
+.ddna-file-stack code:first-child { border-left: 4px solid var(--color-accent); font-weight: 700; }
+.ddna-checks { margin: var(--space-6) 0; border: 1px solid var(--color-border-strong); }
+.ddna-checks div { display: grid; grid-template-columns: 1fr auto; gap: var(--space-4); padding: var(--space-3); border-bottom: 1px solid var(--color-border); font-family: var(--font-mono); font-size: .72rem; }
+.ddna-checks strong { color: var(--color-success); }
+.ddna-parallel { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-2); }
+.ddna-parallel span { padding: var(--space-2); border: 1px solid var(--color-border); }
+.ddna-evidence-set { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: var(--space-5); margin: var(--space-6) 0; }
+.ddna-evidence-set > div { display: grid; border: 1px solid var(--color-border); }
+.ddna-evidence-set code { padding: var(--space-2); border-bottom: 1px solid var(--color-border); }
+.ddna-evidence-set > span { color: var(--color-accent); font-size: 1.6rem; }
+.ddna-evidence-set > strong { padding: var(--space-6); border: 1px solid var(--color-border-strong); text-align: center; }
+.ddna-two-cards > article { min-width: 0; padding: var(--space-5); border: 1px solid var(--color-border); background: var(--surface-elevated); }
+.ddna-ledger { display: flex; max-width: 100%; overflow-x: auto; }
+.ddna-ledger div { display: flex; align-items: center; flex: 0 0 auto; }
+.ddna-ledger span { padding: var(--space-3); border: 1px solid var(--color-border-strong); }
+.ddna-ledger b { padding: var(--space-2); color: var(--color-accent); }
+.ddna-ledger-fields, .ddna-tag-list { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: var(--space-4) 0; }
+.ddna-ledger-fields code, .ddna-tag-list span { padding: var(--space-2) var(--space-3); border: 1px solid var(--color-border); background: var(--surface-elevated); font-size: .7rem; }
+.ddna-do-dont { display: grid; grid-template-columns: 1fr 1fr; margin-top: var(--space-6); border: 1px solid var(--color-border-strong); }
+.ddna-do-dont article { padding: var(--space-6); }
+.ddna-do-dont article + article { border-left: 1px solid var(--color-border-strong); }
+.ddna-do-dont p { display: grid; grid-template-columns: 24px 1fr; gap: var(--space-2); padding-bottom: var(--space-2); border-bottom: 1px solid var(--color-border); }
+.ddna-do-dont p span { color: var(--color-accent); font-weight: 800; }
+.ddna-statement { margin: var(--space-5) auto 0; max-width: 760px; font-size: clamp(1.2rem, 3vw, 2rem); color: var(--color-text); text-align: center; }
+.ddna-status { border-top: 4px solid var(--color-accent); }
+@media (max-width: 800px) { .ddna-question-grid, .ddna-foundation-grid, .ddna-iso-grid { grid-template-columns: 1fr 1fr; } .ddna-hash-comparison, .ddna-t0-grid, .ddna-original-grid, .ddna-verify-grid, .ddna-two-cards { grid-template-columns: 1fr; } }
+@media (max-width: 600px) { .ddna-hero { min-height: auto; } .ddna-question-grid, .ddna-format-grid, .ddna-foundation-grid, .ddna-iso-grid, .ddna-branch-columns, .ddna-do-dont { grid-template-columns: 1fr; } .ddna-do-dont article + article { border-left: 0; border-top: 1px solid var(--color-border-strong); } .ddna-diagram { padding: var(--space-3); } .ddna-evidence-set { grid-template-columns: 1fr; text-align: center; } .ddna-evidence-set > span { transform: rotate(90deg); } .ddna-parallel { grid-template-columns: 1fr; } .ddna-time-example { grid-template-columns: 1fr; } .ddna-time-example strong { grid-column: auto; } }
