@@ -50,6 +50,18 @@ roda em processo filho; timeout ou shutdown encerram esse processo antes da
 remoção do staging. ExifTool, Tesseract e Poppler mantêm também seus timeouts
 específicos.
 
+A admissão executa recuperação de leases abandonados e conta exclusivamente
+`QUEUED` e `PROCESSING` na mesma seção crítica. Em PostgreSQL, um advisory lock
+transacional serializa `recovery -> count -> INSERT`; nos testes/SQLite, um lock
+local equivalente evita ultrapassar o limite entre requisições concorrentes.
+Estados terminais nunca consomem capacidade.
+
+No restart de uma instância, jobs `PROCESSING` pertencentes ao token do executor
+anterior são recuperados imediatamente. Se o staging ainda existe, retornam a
+`QUEUED`; se foi perdido, terminam como `FAILED` com `staging_lost`. Durante a
+vida do mesmo executor, heartbeat ausente ou anterior a 30 segundos aplica a
+mesma política. Assim, um lease abandonado não bloqueia a fila indefinidamente.
+
 ## Falhas e logging
 
 Falhas isoláveis de metadata, magic number, assinatura, PDF, JSON, biometria,
@@ -70,6 +82,7 @@ job. Clientes novos devem usar o fluxo de polling.
 A solução suporta uma instância Uvicorn. Vários processos/instâncias exigem
 lease distribuído, armazenamento temporário compartilhado e coordenação da
 recuperação. O filesystem local continua efêmero. A capacidade da fila é uma
-proteção da instância, não uma cota distribuída. Engines sem callback de
+proteção global do backend e o workspace do navegador exibe apenas seus itens
+locais; rejeições registram contagens globais seguras nos logs. Engines sem callback de
 progresso não atualizam `current_stage` durante sua execução; sua duração e
 estado ficam disponíveis nos logs e no contrato após retorno.

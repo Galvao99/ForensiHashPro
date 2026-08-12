@@ -167,7 +167,7 @@ def test_isolated_process_preserves_analysis_contract(
     engine.dispose()
 
 
-def test_queue_capacity_rejects_before_staging(
+def test_queue_capacity_rejection_cleans_rejected_staging(
     tmp_path: Path, monkeypatch
 ) -> None:
     engine, factory = _database(tmp_path)
