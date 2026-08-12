@@ -229,6 +229,7 @@ export function AnalysisSessionProvider({ children, initialResults = [] }: { chi
           analyses: current.analyses.map((candidate) => candidate.analysisId === item.analysisId ? {
             ...candidate,
             status: error instanceof ApiError && error.code === 'file_too_large' ? 'LIMIT_EXCEEDED' : 'FAILED',
+            errorCode: error instanceof ApiError ? error.code : 'analysis_failed',
             error: error instanceof ApiError ? error.message : 'Não foi possível concluir a análise.',
           } : candidate),
         }))

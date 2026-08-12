@@ -4,12 +4,14 @@ import logging
 import multiprocessing
 import threading
 import time
+from contextlib import contextmanager
 from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from uuid import uuid4
 
-from sqlalchemy import select, update
+from sqlalchemy import func, select, text, update
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.application.analysis_coordinator import AnalysisCancelledError
@@ -27,6 +29,58 @@ TERMINAL_JOB_STATUSES = frozenset(status.value for status in (
     AnalysisJobStatus.SUCCESS, AnalysisJobStatus.PARTIAL, AnalysisJobStatus.FAILED,
     AnalysisJobStatus.LIMIT_EXCEEDED, AnalysisJobStatus.CANCELLED,
 ))
+ACTIVE_JOB_STATUSES = frozenset((
+    AnalysisJobStatus.QUEUED.value,
+    AnalysisJobStatus.PROCESSING.value,
+))
+_CAPACITY_LOCK = threading.Lock()
+_POSTGRES_CAPACITY_LOCK_ID = 4_602_673_457
+
+
+@dataclass(frozen=True, slots=True)
+class AnalysisCapacitySnapshot:
+    configured_capacity: int
+    queued_jobs: int
+    running_jobs: int
+
+    @property
+    def active_jobs(self) -> int:
+        return max(0, self.queued_jobs) + max(0, self.running_jobs)
+
+    @property
+    def available_slots(self) -> int:
+        return max(0, self.configured_capacity - self.active_jobs)
+
+
+@contextmanager
+def analysis_capacity_guard(db: Session):
+    """Serializa recuperação, contagem e INSERT entre requisições concorrentes."""
+    if db.get_bind().dialect.name == "postgresql":
+        db.execute(
+            text("SELECT pg_advisory_xact_lock(:lock_id)"),
+            {"lock_id": _POSTGRES_CAPACITY_LOCK_ID},
+        )
+        yield
+        return
+    with _CAPACITY_LOCK:
+        yield
+
+
+def analysis_capacity_snapshot(
+    db: Session, configured_capacity: int
+) -> AnalysisCapacitySnapshot:
+    counts = dict(
+        db.execute(
+            select(AnalysisJob.status, func.count(AnalysisJob.id))
+            .where(AnalysisJob.status.in_(ACTIVE_JOB_STATUSES))
+            .group_by(AnalysisJob.status)
+        ).all()
+    )
+    return AnalysisCapacitySnapshot(
+        configured_capacity=max(0, configured_capacity),
+        queued_jobs=max(0, int(counts.get(AnalysisJobStatus.QUEUED.value, 0))),
+        running_jobs=max(0, int(counts.get(AnalysisJobStatus.PROCESSING.value, 0))),
+    )
 
 
 def _utcnow() -> datetime:
@@ -135,6 +189,21 @@ class AnalysisJobExecutor:
             self.start()
         self._wake.set()
 
+    @property
+    def worker_token(self) -> str:
+        return self._worker_token
+
+    @property
+    def max_concurrency(self) -> int:
+        return self._max_concurrency
+
+    def executor_state(self) -> str:
+        if self._stop.is_set():
+            return "stopped"
+        if any(thread.is_alive() for thread in self._threads):
+            return "available"
+        return "not_started"
+
     def _run(self) -> None:
         while not self._stop.is_set():
             try:
@@ -147,16 +216,7 @@ class AnalysisJobExecutor:
 
     def recover(self) -> None:
         with self._session_factory() as db:
-            abandoned = self._abandoned(db)
-            for job in abandoned:
-                if job.staging_path and Path(job.staging_path).is_file():
-                    job.status = AnalysisJobStatus.QUEUED.value
-                    job.current_stage = "QUEUED"
-                    job.started_at = None
-                    job.worker_token = None
-                    job.heartbeat_at = None
-                else:
-                    self._fail_staging_lost(job)
+            self.recover_abandoned(db, recover_foreign_workers=True)
             db.commit()
             active = {
                 Path(path) for path in db.scalars(
@@ -168,17 +228,39 @@ class AnalysisJobExecutor:
             }
         self._storage.cleanup_orphans(active)
 
+    def recover_abandoned(
+        self, db: Session, *, recover_foreign_workers: bool = False
+    ) -> int:
+        recovered = 0
+        for job in self._abandoned(
+            db,
+            current_worker_token=self._worker_token,
+            recover_foreign_workers=recover_foreign_workers,
+        ):
+            if job.staging_path and Path(job.staging_path).is_file():
+                job.status = AnalysisJobStatus.QUEUED.value
+                job.current_stage = "QUEUED"
+                job.started_at = None
+                job.worker_token = None
+                job.heartbeat_at = None
+            else:
+                self._fail_staging_lost(job)
+            recovered += 1
+        if recovered:
+            LOGGER.warning(
+                "analysis_jobs_recovered",
+                extra={
+                    "stage": "recovery",
+                    "engine": "job_executor",
+                    "status": "completed",
+                    "recovered_jobs": recovered,
+                },
+            )
+        return recovered
+
     def process_next(self) -> bool:
         with self._session_factory() as db:
-            for job in self._abandoned(db):
-                if job.staging_path and Path(job.staging_path).is_file():
-                    job.status = AnalysisJobStatus.QUEUED.value
-                    job.current_stage = "QUEUED"
-                    job.started_at = None
-                    job.worker_token = None
-                    job.heartbeat_at = None
-                else:
-                    self._fail_staging_lost(job)
+            self.recover_abandoned(db)
             db.execute(
                 update(AnalysisJob)
                 .where(
@@ -346,12 +428,29 @@ class AnalysisJobExecutor:
         job.heartbeat_at = None
 
     @staticmethod
-    def _abandoned(db: Session) -> list[AnalysisJob]:
+    def _abandoned(
+        db: Session,
+        *,
+        current_worker_token: str | None = None,
+        recover_foreign_workers: bool = False,
+    ) -> list[AnalysisJob]:
         cutoff = _utcnow() - ABANDONED_AFTER
-        return list(db.scalars(select(AnalysisJob).where(
-            AnalysisJob.status == AnalysisJobStatus.PROCESSING.value,
-            (AnalysisJob.heartbeat_at.is_(None)) | (AnalysisJob.heartbeat_at < cutoff),
-        )))
+        conditions = [
+            AnalysisJob.heartbeat_at.is_(None),
+            AnalysisJob.heartbeat_at < cutoff,
+        ]
+        if recover_foreign_workers and current_worker_token is not None:
+            conditions.append(AnalysisJob.worker_token != current_worker_token)
+        from sqlalchemy import or_
+
+        return list(
+            db.scalars(
+                select(AnalysisJob).where(
+                    AnalysisJob.status == AnalysisJobStatus.PROCESSING.value,
+                    or_(*conditions),
+                )
+            )
+        )
 
     def _heartbeat(self, job_id: str, stop: threading.Event) -> None:
         while not stop.wait(HEARTBEAT_INTERVAL_SECONDS):

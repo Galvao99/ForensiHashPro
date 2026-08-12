@@ -54,6 +54,19 @@ describe('integração HTTP', () => {
     expect(screen.queryByText(/traceback|exception|\/tmp/i)).not.toBeInTheDocument()
   })
 
+  it('trata rejeição de capacidade como terminal e não como job ativo', async () => {
+    vi.stubGlobal('fetch', authenticatedFetch(() => response({ error: {
+      code: 'analysis_capacity_reached',
+      message: 'A capacidade temporária de análises foi atingida; tente novamente mais tarde.',
+    } }, false)))
+    window.history.pushState({}, '', '/app/analysis')
+    render(<App />)
+    await userEvent.upload(await screen.findByLabelText('Selecionar arquivo'), new File(['%PDF'], 'normal.pdf'))
+    expect(await screen.findByRole('alert')).toHaveTextContent('A capacidade temporária de análises foi atingida')
+    expect(screen.getByText(/1 arquivos · 0 concluídos · 0 analisando · 0 na fila/i)).toBeInTheDocument()
+    expect(document.querySelector('.activity-spinner')).not.toBeInTheDocument()
+  })
+
   it('mostra processamento indeterminado sem percentual inventado', async () => {
     vi.stubGlobal('fetch', authenticatedFetch((url) => url.endsWith('/analysis-jobs')
       ? response({ job_id: 'pending-job', status: 'QUEUED' })

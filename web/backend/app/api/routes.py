@@ -8,7 +8,7 @@ from uuid import uuid4
 
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile, status
 from pydantic import BaseModel, Field
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.application.analysis_coordinator import AnalysisCancelledError
@@ -31,10 +31,16 @@ from web.backend.app.services import (
     UploadTooLargeError,
     WebAnalysisService,
     AnalysisJobExecutor,
+    analysis_capacity_guard,
+    analysis_capacity_snapshot,
     TERMINAL_JOB_STATUSES,
     AnalysisSetService,
 )
-from web.backend.app.runtime_config import analysis_queue_capacity
+from web.backend.app.runtime_config import (
+    analysis_concurrency,
+    analysis_queue_capacity,
+    job_worker_enabled,
+)
 
 
 LOGGER = logging.getLogger("forensihash.web")
@@ -105,36 +111,56 @@ async def create_analysis_job(
     request_id = str(uuid4())
     require_csrf(request)
     try:
-        outstanding = db.scalar(
-            select(func.count(AnalysisJob.id)).where(
-                AnalysisJob.status.in_(
-                    (AnalysisJobStatus.QUEUED.value, AnalysisJobStatus.PROCESSING.value)
-                )
-            )
-        ) or 0
-        if outstanding >= analysis_queue_capacity():
-            raise _error(
-                status.HTTP_429_TOO_MANY_REQUESTS,
-                "analysis_capacity_reached",
-                "A capacidade temporária de análises foi atingida; tente novamente mais tarde.",
-                request_id,
-            )
+        if job_worker_enabled():
+            start_executor = getattr(executor, "start", None)
+            if callable(start_executor):
+                start_executor()
         selected = RetentionMode.PRIVATE if private_session else RetentionMode(retention_mode or user.privacy.retention_mode)
         if selected is RetentionMode.FILE_AND_RESULT:
             raise ValueError("Retenção de arquivo indisponível.")
         staged = await storage.store(file)
-        analysis_id = str(uuid4())
-        job = AnalysisJob(id=analysis_id, user_id=user.id, status=AnalysisJobStatus.QUEUED.value,
-            original_filename=staged.display_name, retention_mode=selected.value,
-            staging_path=str(staged.path), staging_sha256=staged.sha256,
-            size_bytes=staged.size_bytes, current_stage="QUEUED")
-        try:
-            db.add(job)
-            db.commit()
-            db.refresh(job)
-        except Exception:
-            storage.cleanup(staged.path)
-            raise
+        with analysis_capacity_guard(db):
+            recover = getattr(executor, "recover_abandoned", None)
+            if callable(recover):
+                recover(db, recover_foreign_workers=True)
+            configured_capacity = analysis_queue_capacity()
+            capacity = analysis_capacity_snapshot(db, configured_capacity)
+            if capacity.available_slots == 0:
+                executor_state = getattr(executor, "executor_state", lambda: "unknown")()
+                LOGGER.warning(
+                    "analysis_capacity_reached",
+                    extra={
+                        "request_id": request_id,
+                        "stage": "admission",
+                        "engine": "job_executor",
+                        "status": "rejected",
+                        "configured_capacity": configured_capacity,
+                        "active_jobs": capacity.active_jobs,
+                        "queued_jobs": capacity.queued_jobs,
+                        "running_jobs": capacity.running_jobs,
+                        "concurrency": getattr(executor, "max_concurrency", analysis_concurrency()),
+                        "executor_state": executor_state,
+                    },
+                )
+                storage.cleanup(staged.path)
+                raise _error(
+                    status.HTTP_429_TOO_MANY_REQUESTS,
+                    "analysis_capacity_reached",
+                    "A capacidade temporária de análises foi atingida; tente novamente mais tarde.",
+                    request_id,
+                )
+            analysis_id = str(uuid4())
+            job = AnalysisJob(id=analysis_id, user_id=user.id, status=AnalysisJobStatus.QUEUED.value,
+                original_filename=staged.display_name, retention_mode=selected.value,
+                staging_path=str(staged.path), staging_sha256=staged.sha256,
+                size_bytes=staged.size_bytes, current_stage="QUEUED")
+            try:
+                db.add(job)
+                db.commit()
+                db.refresh(job)
+            except Exception:
+                storage.cleanup(staged.path)
+                raise
         executor.wake()
         LOGGER.info("analysis_job_created", extra={"job_id": job.id, "analysis_id": job.id, "stage": "queued", "engine": "job_executor", "status": job.status, "request_id": request_id, "size_bytes": staged.size_bytes})
         return {
