@@ -1,6 +1,6 @@
-import { useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { ArtifactGraph } from '../components/ArtifactGraph'
+import { DocumentMetadata } from '../components/DocumentMetadata'
 import { EvidenceExplorer } from '../components/EvidenceExplorer'
 import { Section } from '../components/ui'
 import { ddnaReferences } from '../content/ddnaReferences'
@@ -17,19 +17,9 @@ const principles = [
 const sectors = ['Instituições financeiras', 'Seguradoras', 'Jurídico', 'Tecnologia', 'Compliance', 'Auditoria', 'Órgãos públicos', 'Perícia / investigação']
 
 export function HomePage() {
-  useEffect(() => {
-    document.title = 'ARQEN | Infraestrutura para Evidências Digitais'
-    const description = document.querySelector<HTMLMetaElement>('meta[name="description"]')
-    const ogTitle = document.querySelector<HTMLMetaElement>('meta[property="og:title"]')
-    const ogDescription = document.querySelector<HTMLMetaElement>('meta[property="og:description"]')
-    const summary = 'Tecnologia para proveniência, integridade, custódia e análise de artefatos digitais.'
-    if (description) description.content = summary
-    if (ogTitle) ogTitle.content = document.title
-    if (ogDescription) ogDescription.content = summary
-  }, [])
-
   return (
     <>
+      <DocumentMetadata title="ARQEN | Infraestrutura para Evidências Digitais" />
       <section className="arqen-hero">
         <div className="container arqen-hero__grid">
           <div className="arqen-hero__copy">

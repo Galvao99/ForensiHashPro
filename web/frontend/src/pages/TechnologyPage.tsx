@@ -1,4 +1,5 @@
 import { Section } from '../components/ui'
+import { DocumentMetadata } from '../components/DocumentMetadata'
 import { currentTechnologies, roadmapTechnologies } from '../content/technologies'
 
 function TechnologyGrid({ items }: { items: string[][] }) {
@@ -8,6 +9,7 @@ function TechnologyGrid({ items }: { items: string[][] }) {
 export function TechnologyPage() {
   return (
     <>
+      <DocumentMetadata title="Tecnologia | ARQEN" description="Componentes, arquitetura e responsabilidades técnicas dos produtos ARQEN." />
       <Section eyebrow="TECNOLOGIA" title="COMPONENTES REAIS E RESPONSABILIDADES DEFINIDAS"><p className="lead">A plataforma combina um núcleo Python, componentes especializados e ferramentas externas detectadas pelo ambiente. A interface não replica regras de análise.</p></Section>
       <Section className="surface-section" eyebrow="UTILIZADO ATUALMENTE" title="STACK TÉCNICA"><TechnologyGrid items={currentTechnologies} /></Section>
       <Section eyebrow="ROADMAP" title="EM DESENVOLVIMENTO / PLANEJADO"><TechnologyGrid items={roadmapTechnologies} /></Section>

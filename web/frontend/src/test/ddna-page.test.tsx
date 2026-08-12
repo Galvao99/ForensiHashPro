@@ -79,7 +79,7 @@ describe('página institucional DDNA', () => {
 
   it('atualiza SEO da rota e conserva navegação por teclado nativa', async () => {
     renderPage()
-    await waitFor(() => expect(document.title).toBe('DDNA — Cadeia de custódia e integridade de arquivos digitais'))
+    await waitFor(() => expect(document.title).toBe('DDNA | Custódia e Proveniência Digital — ARQEN'))
     const hero = screen.getByRole('heading', { name: /custódia verificável/i }).closest('section')!
     expect(within(hero).getAllByRole('link')).toHaveLength(2)
   })

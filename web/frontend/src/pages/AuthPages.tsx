@@ -2,6 +2,7 @@ import { FormEvent, ReactNode, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { Button, Input } from '../components/ui'
 import { useAuth } from '../context/AuthContext'
+import { DocumentMetadata } from '../components/DocumentMetadata'
 
 export function publicRegistrationEnabled() {
   return import.meta.env.VITE_REGISTRATION_ENABLED?.toLowerCase() !== 'false'
@@ -35,7 +36,7 @@ export function LoginPage() {
   }
 
   return (
-    <AuthFrame title="Entrar">
+    <><DocumentMetadata title="Acessar plataforma | ARQEN" /><AuthFrame title="Entrar">
       <form onSubmit={submit} aria-busy={submitting}>
         <label>E-mail<Input name="email" type="email" autoComplete="email" required /></label>
         <label>Senha<Input name="password" type="password" autoComplete="current-password" required /></label>
@@ -46,7 +47,7 @@ export function LoginPage() {
       {publicRegistrationEnabled()
         ? <p>Não possui conta? <Link to="/register">Criar conta</Link></p>
         : <p>Acesso restrito. Solicite uma conta ao administrador.</p>}
-    </AuthFrame>
+    </AuthFrame></>
   )
 }
 
@@ -58,11 +59,11 @@ export function RegisterPage() {
 
   if (!publicRegistrationEnabled()) {
     return (
-      <AuthFrame title="Acesso restrito">
+      <><DocumentMetadata title="Criar conta | ARQEN" /><AuthFrame title="Acesso restrito">
         <p>O cadastro público está desabilitado neste ambiente.</p>
         <p>Contas são fornecidas pela administração durante o beta interno.</p>
         <p><Link to="/login">Voltar para o login</Link></p>
-      </AuthFrame>
+      </AuthFrame></>
     )
   }
 
@@ -92,7 +93,7 @@ export function RegisterPage() {
   }
 
   return (
-    <AuthFrame title="Criar conta">
+    <><DocumentMetadata title="Criar conta | ARQEN" /><AuthFrame title="Criar conta">
       <form onSubmit={submit} aria-busy={submitting}>
         <label>Nome<Input name="name" autoComplete="name" required /></label>
         <label>E-mail<Input name="email" type="email" autoComplete="email" required /></label>
@@ -105,6 +106,6 @@ export function RegisterPage() {
       {submitting && <p role="status" className="processing-note">{authStage === 'VALIDATING' ? 'VALIDANDO SESSÃO…' : 'ENVIANDO CADASTRO…'}</p>}
       {error && <p role="alert" className="error-panel">{error}</p>}
       <p>Já possui conta? <Link to="/login">Entrar</Link></p>
-    </AuthFrame>
+    </AuthFrame></>
   )
 }

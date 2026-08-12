@@ -1,10 +1,12 @@
 import { Link } from 'react-router-dom'
+import { DocumentMetadata } from '../components/DocumentMetadata'
 import { Section } from '../components/ui'
 import { analysisLayers } from '../content/institutional'
 
 export function ProductPage() {
   return (
     <>
+      <DocumentMetadata title="ForensiHash | Análise de Artefatos Digitais — ARQEN" description="Análise técnica de hashes, metadados, estrutura, assinaturas e outros elementos observáveis em artefatos digitais." />
       <Section eyebrow="PRODUTO" title="FORENSIHASH PRO">
         <p className="lead">Uma plataforma para centralizar verificações que normalmente ficam distribuídas entre ferramentas distintas, mantendo fatos técnicos separados de interpretações e limitações.</p>
         <div className="hero-actions"><Link className="button-link" to="/app/analysis">Iniciar análise</Link></div>
