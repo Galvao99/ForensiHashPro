@@ -151,22 +151,22 @@ describe('resultado técnico', () => {
     const timeline = screen.getByRole('heading', { name: 'Timeline' }).closest('section')!
     expect(within(timeline).getAllByText('CreationDate').length).toBeGreaterThan(0)
     expect(within(timeline).getAllByText('Incremental Update #1').length).toBeGreaterThan(0)
-    expect(within(timeline).getByText('Data não determinada')).toBeInTheDocument()
+    expect(within(timeline).getByText('Eventos sem data determinável')).toBeInTheDocument()
     expect(within(timeline).getAllByText(/Ordem temporal inconsistente/).length).toBeGreaterThan(0)
     await userEvent.selectOptions(within(timeline).getByLabelText('Filtrar por tipo'), 'structural')
-    const eventList = timeline.querySelector<HTMLElement>('.timeline-list')!
-    expect(within(eventList).queryByText('CreationDate')).not.toBeInTheDocument()
-    expect(within(eventList).getAllByText('Incremental Update #1').length).toBeGreaterThan(0)
+    expect(within(timeline).queryByRole('button', { name: /CreationDate/ })).not.toBeInTheDocument()
+    expect(within(timeline).getByRole('button', { name: /Incremental Update #1/ })).toBeInTheDocument()
     await userEvent.click(within(timeline).getAllByText('Ver detalhes')[0])
     expect(within(timeline).getAllByText('warning-1').length).toBeGreaterThan(0)
   })
 
-  it('renderiza a Timeline em viewport mobile sem linha horizontal obrigatória', () => {
+  it('mantém eventos sem data fora do eixo cronológico em viewport mobile', () => {
     Object.defineProperty(window, 'innerWidth', { configurable: true, value: 390 })
     const result = structuredClone(analysisFixture)
     result.timeline = [{ record_type: 'event', event_id: 'm1', title: 'Evento', timestamp: null, temporal_status: 'structural_only', category: 'pdf_structure' }]
     render(<ResultView result={result} />)
-    expect(document.querySelector('.timeline-list')).toBeInTheDocument()
+    expect(document.querySelector('.timeline-axis')).not.toBeInTheDocument()
+    expect(document.querySelector('.undated-events')).toBeInTheDocument()
     expect(document.querySelector('.timeline-view')).toBeInTheDocument()
   })
 
