@@ -28,6 +28,8 @@ Proveniência é apresentada somente a partir de campos reais:
 
 Quando esses campos não existem, a interface não cria uma origem substituta.
 
+Entidades usam o tipo técnico preservado em `Fact.data.type`; `Fact.kind=entity` representa apenas a classe geral. O label amigável não substitui o tipo original. O resumo pode abreviar identificadores pessoais ou de rede, enquanto o detalhamento preserva o valor recebido.
+
 ## Estados semânticos
 
 - Confirmação: fato positivo explicitamente reportado.
@@ -44,6 +46,8 @@ Eventos com timestamp válido usam um eixo horizontal proporcional. A posição 
 Eventos temporalmente próximos mantêm sua coordenada real e recebem apenas lanes verticais diferentes para evitar colisão de labels. Timestamps iguais ocupam exatamente a mesma posição, também em lanes distintas. Um evento temporal isolado é centralizado. O eixo possui largura mínima e rolagem horizontal controlada para preservar legibilidade.
 
 Cada marcador é um botão acessível e abre um painel com o timestamp e a provenance realmente disponível. Eventos com timestamp inválido ou `temporal_status: structural_only` são identificados como **Eventos sem data determinável**, ficam fora do eixo cronológico e nunca recebem uma posição temporal inventada. Warnings e limitações permanecem separados dos eventos.
+
+A página individual usa somente `AnalysisContract.timeline`; a Timeline agregada do Analysis Set não substitui a fonte do artefato. Eventos `category=operational` aparecem em **Execução ForensiHash**, fora da **Timeline do artefato**.
 
 ## Findings e correlações
 
