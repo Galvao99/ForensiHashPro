@@ -19,6 +19,7 @@ export function ResultView({ result, analysisSet }: { result: AnalysisContract; 
 }
 
 const workspaceStatusLabels: Record<WorkspaceAnalysis['status'], string> = {
+  WAITING: 'Aguardando',
   QUEUED: 'Na fila',
   UPLOADING: 'Enviando',
   PROCESSING: 'Analisando',
@@ -38,6 +39,36 @@ function ActivityIcon({ status }: { status: WorkspaceAnalysis['status'] }) {
   if (status === 'SUCCESS') return <Check size={15} aria-hidden="true" />
   if (status === 'FAILED' || status === 'LIMIT_EXCEEDED') return <AlertTriangle size={15} aria-hidden="true" />
   return <Circle size={11} aria-hidden="true" />
+}
+
+function formatBytes(value: number): string {
+  if (value < 1_024) return `${value} B`
+  if (value < 1_048_576) return `${(value / 1_024).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} KB`
+  return `${(value / 1_048_576).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} MB`
+}
+
+function WorkspaceProcessingView({ items, onSelect }: { items: WorkspaceAnalysis[]; onSelect: (analysisId: string) => void }) {
+  const terminal = items.filter((item) => ['SUCCESS', 'PARTIAL', 'FAILED', 'LIMIT_EXCEEDED', 'CANCELLED'].includes(item.status))
+  const active = items.find((item) => ['UPLOADING', 'QUEUED', 'PROCESSING'].includes(item.status))
+  const waiting = items.filter((item) => item.status === 'WAITING')
+  const percent = items.length ? Math.round((terminal.length / items.length) * 100) : 0
+  return <div className="app-page queue-processing-view">
+    <p className="eyebrow">ANÁLISE DO CONJUNTO</p>
+    <h1>Processamento do workspace</h1>
+    <p>{items.length} artefatos · fila local controlada</p>
+    <section className="queue-section" aria-labelledby="queue-progress-title">
+      <div className="queue-section-heading"><h2 id="queue-progress-title">Progresso do conjunto</h2><strong>{percent}%</strong></div>
+      <div className="queue-progress" role="progressbar" aria-valuemin={0} aria-valuemax={items.length} aria-valuenow={terminal.length}><span style={{ width: `${percent}%` }} /></div>
+      <p className="queue-counts"><span>{terminal.length} concluídos</span><span>{active ? 1 : 0} analisando</span><span>{waiting.length} na fila</span></p>
+    </section>
+    {active && <section className="queue-section" aria-labelledby="queue-active-title">
+      <p className="queue-label" id="queue-active-title">Em análise</p>
+      <button className="queue-active-item" type="button" onClick={() => onSelect(active.analysisId)}><span><strong>{active.filename}</strong><small>{formatBytes(active.sizeBytes)}</small></span><span>{workspaceStatusLabels[active.status]}</span></button>
+      <dl className="queue-stage"><div><dt>Etapa atual</dt><dd>{active.currentStage === 'CONSOLIDATING' ? 'Consolidando resultados' : active.currentStage ?? (active.status === 'QUEUED' ? 'Aguardando executor' : active.status === 'UPLOADING' ? 'Preparando upload seguro' : 'Análise técnica em andamento')}</dd></div></dl>
+    </section>}
+    {waiting.length > 0 && <section className="queue-section" aria-labelledby="queue-waiting-title"><p className="queue-label" id="queue-waiting-title">Fila</p><ol className="queue-list">{waiting.map((item, index) => <li key={item.clientUploadId}><button type="button" onClick={() => onSelect(item.analysisId)}><span>{String(index + 1).padStart(2, '0')}</span><strong>{item.filename}</strong><small>{formatBytes(item.sizeBytes)}</small><em>aguardando</em></button></li>)}</ol></section>}
+    {terminal.length > 0 && <section className="queue-section" aria-labelledby="queue-completed-title"><p className="queue-label" id="queue-completed-title">Concluídos</p><ul className="queue-list queue-completed">{terminal.map((item) => <li key={item.clientUploadId}><button type="button" onClick={() => onSelect(item.analysisId)}><span>{item.status === 'SUCCESS' ? '✓' : item.status === 'PARTIAL' ? '△' : '×'}</span><strong>{item.filename}</strong><em>{workspaceStatusLabels[item.status]}</em></button></li>)}</ul></section>}
+  </div>
 }
 
 function elapsed(startedAt?: string): string {
@@ -81,6 +112,7 @@ export function ResultPage() {
     if (item.status === 'SUCCESS' || item.status === 'PARTIAL') counts.completed += 1
     if (item.status === 'PROCESSING' || item.status === 'UPLOADING') counts.processing += 1
     if (item.status === 'QUEUED') counts.queued += 1
+    if (item.status === 'WAITING') counts.queued += 1
     return counts
   }, { completed: 0, processing: 0, queued: 0 })
 
@@ -115,8 +147,10 @@ export function ResultPage() {
 
   if (!active && workspace.analyses.length === 0 && !routed) return <div className="app-page"><h1>Resultado não disponível nesta sessão</h1><Link className="button-link" to="/app/analysis">Iniciar análise</Link></div>
 
+  const workspaceProcessing = workspace.analyses.length > 1 && workspace.analyses.some((item) => item.status === 'WAITING' || isRunning(item))
+
   return <div className="workspace-page">
-    {active?.contract ? <ResultView result={active.contract} analysisSet={analysisSetResult} /> : active ? <PendingAnalysis item={active} onRetry={() => retryAnalysis(active.clientUploadId)} /> : <div className="app-page"><p>Preparando workspace…</p></div>}
+    {workspaceProcessing ? <WorkspaceProcessingView items={workspace.analyses} onSelect={setActiveAnalysis} /> : active?.contract ? <ResultView result={active.contract} analysisSet={analysisSetResult} /> : active ? <PendingAnalysis item={active} onRetry={() => retryAnalysis(active.clientUploadId)} /> : <div className="app-page"><p>Preparando workspace…</p></div>}
     <section className="workspace-dock" aria-label="Workspace de análises">
       <div className="workspace-toolbar"><div className="workspace-summary"><strong>{workspace.label}</strong><small>{workspace.analyses.length} arquivos · {workspaceCounts.completed} concluídos · {workspaceCounts.processing} analisando · {workspaceCounts.queued} na fila</small></div><div><input ref={filesInput} type="file" multiple aria-label="Adicionar arquivos" onChange={enqueue} /><input ref={folderInput} type="file" multiple aria-label="Adicionar pasta" onChange={enqueue} {...directoryAttributes} /><button type="button" onClick={() => filesInput.current?.click()}><FilePlus size={15} />Adicionar arquivos</button><button type="button" onClick={() => folderInput.current?.click()}><FolderPlus size={15} />Adicionar pasta</button><button type="button" onClick={closeAll}>Fechar todas as abas</button></div></div>
       {message && <p role="alert" className="workspace-message">{message}</p>}
