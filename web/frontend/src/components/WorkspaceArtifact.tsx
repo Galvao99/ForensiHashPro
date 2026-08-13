@@ -8,8 +8,8 @@ export function artifactKind(item: WorkspaceAnalysis): string {
   return extension && extension !== item.filename.toUpperCase() ? extension : 'ARQUIVO'
 }
 
-export function ArtifactIcon({ item, size = 18 }: { item: WorkspaceAnalysis; size?: number }) {
-  const kind = artifactKind(item)
+export function ArtifactIcon({ item, filename, detectedType, size = 18 }: { item?: WorkspaceAnalysis; filename?: string; detectedType?: string | null; size?: number }) {
+  const kind = item ? artifactKind(item) : detectedType ?? filename?.split('.').pop()?.toUpperCase() ?? 'ARQUIVO'
   if (['JPG', 'JPEG', 'PNG', 'GIF', 'WEBP', 'IMAGE'].some((value) => kind.includes(value))) return <Image size={size} aria-hidden="true" />
   if (kind.includes('JSON')) return <FileJson size={size} aria-hidden="true" />
   if (kind.includes('PDF') || kind.includes('TEXT') || kind === 'TXT') return <FileText size={size} aria-hidden="true" />

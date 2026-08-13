@@ -6,11 +6,71 @@ import { analysisFixture } from './fixtures'
 import type { AnalysisSetResult } from '../types/api'
 
 describe('resultado técnico', () => {
+  it('apresenta cabeçalho e resumo forense apenas com identificação disponível', () => {
+    const result = structuredClone(analysisFixture)
+    result.file = { name: 'contrato.pdf', size_bytes: 862208, mime_type: 'application/pdf' }
+    result.declared_type = '.pdf'
+    result.detected_type = 'PDF'
+    result.technical_structure = { pdf: { pdf_version: '1.7', page_count: 14, object_count: 183, stream_count: 42, incremental_revision_count: 2 } }
+    render(<ResultView result={result} />)
+    expect(screen.getByRole('heading', { name: 'contrato.pdf' })).toBeInTheDocument()
+    expect(screen.getByText('ANÁLISE CONCLUÍDA')).toBeInTheDocument()
+    const summary = document.querySelector<HTMLElement>('#summary')!
+    expect(within(screen.getByRole('heading', { name: 'contrato.pdf' }).closest('header')!).getByText(/14 páginas/)).toBeInTheDocument()
+    expect(within(summary).getByText('183')).toBeInTheDocument()
+    expect(within(summary).getByText('2')).toBeInTheDocument()
+    expect(within(summary).getByText('application/pdf')).toBeInTheDocument()
+  })
+
+  it('trata ausência de assinatura como informação neutra', () => {
+    render(<ResultView result={analysisFixture} />)
+    const summary = document.querySelector<HTMLElement>('#summary')!
+    expect(within(summary).getByText(/nenhuma assinatura criptográfica incorporada foi encontrada/i)).toBeInTheDocument()
+    expect(within(summary).getAllByLabelText('Informação neutra').length).toBeGreaterThan(0)
+  })
+
+  it('resume assinatura existente sem inferir validade', () => {
+    const result = structuredClone(analysisFixture)
+    result.signatures = [{ signer: 'Autoridade de Teste', integrity: 'valid' }]
+    render(<ResultView result={result} />)
+    expect(screen.getByText(/1 assinatura\(s\) incorporada\(s\) reportada\(s\)/i)).toBeInTheDocument()
+    expect(screen.queryByText(/autoria comprovada|documento autêntico/i)).not.toBeInTheDocument()
+  })
+
+  it('expande finding com regra, evidências e provenance existente', async () => {
+    const result = structuredClone(analysisFixture)
+    result.findings = [{ finding_id: 'f-1', title: 'Datas divergentes', statement: 'Valores temporais distintos foram observados.', severity: 'warning', rule_id: 'metadata_date_rule', evidence_refs: ['fact-metadata-1'], confidence: 0.8 }]
+    render(<ResultView result={result} />)
+    const finding = screen.getByText('Datas divergentes').closest('details')!
+    expect(finding).not.toHaveAttribute('open')
+    await userEvent.click(within(finding).getByText('Datas divergentes'))
+    expect(within(finding).getByText('metadata_date_rule')).toBeInTheDocument()
+    await userEvent.click(within(finding).getByRole('button', { name: /evidence refs/i }))
+    expect(within(finding).getByText('fact-metadata-1')).toBeInTheDocument()
+  })
+
+  it('omite valores opcionais ausentes sem inventar páginas, versão ou autoria', () => {
+    render(<ResultView result={analysisFixture} />)
+    const header = screen.getByRole('heading', { name: 'synthetic.txt' }).closest('header')!
+    expect(within(header).queryByText(/páginas|PDF 1\.|autor/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/fraude detectada|documento falso|arquivo adulterado|autoria comprovada/i)).not.toBeInTheDocument()
+  })
+
+  it('apresenta entidades somente quando reportadas pelo contrato', () => {
+    const result = structuredClone(analysisFixture)
+    result.ip_addresses = [{ ip: '192.0.2.10', source: 'native_text' }]
+    result.facts = [{ fact_id: 'entity-1', kind: 'email_entity', source: 'entity_extraction', data: { value: 'perito@example.test' } }]
+    render(<ResultView result={result} />)
+    const summary = document.querySelector<HTMLElement>('#summary')!
+    expect(within(summary).getByText(/IP · 192.0.2.10/)).toBeInTheDocument()
+    expect(within(summary).getAllByText('email_entity').length).toBeGreaterThan(0)
+  })
+
   it('formata hashes e copia o valor integral sem recalculá-lo', async () => {
     const writeText = vi.fn()
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } })
     render(<ResultView result={analysisFixture} />)
-    const hashes = document.querySelector<HTMLElement>('#hashes')!
+    const hashes = document.querySelector<HTMLElement>('#identification')!
     expect(within(hashes).getByRole('columnheader', { name: 'Algoritmo' })).toBeInTheDocument()
     expect(within(hashes).getByText('abc123')).toBeInTheDocument()
     expect(within(hashes).getByText('def456')).toBeInTheDocument()

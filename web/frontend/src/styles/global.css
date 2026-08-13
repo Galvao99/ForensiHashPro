@@ -324,12 +324,50 @@ p { color: var(--color-text-secondary); line-height: 1.7; }
 .timeline-warnings { margin-bottom: 1rem; }
 .timeline-warnings article { padding: .8rem 1rem; border-left: 3px solid #d6a13d; background: color-mix(in srgb, #d6a13d 10%, transparent); }
 .timeline-limitations { margin-top: 1rem; }
+.artifact-result-header { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: .8rem 1rem; align-items: center; padding: 1.15rem 0 1.35rem; border-bottom: 1px solid var(--color-border); }
+.artifact-result-identity { min-width: 0; }
+.artifact-result-identity h1 { margin: .15rem 0; overflow-wrap: anywhere; }
+.artifact-result-identity p:last-child { margin: 0; color: var(--color-text-secondary); font-family: var(--font-mono); font-size: .75rem; }
+.artifact-analysis-state { align-self: start; border: 1px solid var(--color-border); padding: .35rem .55rem; font: 600 .67rem/1 var(--font-mono); letter-spacing: .04em; }
+.artifact-analysis-state.completed { color: var(--color-success); border-color: color-mix(in srgb, var(--color-success) 45%, var(--color-border)); }
+.artifact-analysis-state.partial { color: #b68025; }
+.artifact-primary-hash { grid-column: 2 / -1; min-width: 0; display: grid; grid-template-columns: 5rem minmax(0, 1fr); gap: .7rem; align-items: center; }
+.artifact-primary-hash > span { color: var(--color-text-secondary); font: .68rem var(--font-mono); }
+.artifact-primary-hash .technical-value { min-width: 0; overflow-wrap: anywhere; }
+.forensic-summary { margin: 1.25rem 0 2rem; }
+.forensic-summary > header { display: grid; grid-template-columns: 1fr auto; align-items: end; gap: .15rem 1rem; margin-bottom: .85rem; }
+.forensic-summary > header .eyebrow { grid-column: 1 / -1; }
+.forensic-summary > header h2, .technical-layer-heading h2 { margin: 0; }
+.forensic-summary > header p:last-child, .technical-layer-heading p:last-child { margin: 0; color: var(--color-text-secondary); font-size: .83rem; }
+.forensic-summary-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-top: 1px solid var(--color-border); border-left: 1px solid var(--color-border); }
+.forensic-summary-card { min-width: 0; padding: 1rem; border-right: 1px solid var(--color-border); border-bottom: 1px solid var(--color-border); background: var(--surface-elevated); }
+.forensic-summary-card h3 { margin: 0 0 .8rem; font-size: .9rem; }
+.forensic-metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem 1rem; margin: 0; }
+.forensic-metrics div { min-width: 0; }
+.forensic-metrics dt { color: var(--color-text-secondary); font: .67rem var(--font-mono); text-transform: uppercase; }
+.forensic-metrics dd { margin: .2rem 0 0; overflow-wrap: anywhere; font-size: .86rem; }
+.forensic-neutral, .forensic-confirmed { display: flex; align-items: center; gap: .5rem; margin: 0; color: var(--color-text-secondary); font-size: .84rem; }
+.forensic-confirmed { color: var(--color-success); }
+.entity-summary-list { display: grid; gap: .45rem; }
+.entity-summary-list details { border-top: 1px solid var(--color-border); padding-top: .45rem; }
+.technical-layer-heading { margin: 2rem 0 1rem; padding-top: 1rem; border-top: 1px solid var(--color-border); }
+.expandable-finding { padding: 0; }
+.expandable-finding > summary { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: .65rem; align-items: center; padding: 1rem; cursor: pointer; }
+.expandable-finding > summary::-webkit-details-marker { display: none; }
+.expandable-finding > p, .expandable-finding > .key-value-grid, .expandable-finding > .technical-tree { margin-left: 1rem; margin-right: 1rem; }
+.timeline-group-title { margin: 1rem 0 .75rem; color: var(--color-text-secondary); font: 600 .72rem var(--font-mono); letter-spacing: .04em; text-transform: uppercase; }
+.structural-events article { border-style: dashed; }
 @media (max-width: 640px) {
   .timeline-filters { display: grid; grid-template-columns: 1fr; }
   .timeline-filters label { min-width: 0; }
   .timeline-list { padding-left: 0; }
   .timeline-list > li { grid-template-columns: 1.2rem minmax(0, 1fr); }
   .timeline-list > li::before { left: .5rem; }
+  .artifact-result-header { grid-template-columns: auto minmax(0, 1fr); }
+  .artifact-analysis-state { grid-column: 1 / -1; }
+  .artifact-primary-hash { grid-column: 1 / -1; grid-template-columns: 1fr; }
+  .forensic-summary > header { grid-template-columns: 1fr; }
+  .forensic-summary-grid, .forensic-metrics { grid-template-columns: 1fr; }
 }
 .archive-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border: 1px solid var(--color-border); }
 .archive-summary > div { display: grid; gap: .35rem; padding: 1rem; border-right: 1px solid var(--color-border); }
