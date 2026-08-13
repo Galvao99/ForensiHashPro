@@ -122,7 +122,12 @@ export function BiometricResultView({ biometrics }: { biometrics: Record<string,
 
 export function FactsResultView({ facts }: { facts: Array<Record<string, unknown>> }) {
   if (!facts.length) return <EmptyState>Nenhum fato técnico foi reportado.</EmptyState>
-  return <div className="technical-card-list">{facts.map((fact, index) => <article className="technical-card" key={String(fact.fact_id ?? index)}><h3>Fato técnico: {label(String(fact.kind ?? index + 1))}</h3><KeyValueGrid value={fact} /></article>)}</div>
+  return <div className="technical-card-list">{facts.map((fact, index) => {
+    const data = fact.data && typeof fact.data === 'object' ? fact.data as Record<string, unknown> : null
+    const entityType = fact.kind === 'entity' ? String(data?.type ?? '') : ''
+    const title = entityType ? ({ cpf: 'CPF', phone: 'Telefone', ip: 'Endereço IP', email: 'E-mail', datetime: 'Data', money: 'Valor' }[entityType] ?? label(entityType)) : label(String(fact.kind ?? index + 1))
+    return <article className="technical-card" key={String(fact.fact_id ?? index)}><h3>Fato técnico: {title}</h3><KeyValueGrid value={fact} /></article>
+  })}</div>
 }
 
 export function FindingsResultView({ findings }: { findings: Array<Record<string, unknown>> }) {
@@ -149,10 +154,10 @@ export function CorrelationResultView({ result }: { result: AnalysisSetResult })
   return <div className="technical-card-list">{findings.map((finding) => <article className="technical-card finding-card" key={finding.finding_id}><header><h3>{finding.summary}</h3><span className="technical-state">{finding.severity}</span></header><p>{finding.description}</p><details className="technical-details"><summary>Ver detalhes</summary><ul>{finding.evidence.map((item, index) => <li key={`${String(item.evidence_ref ?? item.filename ?? index)}-${index}`}><strong>{String(item.filename ?? item.evidence_ref ?? 'Evidência')}</strong>{item.page ? ` · página ${String(item.page)}` : ''}{item.context ? ` · ${String(item.context)}` : ''}</li>)}</ul><KeyValueGrid value={{ category: finding.category, rule_id: finding.rule_id, source_engine: finding.source_engine, confidence: finding.confidence, evidence: finding.evidence, entities: finding.entities, limitations: finding.limitations, metadata: finding.metadata }} /></details></article>)}</div>
 }
 
-export function TimelineResultView({ timeline, aggregate }: { timeline: AnalysisContract['timeline']; aggregate?: AnalysisSetResult['timeline_result'] }) {
-  const records = aggregate?.events ?? (timeline ?? []).filter((item) => item.record_type === 'event' || item.record_type === undefined)
-  const warnings = aggregate?.warnings ?? (timeline ?? []).filter((item) => item.record_type === 'warning')
-  const limitations = aggregate?.limitations ?? (timeline ?? []).filter((item) => item.record_type === 'limitation').map((item) => String(item.message ?? '')).filter(Boolean)
+export function TimelineResultView({ timeline }: { timeline: AnalysisContract['timeline']; aggregate?: AnalysisSetResult['timeline_result'] }) {
+  const records = (timeline ?? []).filter((item) => item.record_type === 'event' || item.record_type === undefined)
+  const warnings = (timeline ?? []).filter((item) => item.record_type === 'warning')
+  const limitations = (timeline ?? []).filter((item) => item.record_type === 'limitation').map((item) => String(item.message ?? '')).filter(Boolean)
   const [file, setFile] = useState('all')
   const [category, setCategory] = useState('all')
   const [kind, setKind] = useState('all')
@@ -164,7 +169,11 @@ export function TimelineResultView({ timeline, aggregate }: { timeline: Analysis
       && (category === 'all' || item.category === category)
       && (kind === 'all' || (kind === 'structural' ? structural : !structural))
   })
-  if (!records.length && !warnings.length) return <EmptyState>Nenhum evento temporal ou estrutural foi reportado.</EmptyState>
+  const artifactRecords = records.filter((item) => item.category !== 'operational')
+  const artifactVisible = visible.filter((item) => item.category !== 'operational')
+  const operationalRecords = records.filter((item) => item.category === 'operational')
+  const operationalVisible = visible.filter((item) => item.category === 'operational')
+  if (!records.length && !warnings.length) return <EmptyState>Nenhum evento temporal foi identificado neste artefato.</EmptyState>
   return <div className="timeline-view">
     <div className="timeline-filters" aria-label="Filtros da Timeline">
       <label>Arquivo<select aria-label="Filtrar por arquivo" value={file} onChange={(event) => setFile(event.target.value)}><option value="all">Todos</option>{files.map((name) => <option key={name}>{name}</option>)}</select></label>
@@ -172,7 +181,8 @@ export function TimelineResultView({ timeline, aggregate }: { timeline: Analysis
       <label>Tipo<select aria-label="Filtrar por tipo" value={kind} onChange={(event) => setKind(event.target.value)}><option value="all">Todos</option><option value="temporal">Temporal</option><option value="structural">Estrutural</option></select></label>
     </div>
     {warnings.length > 0 && <section className="timeline-warnings" aria-label="Warnings da Timeline"><h3>Warnings técnicos</h3>{warnings.map((warning, index) => <article key={String(warning.warning_id ?? index)}><strong>⚠ {String(warning.title ?? 'Warning temporal')}</strong><p>{String(warning.description ?? '')}</p><details><summary>Ver detalhes</summary><KeyValueGrid value={warning} /></details></article>)}</section>}
-    <EvidenceTimeline visibleEvents={visible} scaleEvents={records} />
+    <EvidenceTimeline visibleEvents={artifactVisible} scaleEvents={artifactRecords} heading="Timeline do artefato" />
+    {operationalVisible.length > 0 && <section className="operational-timeline" aria-label="Execução ForensiHash"><EvidenceTimeline visibleEvents={operationalVisible} scaleEvents={operationalRecords} heading="Execução ForensiHash" /></section>}
     {!visible.length && <EmptyState>Nenhum evento corresponde aos filtros selecionados.</EmptyState>}
     {limitations.length ? <div className="timeline-limitations"><h3>Limitações</h3><ul>{limitations.map((item) => <li key={item}>{item}</li>)}</ul></div> : null}
   </div>

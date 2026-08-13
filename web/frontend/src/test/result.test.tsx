@@ -59,11 +59,12 @@ describe('resultado técnico', () => {
   it('apresenta entidades somente quando reportadas pelo contrato', () => {
     const result = structuredClone(analysisFixture)
     result.ip_addresses = [{ ip: '192.0.2.10', source: 'native_text' }]
-    result.facts = [{ fact_id: 'entity-1', kind: 'email_entity', source: 'entity_extraction', data: { value: 'perito@example.test' } }]
+    result.facts = [{ fact_id: 'entity-1', kind: 'entity', source: 'entity_resolver_v2', data: { type: 'email', normalized_value: 'perito@example.test', provenance: [{ source_type: 'native_text', evidence_ref: 'evidence-test' }] } }]
     render(<ResultView result={result} />)
     const summary = document.querySelector<HTMLElement>('#summary')!
-    expect(within(summary).getByText(/IP · 192.0.2.10/)).toBeInTheDocument()
-    expect(within(summary).getAllByText('email_entity').length).toBeGreaterThan(0)
+    expect(within(summary).getByText('192.xxx.xxx.10')).toBeInTheDocument()
+    expect(within(summary).getAllByText('E-mail').length).toBeGreaterThan(0)
+    expect(within(summary).queryByText(/^entity$/i)).not.toBeInTheDocument()
   })
 
   it('formata hashes e copia o valor integral sem recalculá-lo', async () => {

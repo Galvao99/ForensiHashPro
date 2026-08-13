@@ -1,6 +1,7 @@
 import { AlertTriangle, Check, Circle, FileWarning } from 'lucide-react'
+import { useEffect } from 'react'
 import { ArtifactIcon, formatArtifactBytes } from './WorkspaceArtifact'
-import { KeyValueGrid } from './ResultPresentation'
+import { EntityResultView, entitiesFromResult } from './EntityPresentation'
 import { TechnicalValue } from './ui'
 import type { AnalysisContract } from '../types/api'
 
@@ -82,11 +83,33 @@ export function SignatureSummary({ signatures }: { signatures: Array<Record<stri
 }
 
 export function EntitySummary({ result }: { result: AnalysisContract }) {
-  const entityFacts = result.facts.filter((fact) => /entit|cpf|cnpj|phone|email|address|date|value/i.test(String(fact.kind ?? '')))
-  const count = (result.ip_addresses?.length ?? 0) + entityFacts.length
-  return <section className="forensic-summary-card" aria-labelledby="entity-summary-title"><h3 id="entity-summary-title">Entidades</h3>{count ? <div className="entity-summary-list">{result.ip_addresses?.map((item, index) => <details key={String(item.ip ?? item.value ?? index)}><summary>IP · {String(item.ip ?? item.value ?? 'valor reportado')}</summary><KeyValueGrid value={item} /></details>)}{entityFacts.map((fact, index) => <details key={String(fact.fact_id ?? index)}><summary>{String(fact.kind ?? 'Entidade')}</summary><KeyValueGrid value={fact} /></details>)}</div> : <p className="forensic-neutral"><SemanticMark tone="neutral" /> Nenhuma entidade foi reportada no contrato.</p>}</section>
+  const count = entitiesFromResult(result).length
+  return <section className="forensic-summary-card" aria-labelledby="entity-summary-title"><h3 id="entity-summary-title">Entidades</h3>{count ? <EntityResultView result={result} compact /> : <p className="forensic-neutral"><SemanticMark tone="neutral" /> Nenhuma entidade foi identificada neste artefato.</p>}</section>
 }
 
 export function ForensicSummary({ result }: { result: AnalysisContract }) {
+  useEffect(() => {
+    const navigation = document.querySelector<HTMLElement>('.result-nav')
+    if (!navigation) return
+    navigation.style.display = 'flex'
+    navigation.style.flexWrap = 'nowrap'
+    navigation.style.overflowX = 'auto'
+    const links = Array.from(navigation.querySelectorAll<HTMLAnchorElement>('a[href^="#"]'))
+    const activate = (link: HTMLAnchorElement) => {
+      links.forEach((item) => item.removeAttribute('aria-current'))
+      link.setAttribute('aria-current', 'location')
+      link.scrollIntoView?.({ block: 'nearest', inline: 'nearest' })
+    }
+    const onClick = (event: Event) => activate(event.currentTarget as HTMLAnchorElement)
+    links.forEach((link) => link.addEventListener('click', onClick))
+    if (links[0]) activate(links[0])
+    const observer = typeof IntersectionObserver === 'undefined' ? null : new IntersectionObserver((entries) => {
+      const visible = entries.filter((entry) => entry.isIntersecting).sort((left, right) => right.intersectionRatio - left.intersectionRatio)[0]
+      const link = visible && links.find((item) => item.hash === `#${visible.target.id}`)
+      if (link) activate(link)
+    }, { rootMargin: '-15% 0px -70%', threshold: [0, .25, .5] })
+    links.forEach((link) => { const section = document.querySelector(link.hash); if (section) observer?.observe(section) })
+    return () => { links.forEach((link) => link.removeEventListener('click', onClick)); observer?.disconnect() }
+  }, [])
   return <section id="summary" className="forensic-summary" aria-labelledby="forensic-summary-title"><header><p className="eyebrow">CAMADA 1</p><h2 id="forensic-summary-title">Resumo forense</h2><p>Leitura sintética de fatos disponibilizados pelo AnalysisContract.</p></header><div className="forensic-summary-grid"><IdentificationSummary result={result} /><StructureSummary result={result} /><MetadataSummary metadata={result.metadata} /><SignatureSummary signatures={result.signatures} /><EntitySummary result={result} /></div></section>
 }

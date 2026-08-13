@@ -56,7 +56,7 @@ function EventDetails({ event, onClose }: { event: TimelineRecord; onClose?: () 
   </aside>
 }
 
-export function EvidenceTimeline({ visibleEvents, scaleEvents }: { visibleEvents: TimelineRecord[]; scaleEvents: TimelineRecord[] }) {
+export function EvidenceTimeline({ visibleEvents, scaleEvents, heading = 'Eventos com data conhecida' }: { visibleEvents: TimelineRecord[]; scaleEvents: TimelineRecord[]; heading?: string }) {
   const [selected, setSelected] = useState<TimelineRecord | null>(null)
   const positioned = useMemo(() => positionTimelineEvents(visibleEvents, scaleEvents), [visibleEvents, scaleEvents])
   const undated = visibleEvents.filter((event) => timestampMilliseconds(event) === null)
@@ -67,7 +67,7 @@ export function EvidenceTimeline({ visibleEvents, scaleEvents }: { visibleEvents
 
   return <div className="evidence-timeline">
     {positioned.length > 0 && <section aria-labelledby="dated-events-title">
-      <h3 id="dated-events-title" className="timeline-group-title">Eventos com data conhecida</h3>
+      <h3 id="dated-events-title" className="timeline-group-title">{heading}</h3>
       <div className="timeline-range" aria-label="Intervalo temporal"><time>{earliest ? eventTimestamp(earliest) : ''}</time><span aria-hidden="true" /><time>{latest ? eventTimestamp(latest) : ''}</time></div>
       <div className="timeline-scroll" tabIndex={0} aria-label="Linha cronológica; use rolagem horizontal quando necessário">
         <div className="timeline-axis" style={{ '--timeline-lanes': laneCount } as CSSProperties}>
