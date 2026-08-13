@@ -1,5 +1,6 @@
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { ApiError, createAnalysisJob, createAnalysisSet, getAnalysisJob, getAnalysisJobResult } from '../lib/api'
+import { analysisDiagnostic, nextProviderInstanceId, nextSubmissionAttemptId } from '../lib/analysisDiagnostics'
 import type { AnalysisContract, AnalysisSetResult, AnalysisSummary } from '../types/api'
 
 export const ANALYSIS_CONCURRENCY = 2
@@ -131,6 +132,7 @@ function resultStatus(result: AnalysisContract): WorkspaceAnalysisStatus {
 }
 
 export function AnalysisSessionProvider({ children, initialResults = [] }: { children: ReactNode; initialResults?: AnalysisContract[] }) {
+  const [providerInstanceId] = useState(nextProviderInstanceId)
   const [analyses, setAnalyses] = useState<SessionEntry[]>(() => initialResults.map((result) => ({ result, summary: summarizeAnalysis(result), persisted: false })))
   const [internalWorkspace, setInternalWorkspace] = useState<InternalWorkspace>(() => ({
     workspaceId: localId('workspace'),
@@ -143,6 +145,7 @@ export function AnalysisSessionProvider({ children, initialResults = [] }: { chi
   const workspaceRef = useRef(internalWorkspace)
   const running = useRef(new Set<string>())
   const submissionClaims = useRef(new Set<string>())
+  const submittedUploadIds = useRef(new Set<string>())
   const dismissed = useRef(new Set<string>())
   const polling = useRef(new Map<string, { controller: AbortController; timer?: number }>())
 
@@ -160,10 +163,14 @@ export function AnalysisSessionProvider({ children, initialResults = [] }: { chi
   }, [])
 
   const pollJob = useCallback((clientUploadId: string, jobId: string, persisted: boolean) => {
-    if (polling.current.has(jobId)) return
+    if (polling.current.has(jobId)) {
+      analysisDiagnostic('submit.blocked', { providerInstanceId, clientUploadId, jobId, source: 'pollJob', reason: 'poller-already-active' })
+      return
+    }
     const controller = new AbortController()
     const state = { controller, timer: undefined as number | undefined }
     polling.current.set(jobId, state)
+    analysisDiagnostic('poller.created', { providerInstanceId, clientUploadId, jobId, source: 'AnalysisSessionContext', reason: 'job-created' })
     const poll = async () => {
       try {
         const job = await getAnalysisJob(jobId, controller.signal)
@@ -190,10 +197,12 @@ export function AnalysisSessionProvider({ children, initialResults = [] }: { chi
             }
           })
           polling.current.delete(jobId)
+          analysisDiagnostic('poller.disposed', { providerInstanceId, clientUploadId, jobId, source: 'pollJob', reason: 'result-received' })
           return
         }
         if (['FAILED', 'LIMIT_EXCEEDED', 'CANCELLED'].includes(job.status)) {
           polling.current.delete(jobId)
+          analysisDiagnostic('poller.disposed', { providerInstanceId, clientUploadId, jobId, source: 'pollJob', reason: 'terminal-status' })
           return
         }
         state.timer = window.setTimeout(poll, JOB_POLL_INTERVAL_MS)
@@ -211,36 +220,63 @@ export function AnalysisSessionProvider({ children, initialResults = [] }: { chi
           error: error instanceof ApiError ? error.message : 'Não foi possível acompanhar a análise.',
         } : candidate) }))
         polling.current.delete(jobId)
+        analysisDiagnostic('poller.disposed', { providerInstanceId, clientUploadId, jobId, source: 'pollJob', reason: 'poll-failed' })
       }
     }
     void poll()
-  }, [storeResult, updateWorkspace])
+  }, [providerInstanceId, storeResult, updateWorkspace])
 
-  const runAnalysis = useCallback(async (item: InternalWorkspaceAnalysis) => {
-    if (item.submissionState !== 'SELECTED' || item.jobId || submissionClaims.current.has(item.clientUploadId)) return
-    submissionClaims.current.add(item.clientUploadId)
-    running.current.add(item.clientUploadId)
+  const submitUpload = useCallback(async (clientUploadId: string, source: string, reason: string) => {
+    const item = workspaceRef.current.analyses.find((candidate) => candidate.clientUploadId === clientUploadId)
+    const submissionAttemptId = nextSubmissionAttemptId()
+    analysisDiagnostic('submit.attempt', {
+      providerInstanceId, submissionAttemptId, clientUploadId, filename: item?.filename,
+      currentState: item?.submissionState ?? 'MISSING', jobId: item?.jobId ?? null, source, reason,
+    })
+    if (!item || item.submissionState !== 'SELECTED' || item.jobId || submissionClaims.current.has(clientUploadId) || submittedUploadIds.current.has(clientUploadId)) {
+      analysisDiagnostic('submit.blocked', {
+        providerInstanceId, submissionAttemptId, clientUploadId, filename: item?.filename,
+        currentState: item?.submissionState ?? 'MISSING', jobId: item?.jobId ?? null, source,
+        reason: !item ? 'upload-missing' : item.jobId ? 'job-already-exists' : submittedUploadIds.current.has(clientUploadId) ? 'upload-already-submitted' : 'submission-not-selected-or-claimed',
+      })
+      return
+    }
+    submissionClaims.current.add(clientUploadId)
+    submittedUploadIds.current.add(clientUploadId)
+    running.current.add(clientUploadId)
+    analysisDiagnostic('submit.claimed', {
+      providerInstanceId, submissionAttemptId, clientUploadId, filename: item.filename,
+      currentState: item.submissionState, jobId: null, source, reason,
+    })
     updateWorkspace((current) => ({
       ...current,
-      analyses: current.analyses.map((candidate) => candidate.clientUploadId === item.clientUploadId && candidate.submissionState === 'SELECTED' && !candidate.jobId
+      analyses: current.analyses.map((candidate) => candidate.clientUploadId === clientUploadId && candidate.submissionState === 'SELECTED' && !candidate.jobId
         ? { ...candidate, status: 'UPLOADING', submissionState: 'SUBMITTING' }
         : candidate),
     }))
+    analysisDiagnostic('upload.transition', {
+      providerInstanceId, submissionAttemptId, clientUploadId, filename: item.filename,
+      currentState: 'SUBMITTING', jobId: null, source, reason: 'submit-claimed',
+    })
     try {
       const created = await createAnalysisJob(item.file, {
         retentionMode: item.request.retentionMode, privateSession: item.request.privateSession, csrfToken: item.request.csrfToken,
       })
-      if (!dismissed.current.has(item.clientUploadId)) {
-        updateWorkspace((current) => ({ ...current, analyses: current.analyses.map((candidate) => candidate.clientUploadId === item.clientUploadId ? {
+      if (!dismissed.current.has(clientUploadId)) {
+        updateWorkspace((current) => ({ ...current, analyses: current.analyses.map((candidate) => candidate.clientUploadId === clientUploadId ? {
           ...candidate, jobId: created.job_id, status: created.status, submissionState: 'SUBMITTED',
         } : candidate) }))
-        pollJob(item.clientUploadId, created.job_id, item.persisted)
+        analysisDiagnostic('job.created', {
+          providerInstanceId, submissionAttemptId, clientUploadId, filename: item.filename,
+          currentState: 'SUBMITTED', jobId: created.job_id, source, reason: 'analysis-job-accepted',
+        })
+        pollJob(clientUploadId, created.job_id, item.persisted)
       }
     } catch (error) {
-      if (!dismissed.current.has(item.clientUploadId)) {
+      if (!dismissed.current.has(clientUploadId)) {
         updateWorkspace((current) => ({
           ...current,
-          analyses: current.analyses.map((candidate) => candidate.clientUploadId === item.clientUploadId ? {
+          analyses: current.analyses.map((candidate) => candidate.clientUploadId === clientUploadId ? {
             ...candidate,
             status: error instanceof ApiError && error.code === 'file_too_large' ? 'LIMIT_EXCEEDED' : 'FAILED',
             submissionState: 'FAILED',
@@ -250,20 +286,24 @@ export function AnalysisSessionProvider({ children, initialResults = [] }: { chi
         }))
       }
     } finally {
-      running.current.delete(item.clientUploadId)
-      submissionClaims.current.delete(item.clientUploadId)
-      dismissed.current.delete(item.clientUploadId)
+      running.current.delete(clientUploadId)
+      submissionClaims.current.delete(clientUploadId)
+      dismissed.current.delete(clientUploadId)
       updateWorkspace((current) => ({ ...current }))
     }
-  }, [pollJob, updateWorkspace])
+  }, [pollJob, providerInstanceId, updateWorkspace])
 
-  useEffect(() => () => {
+  useEffect(() => {
+    analysisDiagnostic('provider.mounted', { providerInstanceId, source: 'AnalysisSessionProvider', reason: 'react-mount' })
+    return () => {
+      analysisDiagnostic('provider.unmounted', { providerInstanceId, source: 'AnalysisSessionProvider', reason: 'react-unmount' })
     polling.current.forEach(({ controller, timer }) => {
       controller.abort()
       if (timer !== undefined) window.clearTimeout(timer)
     })
     polling.current.clear()
-  }, [])
+    }
+  }, [providerInstanceId])
 
   useEffect(() => {
     const available = ANALYSIS_CONCURRENCY - running.current.size
@@ -271,8 +311,8 @@ export function AnalysisSessionProvider({ children, initialResults = [] }: { chi
     const next = internalWorkspace.analyses
       .filter((item) => item.submissionState === 'SELECTED' && !item.jobId && !running.current.has(item.clientUploadId))
       .slice(0, available)
-    next.forEach((item) => { void runAnalysis(item) })
-  }, [internalWorkspace, runAnalysis])
+    next.forEach((item) => { void submitUpload(item.clientUploadId, 'AnalysisSessionContext.queueEffect', 'selected-upload-available') })
+  }, [internalWorkspace, submitUpload])
 
   useEffect(() => {
     const items = internalWorkspace.analyses
@@ -341,6 +381,10 @@ export function AnalysisSessionProvider({ children, initialResults = [] }: { chi
         request: options,
         submissionState: 'SELECTED',
       })
+      analysisDiagnostic('upload.created', {
+        providerInstanceId, clientUploadId: accepted.at(-1)!.clientUploadId, filename: file.name,
+        currentState: 'SELECTED', jobId: null, source: 'enqueueFiles', reason: 'user-selected-file',
+      })
     }
     if (accepted.length) {
       setAnalysisSetResult(null)
@@ -357,7 +401,7 @@ export function AnalysisSessionProvider({ children, initialResults = [] }: { chi
       ? `Foram recusados ${rejected} arquivo(s) por caminho relativo inseguro ou pelo limite de ${MAX_WORKSPACE_FILES} abas.`
       : undefined
     return { accepted: accepted.length, rejected, message }
-  }, [updateWorkspace])
+  }, [providerInstanceId, updateWorkspace])
 
   const setActiveAnalysis = useCallback((analysisId: string) => {
     updateWorkspace((current) => current.analyses.some((item) => item.analysisId === analysisId) ? { ...current, activeAnalysisId: analysisId } : current)
@@ -385,13 +429,18 @@ export function AnalysisSessionProvider({ children, initialResults = [] }: { chi
   }, [updateWorkspace])
 
   const retryAnalysis = useCallback((clientUploadId: string) => {
+    submittedUploadIds.current.delete(clientUploadId)
     updateWorkspace((current) => ({
       ...current,
       analyses: current.analyses.map((item) => item.clientUploadId === clientUploadId && item.submissionState === 'FAILED'
         ? { ...item, jobId: undefined, status: 'QUEUED', submissionState: 'SELECTED', error: undefined, errorCode: undefined }
         : item),
     }))
-  }, [updateWorkspace])
+    analysisDiagnostic('upload.transition', {
+      providerInstanceId, clientUploadId, currentState: 'SELECTED', jobId: null,
+      source: 'retryAnalysis', reason: 'manual-retry',
+    })
+  }, [providerInstanceId, updateWorkspace])
 
   const closeAllAnalyses = useCallback(() => {
     const current = workspaceRef.current.analyses

@@ -98,12 +98,23 @@ services:
       - key: VITE_REGISTRATION_ENABLED
         value: "false"
 
+      - key: VITE_ANALYSIS_DIAGNOSTICS
+        value: "true"
+
     routes:
       - type: rewrite
         source: /*
         destination: /index.html
 
     headers:
+      - path: /index.html
+        name: Cache-Control
+        value: no-cache
+
+      - path: /assets/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable
+
       - path: /*
         name: X-Content-Type-Options
         value: nosniff
