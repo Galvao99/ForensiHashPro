@@ -35,6 +35,7 @@ from app.processing import (
     StepResult,
 )
 from app.services.export_service import ExportService
+from app.services.timeline_service import TimelineService
 from app.workers.analysis_worker import AnalysisWorker
 from app.entities import EntitySource, EntitySourceType, EntityType, NormalizedEntity
 
@@ -157,6 +158,35 @@ def test_resolved_entity_is_exposed_as_traceable_fact_without_internal_path() ->
     assert entity_fact.data["provenance"][0]["page"] == 4
     assert entity_fact.data["provenance"][0]["evidence_ref"] == contract.evidence_id
     assert "C:/private" not in serialized
+
+
+def test_signature_collection_only_contains_an_identified_signature() -> None:
+    result = _legacy_result()
+    assert LegacyAnalysisAdapter().convert(result).signatures == []
+
+
+def test_metadata_dates_reach_serialized_analysis_contract_timeline() -> None:
+    result = _legacy_result()
+    result.metadata = MetadataResult({
+        "PDF:CreateDate": "2023-08-16T14:30:00",
+        "PDF:ModifyDate": "2025-02-14T09:17:00",
+    })
+    timeline = TimelineService().build(result)
+    result.timeline_events = timeline.events
+    result.timeline_warnings = timeline.warnings
+    result.timeline_limitations = timeline.limitations
+
+    contract = LegacyAnalysisAdapter().convert(result)
+    payload = json.loads(AnalysisContractJson.dumps(contract))
+    artifact_events = [
+        item for item in payload["timeline"]
+        if item.get("category") == "metadata"
+    ]
+
+    assert [item["title"] for item in artifact_events] == ["CreateDate", "ModifyDate"]
+    assert [item["timestamp"] for item in artifact_events] == [
+        "2023-08-16T14:30:00", "2025-02-14T09:17:00"
+    ]
 
 
 def test_contract_round_trip_preserves_sections_and_external_results() -> None:

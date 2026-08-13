@@ -129,7 +129,11 @@ class LegacyAnalysisAdapter:
             },
             native_text=text_payload if text_source.startswith("native") else None,
             ocr=text_payload if text_source == "ocr" else None,
-            signatures=[_plain(result.digital_signature)],
+            signatures=(
+                [_plain(result.digital_signature)]
+                if result.digital_signature.has_signature is True
+                else []
+            ),
             ip_addresses=None,
             timeline=(
                 [
