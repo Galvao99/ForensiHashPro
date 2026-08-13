@@ -46,7 +46,7 @@ function elapsed(startedAt?: string): string {
   return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`
 }
 
-function PendingAnalysis({ item }: { item: WorkspaceAnalysis }) {
+function PendingAnalysis({ item, onRetry }: { item: WorkspaceAnalysis; onRetry: () => void }) {
   const [, tick] = useState(0)
   useEffect(() => {
     if (item.status !== 'PROCESSING') return
@@ -54,14 +54,14 @@ function PendingAnalysis({ item }: { item: WorkspaceAnalysis }) {
     return () => window.clearInterval(timer)
   }, [item.status])
   const busy = isRunning(item)
-  return <div className="app-page workspace-pending" aria-live="polite" aria-busy={busy}><p className="eyebrow">ANÁLISE EM ANDAMENTO</p><h1>{item.filename}</h1>{item.relativePath && <p><TechnicalValue>{item.relativePath}</TechnicalValue></p>}<div className="processing-indicator"><ActivityIcon status={item.status} /><strong>{workspaceStatusLabels[item.status]}</strong></div><dl className="processing-facts"><div><dt>Etapa atual</dt><dd>{item.currentStage === 'CONSOLIDATING' ? 'Consolidando resultados' : item.status === 'QUEUED' ? 'Aguardando executor' : item.status === 'UPLOADING' ? 'Preparando upload seguro' : 'Análise técnica em andamento'}</dd></div><div><dt>Status</dt><dd>{item.status}</dd></div><div><dt>Tempo decorrido</dt><dd>{item.status === 'PROCESSING' ? elapsed(item.startedAt) : '00:00'}</dd></div></dl>{item.error ? <p role="alert" className="error-panel">{item.error}</p> : <p>O restante do workspace permanece disponível durante o processamento.</p>}</div>
+  return <div className="app-page workspace-pending" aria-live="polite" aria-busy={busy}><p className="eyebrow">ANÁLISE EM ANDAMENTO</p><h1>{item.filename}</h1>{item.relativePath && <p><TechnicalValue>{item.relativePath}</TechnicalValue></p>}<div className="processing-indicator"><ActivityIcon status={item.status} /><strong>{workspaceStatusLabels[item.status]}</strong></div><dl className="processing-facts"><div><dt>Etapa atual</dt><dd>{item.currentStage === 'CONSOLIDATING' ? 'Consolidando resultados' : item.status === 'QUEUED' ? 'Aguardando executor' : item.status === 'UPLOADING' ? 'Preparando upload seguro' : 'Análise técnica em andamento'}</dd></div><div><dt>Status</dt><dd>{item.status}</dd></div><div><dt>Tempo decorrido</dt><dd>{item.status === 'PROCESSING' ? elapsed(item.startedAt) : '00:00'}</dd></div></dl>{item.error ? <><p role="alert" className="error-panel">{item.error}</p>{(item.status === 'FAILED' || item.status === 'LIMIT_EXCEEDED') && <button type="button" onClick={onRetry}>Tentar novamente</button>}</> : <p>O restante do workspace permanece disponível durante o processamento.</p>}</div>
 }
 
 export function ResultPage() {
   const location = useLocation()
   const { analysisId } = useParams()
   const { privacy, csrfToken } = useAuth()
-  const { workspace, analysisSetResult, getAnalysis, isPersisted, openAnalysis, enqueueFiles, setActiveAnalysis, closeAnalysis, closeAllAnalyses } = useAnalysisSession()
+  const { workspace, analysisSetResult, getAnalysis, isPersisted, openAnalysis, enqueueFiles, retryAnalysis, setActiveAnalysis, closeAnalysis, closeAllAnalyses } = useAnalysisSession()
   const [message, setMessage] = useState('')
   const filesInput = useRef<HTMLInputElement>(null)
   const folderInput = useRef<HTMLInputElement>(null)
@@ -116,12 +116,12 @@ export function ResultPage() {
   if (!active && workspace.analyses.length === 0 && !routed) return <div className="app-page"><h1>Resultado não disponível nesta sessão</h1><Link className="button-link" to="/app/analysis">Iniciar análise</Link></div>
 
   return <div className="workspace-page">
-    {active?.contract ? <ResultView result={active.contract} analysisSet={analysisSetResult} /> : active ? <PendingAnalysis item={active} /> : <div className="app-page"><p>Preparando workspace…</p></div>}
+    {active?.contract ? <ResultView result={active.contract} analysisSet={analysisSetResult} /> : active ? <PendingAnalysis item={active} onRetry={() => retryAnalysis(active.clientUploadId)} /> : <div className="app-page"><p>Preparando workspace…</p></div>}
     <section className="workspace-dock" aria-label="Workspace de análises">
       <div className="workspace-toolbar"><div className="workspace-summary"><strong>{workspace.label}</strong><small>{workspace.analyses.length} arquivos · {workspaceCounts.completed} concluídos · {workspaceCounts.processing} analisando · {workspaceCounts.queued} na fila</small></div><div><input ref={filesInput} type="file" multiple aria-label="Adicionar arquivos" onChange={enqueue} /><input ref={folderInput} type="file" multiple aria-label="Adicionar pasta" onChange={enqueue} {...directoryAttributes} /><button type="button" onClick={() => filesInput.current?.click()}><FilePlus size={15} />Adicionar arquivos</button><button type="button" onClick={() => folderInput.current?.click()}><FolderPlus size={15} />Adicionar pasta</button><button type="button" onClick={closeAll}>Fechar todas as abas</button></div></div>
       {message && <p role="alert" className="workspace-message">{message}</p>}
       <div className="workspace-tabs" role="tablist" aria-label="Análises abertas">
-        {workspace.analyses.map((item) => <div key={item.analysisId} role="tab" tabIndex={0} aria-selected={item.analysisId === workspace.activeAnalysisId} className={`workspace-tab ${item.analysisId === workspace.activeAnalysisId ? 'active' : ''}`} onClick={() => setActiveAnalysis(item.analysisId)} onKeyDown={(event) => tabKeyboard(event, item)}><ActivityIcon status={item.status} /><span className="workspace-tab-name" title={item.relativePath ?? item.filename}>{item.filename}</span><small className={`workspace-tab-status state-${item.status.toLowerCase()}`}>{workspaceStatusLabels[item.status]}</small><button type="button" aria-label={`Fechar análise de ${item.filename}`} onClick={(event) => { event.stopPropagation(); close(item) }}><X size={13} /></button></div>)}
+        {workspace.analyses.map((item) => <div key={item.clientUploadId} role="tab" tabIndex={0} aria-selected={item.analysisId === workspace.activeAnalysisId} className={`workspace-tab ${item.analysisId === workspace.activeAnalysisId ? 'active' : ''}`} onClick={() => setActiveAnalysis(item.analysisId)} onKeyDown={(event) => tabKeyboard(event, item)}><ActivityIcon status={item.status} /><span className="workspace-tab-name" title={item.relativePath ?? item.filename}>{item.filename}</span><small className={`workspace-tab-status state-${item.status.toLowerCase()}`}>{workspaceStatusLabels[item.status]}</small><button type="button" aria-label={`Fechar análise de ${item.filename}`} onClick={(event) => { event.stopPropagation(); close(item) }}><X size={13} /></button></div>)}
       </div>
     </section>
   </div>

@@ -17,6 +17,7 @@ export type WorkspaceAnalysisStatus =
   | 'CANCELLED'
 
 export interface WorkspaceAnalysis {
+  clientUploadId: string
   analysisId: string
   jobId?: string
   filename: string
@@ -52,6 +53,7 @@ interface EnqueueOptions {
 interface InternalWorkspaceAnalysis extends WorkspaceAnalysis {
   file: File
   request: EnqueueOptions
+  submissionState: 'SELECTED' | 'SUBMITTING' | 'SUBMITTED' | 'FAILED'
 }
 
 interface InternalWorkspace extends Omit<AnalysisWorkspace, 'analyses'> {
@@ -69,6 +71,7 @@ interface AnalysisSessionValue {
   setActiveAnalysis: (analysisId: string) => void
   closeAnalysis: (analysisId: string) => void
   closeAllAnalyses: () => void
+  retryAnalysis: (clientUploadId: string) => void
   getAnalysis: (analysisId: string) => AnalysisContract | undefined
   isPersisted: (analysisId: string) => boolean
 }
@@ -136,9 +139,10 @@ export function AnalysisSessionProvider({ children, initialResults = [] }: { chi
     activeAnalysisId: null,
   }))
   const [analysisSetResult, setAnalysisSetResult] = useState<AnalysisSetResult | null>(null)
-  const correlatedWorkspace = useRef<string | null>(null)
+  const attemptedAnalysisSets = useRef(new Set<string>())
   const workspaceRef = useRef(internalWorkspace)
   const running = useRef(new Set<string>())
+  const submissionClaims = useRef(new Set<string>())
   const dismissed = useRef(new Set<string>())
   const polling = useRef(new Map<string, { controller: AbortController; timer?: number }>())
 
@@ -155,88 +159,100 @@ export function AnalysisSessionProvider({ children, initialResults = [] }: { chi
     setAnalyses((current) => [entry, ...current.filter(({ summary }) => summary.analysisId !== result.analysis_id)])
   }, [])
 
-  const pollJob = useCallback((localAnalysisId: string, jobId: string, persisted: boolean) => {
+  const pollJob = useCallback((clientUploadId: string, jobId: string, persisted: boolean) => {
+    if (polling.current.has(jobId)) return
     const controller = new AbortController()
     const state = { controller, timer: undefined as number | undefined }
-    polling.current.set(localAnalysisId, state)
+    polling.current.set(jobId, state)
     const poll = async () => {
       try {
         const job = await getAnalysisJob(jobId, controller.signal)
-        if (dismissed.current.has(localAnalysisId)) return
-        updateWorkspace((current) => ({ ...current, analyses: current.analyses.map((candidate) => candidate.analysisId === localAnalysisId ? {
+        if (dismissed.current.has(clientUploadId)) return
+        updateWorkspace((current) => ({ ...current, analyses: current.analyses.map((candidate) => candidate.clientUploadId === clientUploadId && candidate.jobId === jobId ? {
           ...candidate, status: job.status, currentStage: job.current_stage ?? undefined,
           startedAt: job.started_at ?? candidate.startedAt, error: job.safe_error_message ?? undefined,
           errorCode: job.error_code ?? undefined,
+          submissionState: ['FAILED', 'LIMIT_EXCEEDED', 'CANCELLED'].includes(job.status) ? 'FAILED' : candidate.submissionState,
         } : candidate) }))
         if (job.status === 'SUCCESS' || job.status === 'PARTIAL') {
           const result = await getAnalysisJobResult(jobId, controller.signal)
           storeResult(result, persisted)
-          updateWorkspace((current) => ({
-            ...current,
-            activeAnalysisId: current.activeAnalysisId === localAnalysisId ? result.analysis_id : current.activeAnalysisId,
-            analyses: current.analyses.map((candidate) => candidate.analysisId === localAnalysisId ? {
-              ...candidate, analysisId: result.analysis_id, filename: asString(result.file.name) ?? candidate.filename,
-              status: resultStatus(result), contract: result,
-            } : candidate),
-          }))
-          polling.current.delete(localAnalysisId)
+          updateWorkspace((current) => {
+            const target = current.analyses.find((candidate) => candidate.clientUploadId === clientUploadId && candidate.jobId === jobId)
+            if (!target) return current
+            return {
+              ...current,
+              activeAnalysisId: current.activeAnalysisId === target.analysisId ? result.analysis_id : current.activeAnalysisId,
+              analyses: current.analyses.map((candidate) => candidate.clientUploadId === clientUploadId && candidate.jobId === jobId ? {
+                ...candidate, analysisId: result.analysis_id, filename: asString(result.file.name) ?? candidate.filename,
+                status: resultStatus(result), contract: result,
+              } : candidate),
+            }
+          })
+          polling.current.delete(jobId)
           return
         }
         if (['FAILED', 'LIMIT_EXCEEDED', 'CANCELLED'].includes(job.status)) {
-          polling.current.delete(localAnalysisId)
+          polling.current.delete(jobId)
           return
         }
         state.timer = window.setTimeout(poll, JOB_POLL_INTERVAL_MS)
       } catch (error) {
-        if (controller.signal.aborted || dismissed.current.has(localAnalysisId)) return
+        if (controller.signal.aborted || dismissed.current.has(clientUploadId)) return
         if (error instanceof ApiError && (error.code === 'network_error' || error.code === 'request_timeout')) {
-          updateWorkspace((current) => ({ ...current, analyses: current.analyses.map((candidate) => candidate.analysisId === localAnalysisId ? {
+          updateWorkspace((current) => ({ ...current, analyses: current.analyses.map((candidate) => candidate.clientUploadId === clientUploadId && candidate.jobId === jobId ? {
             ...candidate, errorCode: 'status_unavailable', error: 'Não foi possível atualizar o status; uma nova tentativa será feita.',
           } : candidate) }))
           state.timer = window.setTimeout(poll, JOB_POLL_INTERVAL_MS)
           return
         }
-        updateWorkspace((current) => ({ ...current, analyses: current.analyses.map((candidate) => candidate.analysisId === localAnalysisId ? {
-          ...candidate, status: 'FAILED', errorCode: error instanceof ApiError ? error.code : 'status_unavailable',
+        updateWorkspace((current) => ({ ...current, analyses: current.analyses.map((candidate) => candidate.clientUploadId === clientUploadId && candidate.jobId === jobId ? {
+          ...candidate, status: 'FAILED', submissionState: 'FAILED', errorCode: error instanceof ApiError ? error.code : 'status_unavailable',
           error: error instanceof ApiError ? error.message : 'Não foi possível acompanhar a análise.',
         } : candidate) }))
-        polling.current.delete(localAnalysisId)
+        polling.current.delete(jobId)
       }
     }
     void poll()
   }, [storeResult, updateWorkspace])
 
   const runAnalysis = useCallback(async (item: InternalWorkspaceAnalysis) => {
-    running.current.add(item.analysisId)
+    if (item.submissionState !== 'SELECTED' || item.jobId || submissionClaims.current.has(item.clientUploadId)) return
+    submissionClaims.current.add(item.clientUploadId)
+    running.current.add(item.clientUploadId)
     updateWorkspace((current) => ({
       ...current,
-      analyses: current.analyses.map((candidate) => candidate.analysisId === item.analysisId ? { ...candidate, status: 'UPLOADING' } : candidate),
+      analyses: current.analyses.map((candidate) => candidate.clientUploadId === item.clientUploadId && candidate.submissionState === 'SELECTED' && !candidate.jobId
+        ? { ...candidate, status: 'UPLOADING', submissionState: 'SUBMITTING' }
+        : candidate),
     }))
     try {
       const created = await createAnalysisJob(item.file, {
         retentionMode: item.request.retentionMode, privateSession: item.request.privateSession, csrfToken: item.request.csrfToken,
       })
-      if (!dismissed.current.has(item.analysisId)) {
-        updateWorkspace((current) => ({ ...current, analyses: current.analyses.map((candidate) => candidate.analysisId === item.analysisId ? {
-          ...candidate, jobId: created.job_id, status: created.status,
+      if (!dismissed.current.has(item.clientUploadId)) {
+        updateWorkspace((current) => ({ ...current, analyses: current.analyses.map((candidate) => candidate.clientUploadId === item.clientUploadId ? {
+          ...candidate, jobId: created.job_id, status: created.status, submissionState: 'SUBMITTED',
         } : candidate) }))
-        pollJob(item.analysisId, created.job_id, item.persisted)
+        pollJob(item.clientUploadId, created.job_id, item.persisted)
       }
     } catch (error) {
-      if (!dismissed.current.has(item.analysisId)) {
+      if (!dismissed.current.has(item.clientUploadId)) {
         updateWorkspace((current) => ({
           ...current,
-          analyses: current.analyses.map((candidate) => candidate.analysisId === item.analysisId ? {
+          analyses: current.analyses.map((candidate) => candidate.clientUploadId === item.clientUploadId ? {
             ...candidate,
             status: error instanceof ApiError && error.code === 'file_too_large' ? 'LIMIT_EXCEEDED' : 'FAILED',
+            submissionState: 'FAILED',
             errorCode: error instanceof ApiError ? error.code : 'analysis_failed',
             error: error instanceof ApiError ? error.message : 'Não foi possível concluir a análise.',
           } : candidate),
         }))
       }
     } finally {
-      running.current.delete(item.analysisId)
-      dismissed.current.delete(item.analysisId)
+      running.current.delete(item.clientUploadId)
+      submissionClaims.current.delete(item.clientUploadId)
+      dismissed.current.delete(item.clientUploadId)
       updateWorkspace((current) => ({ ...current }))
     }
   }, [pollJob, updateWorkspace])
@@ -253,7 +269,7 @@ export function AnalysisSessionProvider({ children, initialResults = [] }: { chi
     const available = ANALYSIS_CONCURRENCY - running.current.size
     if (available <= 0) return
     const next = internalWorkspace.analyses
-      .filter((item) => item.status === 'QUEUED' && !running.current.has(item.analysisId))
+      .filter((item) => item.submissionState === 'SELECTED' && !item.jobId && !running.current.has(item.clientUploadId))
       .slice(0, available)
     next.forEach((item) => { void runAnalysis(item) })
   }, [internalWorkspace, runAnalysis])
@@ -261,9 +277,11 @@ export function AnalysisSessionProvider({ children, initialResults = [] }: { chi
   useEffect(() => {
     const items = internalWorkspace.analyses
     const terminal = new Set<WorkspaceAnalysisStatus>(['SUCCESS', 'PARTIAL', 'FAILED', 'LIMIT_EXCEEDED', 'CANCELLED'])
-    if (!items.length || correlatedWorkspace.current === internalWorkspace.workspaceId) return
+    if (!items.length) return
     if (!items.every((item) => item.jobId && terminal.has(item.status))) return
-    correlatedWorkspace.current = internalWorkspace.workspaceId
+    const attemptKey = items.map((item) => item.jobId).sort().join(':')
+    if (attemptedAnalysisSets.current.has(attemptKey)) return
+    attemptedAnalysisSets.current.add(attemptKey)
     const csrfToken = items.find((item) => item.request.csrfToken)?.request.csrfToken
     void createAnalysisSet(items.map((item) => item.jobId!), csrfToken)
       .then((result) => {
@@ -271,9 +289,7 @@ export function AnalysisSessionProvider({ children, initialResults = [] }: { chi
           setAnalysisSetResult(result)
         }
       })
-      .catch(() => {
-        correlatedWorkspace.current = null
-      })
+      .catch(() => undefined)
   }, [internalWorkspace])
 
   const addAnalysis = useCallback((result: AnalysisContract, options?: { persisted?: boolean; openInWorkspace?: boolean }) => {
@@ -282,6 +298,7 @@ export function AnalysisSessionProvider({ children, initialResults = [] }: { chi
     if (options?.openInWorkspace === false) return
     updateWorkspace((current) => {
       const item: InternalWorkspaceAnalysis = {
+        clientUploadId: localId('restored'),
         analysisId: result.analysis_id,
         filename: asString(result.file.name) ?? 'Evidência sem nome',
         status: resultStatus(result),
@@ -289,6 +306,7 @@ export function AnalysisSessionProvider({ children, initialResults = [] }: { chi
         persisted,
         file: new File([], asString(result.file.name) ?? 'evidence'),
         request: { privateSession: !persisted },
+        submissionState: 'SUBMITTED',
       }
       return {
         ...current,
@@ -313,6 +331,7 @@ export function AnalysisSessionProvider({ children, initialResults = [] }: { chi
         continue
       }
       accepted.push({
+        clientUploadId: localId('upload'),
         analysisId: localId('queued'),
         filename: file.name,
         relativePath,
@@ -320,11 +339,11 @@ export function AnalysisSessionProvider({ children, initialResults = [] }: { chi
         persisted: !options.privateSession && options.retentionMode === 'RESULT_ONLY',
         file,
         request: options,
+        submissionState: 'SELECTED',
       })
     }
     if (accepted.length) {
       setAnalysisSetResult(null)
-      correlatedWorkspace.current = null
       const folder = accepted[0].relativePath?.split('/')[0]
       const sharedFolder = folder && accepted.every((item) => item.relativePath?.startsWith(`${folder}/`)) ? folder : undefined
       updateWorkspace((current) => ({
@@ -347,11 +366,11 @@ export function AnalysisSessionProvider({ children, initialResults = [] }: { chi
   const closeAnalysis = useCallback((analysisId: string) => {
     const closing = workspaceRef.current.analyses.find((item) => item.analysisId === analysisId)
     if (!closing) return
-    const activePoll = polling.current.get(analysisId)
+    const activePoll = closing.jobId ? polling.current.get(closing.jobId) : undefined
     activePoll?.controller.abort()
     if (activePoll?.timer !== undefined) window.clearTimeout(activePoll.timer)
-    polling.current.delete(analysisId)
-    if (running.current.has(analysisId)) dismissed.current.add(analysisId)
+    if (closing.jobId) polling.current.delete(closing.jobId)
+    if (running.current.has(closing.clientUploadId)) dismissed.current.add(closing.clientUploadId)
     if (!closing.persisted && closing.contract) {
       setAnalyses((current) => current.filter(({ summary }) => summary.analysisId !== closing.contract?.analysis_id))
     }
@@ -365,11 +384,20 @@ export function AnalysisSessionProvider({ children, initialResults = [] }: { chi
     })
   }, [updateWorkspace])
 
+  const retryAnalysis = useCallback((clientUploadId: string) => {
+    updateWorkspace((current) => ({
+      ...current,
+      analyses: current.analyses.map((item) => item.clientUploadId === clientUploadId && item.submissionState === 'FAILED'
+        ? { ...item, jobId: undefined, status: 'QUEUED', submissionState: 'SELECTED', error: undefined, errorCode: undefined }
+        : item),
+    }))
+  }, [updateWorkspace])
+
   const closeAllAnalyses = useCallback(() => {
     const current = workspaceRef.current.analyses
     polling.current.forEach(({ controller, timer }) => { controller.abort(); if (timer !== undefined) window.clearTimeout(timer) })
     polling.current.clear()
-    current.forEach((item) => { if (running.current.has(item.analysisId)) dismissed.current.add(item.analysisId) })
+    current.forEach((item) => { if (running.current.has(item.clientUploadId)) dismissed.current.add(item.clientUploadId) })
     const privateIds = new Set(current.filter((item) => !item.persisted && item.contract).map((item) => item.contract!.analysis_id))
     setAnalyses((entries) => entries.filter(({ summary }) => !privateIds.has(summary.analysisId)))
     updateWorkspace((workspace) => ({ ...workspace, analyses: [], activeAnalysisId: null, label: 'Análises abertas' }))
@@ -380,6 +408,7 @@ export function AnalysisSessionProvider({ children, initialResults = [] }: { chi
     label: internalWorkspace.label,
     activeAnalysisId: internalWorkspace.activeAnalysisId,
     analyses: internalWorkspace.analyses.map((item) => ({
+      clientUploadId: item.clientUploadId,
       analysisId: item.analysisId,
       jobId: item.jobId,
       filename: item.filename,
@@ -405,13 +434,14 @@ export function AnalysisSessionProvider({ children, initialResults = [] }: { chi
     setActiveAnalysis,
     closeAnalysis,
     closeAllAnalyses,
+    retryAnalysis,
     getAnalysis(analysisId) {
       return analyses.find(({ summary }) => summary.analysisId === analysisId)?.result
     },
     isPersisted(analysisId) {
       return analyses.find(({ summary }) => summary.analysisId === analysisId)?.persisted ?? false
     },
-  }), [addAnalysis, analyses, analysisSetResult, closeAllAnalyses, closeAnalysis, enqueueFiles, openAnalysis, setActiveAnalysis, workspace])
+  }), [addAnalysis, analyses, analysisSetResult, closeAllAnalyses, closeAnalysis, enqueueFiles, openAnalysis, retryAnalysis, setActiveAnalysis, workspace])
 
   return <AnalysisSessionContext.Provider value={value}>{children}</AnalysisSessionContext.Provider>
 }
