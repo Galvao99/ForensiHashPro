@@ -2,6 +2,7 @@ import { ChangeEvent, KeyboardEvent, useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useParams } from 'react-router-dom'
 import { AlertTriangle, Check, Circle, FilePlus, FolderPlus, LoaderCircle, X } from 'lucide-react'
 import { TechnicalValue } from '../components/ui'
+import { ArtifactIcon, artifactDuration, artifactKind, formatArtifactBytes } from '../components/WorkspaceArtifact'
 import {
   ArchiveResultView, BiometricResultView, CorrelationResultView, ExecutionResultView, FactsResultView, FindingsResultView,
   HashResultView, LimitationsResultView, MetadataResultView, OverviewResultView,
@@ -41,33 +42,32 @@ function ActivityIcon({ status }: { status: WorkspaceAnalysis['status'] }) {
   return <Circle size={11} aria-hidden="true" />
 }
 
-function formatBytes(value: number): string {
-  if (value < 1_024) return `${value} B`
-  if (value < 1_048_576) return `${(value / 1_024).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} KB`
-  return `${(value / 1_048_576).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} MB`
-}
-
 function WorkspaceProcessingView({ items, onSelect }: { items: WorkspaceAnalysis[]; onSelect: (analysisId: string) => void }) {
+  const [, tick] = useState(0)
   const terminal = items.filter((item) => ['SUCCESS', 'PARTIAL', 'FAILED', 'LIMIT_EXCEEDED', 'CANCELLED'].includes(item.status))
   const active = items.find((item) => ['UPLOADING', 'QUEUED', 'PROCESSING'].includes(item.status))
   const waiting = items.filter((item) => item.status === 'WAITING')
   const percent = items.length ? Math.round((terminal.length / items.length) * 100) : 0
+  useEffect(() => {
+    if (active?.status !== 'PROCESSING') return
+    const timer = window.setInterval(() => tick((value) => value + 1), 1_000)
+    return () => window.clearInterval(timer)
+  }, [active?.status])
   return <div className="app-page queue-processing-view">
-    <p className="eyebrow">ANÁLISE DO CONJUNTO</p>
-    <h1>Processamento do workspace</h1>
-    <p>{items.length} artefatos · fila local controlada</p>
+    <p className="eyebrow">ANÁLISE EM ANDAMENTO</p>
+    <h1>Processamento do workspace</h1><p>{items.length} artefatos · fila serial controlada</p>
     <section className="queue-section" aria-labelledby="queue-progress-title">
       <div className="queue-section-heading"><h2 id="queue-progress-title">Progresso do conjunto</h2><strong>{percent}%</strong></div>
       <div className="queue-progress" role="progressbar" aria-valuemin={0} aria-valuemax={items.length} aria-valuenow={terminal.length}><span style={{ width: `${percent}%` }} /></div>
       <p className="queue-counts"><span>{terminal.length} concluídos</span><span>{active ? 1 : 0} analisando</span><span>{waiting.length} na fila</span></p>
     </section>
     {active && <section className="queue-section" aria-labelledby="queue-active-title">
-      <p className="queue-label" id="queue-active-title">Em análise</p>
-      <button className="queue-active-item" type="button" onClick={() => onSelect(active.analysisId)}><span><strong>{active.filename}</strong><small>{formatBytes(active.sizeBytes)}</small></span><span>{workspaceStatusLabels[active.status]}</span></button>
-      <dl className="queue-stage"><div><dt>Etapa atual</dt><dd>{active.currentStage === 'CONSOLIDATING' ? 'Consolidando resultados' : active.currentStage ?? (active.status === 'QUEUED' ? 'Aguardando executor' : active.status === 'UPLOADING' ? 'Preparando upload seguro' : 'Análise técnica em andamento')}</dd></div></dl>
+      <p className="queue-label" id="queue-active-title">Analisando agora</p>
+      <button className="queue-active-item" type="button" onClick={() => onSelect(active.analysisId)}><ArtifactIcon item={active} size={22} /><span><strong>{active.filename}</strong><small>{artifactKind(active)} · {formatArtifactBytes(active.sizeBytes)}</small></span><em>{workspaceStatusLabels[active.status]}</em></button>
+      <dl className="queue-stage"><div><dt>Etapa atual</dt><dd>{active.currentStage === 'CONSOLIDATING' ? 'CONSOLIDANDO RESULTADOS' : active.currentStage ?? (active.status === 'QUEUED' ? 'AGUARDANDO EXECUTOR' : active.status === 'UPLOADING' ? 'PREPARANDO UPLOAD SEGURO' : 'ANÁLISE TÉCNICA EM ANDAMENTO')}</dd></div><div><dt>Tempo decorrido</dt><dd>{active.status === 'PROCESSING' ? elapsed(active.startedAt) : '00:00'}</dd></div></dl>
     </section>}
-    {waiting.length > 0 && <section className="queue-section" aria-labelledby="queue-waiting-title"><p className="queue-label" id="queue-waiting-title">Fila</p><ol className="queue-list">{waiting.map((item, index) => <li key={item.clientUploadId}><button type="button" onClick={() => onSelect(item.analysisId)}><span>{String(index + 1).padStart(2, '0')}</span><strong>{item.filename}</strong><small>{formatBytes(item.sizeBytes)}</small><em>aguardando</em></button></li>)}</ol></section>}
-    {terminal.length > 0 && <section className="queue-section" aria-labelledby="queue-completed-title"><p className="queue-label" id="queue-completed-title">Concluídos</p><ul className="queue-list queue-completed">{terminal.map((item) => <li key={item.clientUploadId}><button type="button" onClick={() => onSelect(item.analysisId)}><span>{item.status === 'SUCCESS' ? '✓' : item.status === 'PARTIAL' ? '△' : '×'}</span><strong>{item.filename}</strong><em>{workspaceStatusLabels[item.status]}</em></button></li>)}</ul></section>}
+    {waiting.length > 0 && <section className="queue-section" aria-labelledby="queue-waiting-title"><p className="queue-label" id="queue-waiting-title">Na fila</p><ol className="queue-list">{waiting.map((item, index) => <li key={item.clientUploadId}><button type="button" onClick={() => onSelect(item.analysisId)}><span>{String(index + 1).padStart(2, '0')}</span><ArtifactIcon item={item} /><strong>{item.filename}</strong><small>{artifactKind(item)} · {formatArtifactBytes(item.sizeBytes)}</small><em>aguardando</em></button></li>)}</ol></section>}
+    {terminal.length > 0 && <section className="queue-section" aria-labelledby="queue-completed-title"><p className="queue-label" id="queue-completed-title">Concluídos</p><ul className="queue-list queue-completed">{terminal.map((item) => <li key={item.clientUploadId}><button type="button" onClick={() => onSelect(item.analysisId)}><span>{item.status === 'SUCCESS' ? '✓' : item.status === 'PARTIAL' ? '△' : '×'}</span><ArtifactIcon item={item} /><strong>{item.filename}</strong><small>{artifactDuration(item)}</small><em>{workspaceStatusLabels[item.status]}</em></button></li>)}</ul></section>}
   </div>
 }
 

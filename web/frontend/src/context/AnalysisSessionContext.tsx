@@ -5,7 +5,14 @@ import type { AnalysisContract, AnalysisSetResult, AnalysisSummary } from '../ty
 
 export const MAX_ACTIVE_ANALYSES = 1
 export const MAX_WORKSPACE_FILES = 50
-export const JOB_POLL_INTERVAL_MS = 2_500
+export const PROCESSING_POLL_INTERVAL_MS = 2_500
+export const QUEUED_POLL_INTERVAL_MS = 4_000
+
+export function pollIntervalForStatus(status: WorkspaceAnalysisStatus): number | null {
+  if (status === 'QUEUED') return QUEUED_POLL_INTERVAL_MS
+  if (status === 'PROCESSING') return PROCESSING_POLL_INTERVAL_MS
+  return null
+}
 
 export type WorkspaceAnalysisStatus =
   | 'WAITING'
@@ -207,14 +214,15 @@ export function AnalysisSessionProvider({ children, initialResults = [] }: { chi
           analysisDiagnostic('poller.disposed', { providerInstanceId, clientUploadId, jobId, source: 'pollJob', reason: 'terminal-status' })
           return
         }
-        state.timer = window.setTimeout(poll, JOB_POLL_INTERVAL_MS)
+        const nextInterval = pollIntervalForStatus(job.status)
+        if (nextInterval !== null) state.timer = window.setTimeout(poll, nextInterval)
       } catch (error) {
         if (controller.signal.aborted || dismissed.current.has(clientUploadId)) return
         if (error instanceof ApiError && (error.code === 'network_error' || error.code === 'request_timeout')) {
           updateWorkspace((current) => ({ ...current, analyses: current.analyses.map((candidate) => candidate.clientUploadId === clientUploadId && candidate.jobId === jobId ? {
             ...candidate, errorCode: 'status_unavailable', error: 'Não foi possível atualizar o status; uma nova tentativa será feita.',
           } : candidate) }))
-          state.timer = window.setTimeout(poll, JOB_POLL_INTERVAL_MS)
+          state.timer = window.setTimeout(poll, PROCESSING_POLL_INTERVAL_MS)
           return
         }
         updateWorkspace((current) => ({ ...current, analyses: current.analyses.map((candidate) => candidate.clientUploadId === clientUploadId && candidate.jobId === jobId ? {

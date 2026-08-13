@@ -129,7 +129,7 @@ describe('workspace de análises individuais', () => {
     await userEvent.upload(await screen.findByLabelText('Selecionar pasta'), files)
 
     expect(await screen.findByRole('heading', { name: 'Processamento do workspace' })).toBeInTheDocument()
-    expect(screen.getByText('3 artefatos · fila local controlada')).toBeInTheDocument()
+    expect(screen.getByText('3 artefatos · fila serial controlada')).toBeInTheDocument()
     expect(screen.getByText('1 analisando')).toBeInTheDocument()
     expect(screen.getByText('2 na fila')).toBeInTheDocument()
     expect(screen.getAllByText('aguardando')).toHaveLength(2)

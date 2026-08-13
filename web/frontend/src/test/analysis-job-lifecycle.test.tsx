@@ -2,7 +2,7 @@ import { ReactNode, StrictMode } from 'react'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
-import { AnalysisSessionProvider, useAnalysisSession } from '../context/AnalysisSessionContext'
+import { AnalysisSessionProvider, PROCESSING_POLL_INTERVAL_MS, QUEUED_POLL_INTERVAL_MS, pollIntervalForStatus, useAnalysisSession } from '../context/AnalysisSessionContext'
 import type { AnalysisContract, AnalysisSetResult } from '../types/api'
 import { analysisFixture } from './fixtures'
 
@@ -78,6 +78,12 @@ function posts(mock: ReturnType<typeof vi.fn>, suffix: string) {
 }
 
 describe('lifecycle idempotente de AnalysisJob e Analysis Set', () => {
+  it('usa polling adaptativo e encerra agendamento em estados terminais', () => {
+    expect(pollIntervalForStatus('QUEUED')).toBe(QUEUED_POLL_INTERVAL_MS)
+    expect(pollIntervalForStatus('PROCESSING')).toBe(PROCESSING_POLL_INTERVAL_MS)
+    expect(pollIntervalForStatus('SUCCESS')).toBeNull()
+    expect(pollIntervalForStatus('FAILED')).toBeNull()
+  })
   it('um arquivo mantém uma entrada e um POST através de StrictMode, rerender e queued → processing → success', async () => {
     const fetchMock = lifecycleFetch(1)
     vi.stubGlobal('fetch', fetchMock)
@@ -91,7 +97,7 @@ describe('lifecycle idempotente de AnalysisJob e Analysis Set', () => {
 
     expect(screen.getAllByTestId('upload')).toHaveLength(1)
     expect(posts(fetchMock, '/analysis-jobs')).toHaveLength(1)
-    expect(posts(fetchMock, '/analysis-sets')).toHaveLength(1)
+    await waitFor(() => expect(posts(fetchMock, '/analysis-sets')).toHaveLength(1))
   }, 10_000)
 
   it('três UploadItems, inclusive dois com conteúdo igual, criam exatamente três jobs e um set', async () => {
