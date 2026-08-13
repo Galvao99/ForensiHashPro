@@ -57,10 +57,10 @@ describe('browser staging regression — app completo', () => {
     expect(await screen.findByRole('heading', { name: 'contrato.pdf' })).toBeInTheDocument()
     await waitFor(() => expect(calls(fetchMock, 'GET', '/analysis-jobs/browser-job-1')).toHaveLength(2), { timeout: 5_000 })
     expect(calls(fetchMock, 'POST', '/analysis-jobs')).toHaveLength(1)
-    expect(calls(fetchMock, 'POST', '/analysis-sets')).toHaveLength(1)
+    await waitFor(() => expect(calls(fetchMock, 'POST', '/analysis-sets')).toHaveLength(1))
 
     await userEvent.click(screen.getAllByRole('link', { name: 'Overview' }).find((link) => link.getAttribute('href') === '/app')!)
-    expect(await screen.findByText('Últimas análises')).toBeInTheDocument()
+    expect(await screen.findByText('Artefatos do workspace')).toBeInTheDocument()
     await userEvent.click(screen.getAllByRole('link', { name: 'Nova análise' })[0])
     expect(await screen.findByLabelText('Selecionar arquivo')).toBeInTheDocument()
     expect(calls(fetchMock, 'POST', '/analysis-jobs')).toHaveLength(1)
