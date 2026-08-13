@@ -3,6 +3,7 @@ import { JsonView } from './JsonView'
 import { StatusBadge } from './StatusBadge'
 import { TechnicalValue } from './ui'
 import { TechnicalTree } from './TechnicalTree'
+import { EvidenceTimeline } from './EvidenceTimeline'
 import type { AnalysisContract, AnalysisSetResult, ProcessingStatus } from '../types/api'
 
 const PROCESSING_STATUSES = new Set<ProcessingStatus>(['success', 'no_findings', 'partial', 'skipped', 'unavailable', 'failed', 'cancelled', 'limit_exceeded'])
@@ -171,12 +172,7 @@ export function TimelineResultView({ timeline, aggregate }: { timeline: Analysis
       <label>Tipo<select aria-label="Filtrar por tipo" value={kind} onChange={(event) => setKind(event.target.value)}><option value="all">Todos</option><option value="temporal">Temporal</option><option value="structural">Estrutural</option></select></label>
     </div>
     {warnings.length > 0 && <section className="timeline-warnings" aria-label="Warnings da Timeline"><h3>Warnings técnicos</h3>{warnings.map((warning, index) => <article key={String(warning.warning_id ?? index)}><strong>⚠ {String(warning.title ?? 'Warning temporal')}</strong><p>{String(warning.description ?? '')}</p><details><summary>Ver detalhes</summary><KeyValueGrid value={warning} /></details></article>)}</section>}
-    {visible.some((event) => event.temporal_status !== 'structural_only') && <h3 className="timeline-group-title">Eventos com data conhecida</h3>}
-    {visible.some((event) => event.temporal_status === 'structural_only') && <h3 className="timeline-group-title">Eventos sem data determinável</h3>}
-    <ol className="timeline-list">{visible.map((event, index) => {
-      const structural = event.temporal_status === 'structural_only'
-      return <li key={String(event.event_id ?? index)} className={structural ? 'structural' : 'temporal'}><span className="timeline-marker" aria-hidden="true">{structural ? '◆' : '●'}</span><article><time>{structural ? 'Data não determinada' : String(event.timestamp ?? event.raw_timestamp ?? 'Data não determinada')}</time><h3>{String(event.title ?? 'Evento técnico')}</h3><p>{String(event.description ?? '')}</p><small>{String(event.source_type ?? 'fonte não informada')} · {String(event.filename ?? event.evidence_ref ?? 'evidência')}</small><details className="technical-details"><summary>Ver detalhes</summary><KeyValueGrid value={event} /></details></article></li>
-    })}</ol>
+    <EvidenceTimeline visibleEvents={visible} scaleEvents={records} />
     {!visible.length && <EmptyState>Nenhum evento corresponde aos filtros selecionados.</EmptyState>}
     {limitations.length ? <div className="timeline-limitations"><h3>Limitações</h3><ul>{limitations.map((item) => <li key={item}>{item}</li>)}</ul></div> : null}
   </div>

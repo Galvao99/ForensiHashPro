@@ -135,3 +135,29 @@ O backend atual informa estado operacional e `current_stage`, mas não fornece p
 - a capacidade global do backend continua sendo autoridade e pode responder `429`.
 
 O Analysis Set permanece inelegível até todos os itens possuírem `jobId` e estarem terminais. Assim, a fila de uploads não dispara correlação parcial durante o processamento da pasta.
+
+## Refinamento do Analysis Workspace
+
+### Polling adaptativo
+
+O polling anterior usava intervalo fixo de 2,5 segundos. Como a primeira consulta é imediata, uma análise de aproximadamente 10 segundos produzia em torno de cinco GETs de status. O intervalo continua moderado durante processamento, mas jobs aguardando executor agora são consultados com menor frequência:
+
+```text
+QUEUED remoto: 4.000 ms
+PROCESSING:     2.500 ms
+TERMINAL:       encerramento imediato
+```
+
+Uma análise de 10 segundos inteiramente em `PROCESSING` continua produzindo aproximadamente cinco consultas, incluindo a inicial. Se permanecer `QUEUED` durante os 10 segundos, produz aproximadamente quatro. Erros transitórios de rede usam 2,5 segundos; nenhum POST é repetido.
+
+### Processing View
+
+A tela do conjunto mostra apenas dados derivados do workspace ou retornados pelo backend: artefatos terminais, item ativo, fila local, tipo detectado ou extensão, tamanho, `current_stage`, tempo decorrido desde `started_at` e duração final do contrato. Não existe percentual por arquivo porque o contrato não fornece progresso granular por engine.
+
+### Overview
+
+O Overview autenticado representa o workspace corrente, não uma lista truncada de resultados recentes. Ele inclui itens `WAITING`, jobs remotos, processamento e terminais, mantendo `clientUploadId` como identidade da linha. O histórico autorizado continua separado na página Histórico e nunca alimenta a fila.
+
+### Identidade visual interna
+
+O shell autenticado utiliza os assets existentes `forensihash_logo_preto.png` no tema claro e `forensihash_logo_branco.png` no tema escuro. Os arquivos não foram renomeados nem recriados. A identidade pública ARQEN permanece inalterada.
