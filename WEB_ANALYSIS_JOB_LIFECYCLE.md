@@ -110,3 +110,28 @@ Asserções: um upload ID, um POST de job, um job ID, um poller, um POST de set 
 4. Na coluna **Method**, deve existir exatamente um `POST` para a URL terminada em `/analysis-jobs`, com status `202`.
 5. As linhas posteriores devem ter método `GET` e URL terminada no mesmo `jobId`. `POST` cria; `GET` apenas consulta.
 6. Se houver outro POST, copie os eventos `submit.attempt`, `submit.claimed`, `job.created`, `provider.mounted` e `upload.created` correspondentes. IDs iguais indicam repetição do mesmo lifecycle; IDs de provider ou upload diferentes indicam criação em outra instância/origem.
+
+## Fila controlada para múltiplos arquivos e pastas
+
+Seleção e processamento são fases separadas. Todos os arquivos aceitos são inseridos imediatamente no workspace com estado local `WAITING`, mas `MAX_ACTIVE_ANALYSES = 1` limita o workspace Web a um job remoto não terminal.
+
+O slot não é liberado quando o POST retorna `202`. A resposta apenas muda o item para `QUEUED`, que significa que o job já existe e aguarda o executor remoto. O próximo item só avança quando o item corrente chega a `SUCCESS`, `PARTIAL`, `FAILED`, `LIMIT_EXCEEDED` ou `CANCELLED`.
+
+```text
+WAITING (fila local, sem jobId)
+  -> UPLOADING (submissão reivindicada)
+  -> QUEUED (job remoto criado)
+  -> PROCESSING
+  -> SUCCESS | PARTIAL | FAILED | LIMIT_EXCEEDED | CANCELLED
+```
+
+Uma falha terminal libera o slot para o próximo artefato. A barreira monotônica por `clientUploadId` continua aplicada; a fila apenas decide quando chamar o caminho único `submitUpload`.
+
+O backend atual informa estado operacional e `current_stage`, mas não fornece percentual de progresso por engine nem capacidade segura específica do workspace. Por isso:
+
+- o progresso do conjunto é a razão real entre itens terminais e total de itens;
+- a etapa atual exibe apenas `current_stage` ou uma descrição derivada do estado;
+- não é exibido percentual inventado para o arquivo ativo;
+- a capacidade global do backend continua sendo autoridade e pode responder `429`.
+
+O Analysis Set permanece inelegível até todos os itens possuírem `jobId` e estarem terminais. Assim, a fila de uploads não dispara correlação parcial durante o processamento da pasta.

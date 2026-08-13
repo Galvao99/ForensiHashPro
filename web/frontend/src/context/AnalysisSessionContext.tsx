@@ -3,11 +3,12 @@ import { ApiError, createAnalysisJob, createAnalysisSet, getAnalysisJob, getAnal
 import { analysisDiagnostic, nextProviderInstanceId, nextSubmissionAttemptId } from '../lib/analysisDiagnostics'
 import type { AnalysisContract, AnalysisSetResult, AnalysisSummary } from '../types/api'
 
-export const ANALYSIS_CONCURRENCY = 2
+export const MAX_ACTIVE_ANALYSES = 1
 export const MAX_WORKSPACE_FILES = 50
 export const JOB_POLL_INTERVAL_MS = 2_500
 
 export type WorkspaceAnalysisStatus =
+  | 'WAITING'
   | 'QUEUED'
   | 'UPLOADING'
   | 'PROCESSING'
@@ -22,6 +23,7 @@ export interface WorkspaceAnalysis {
   analysisId: string
   jobId?: string
   filename: string
+  sizeBytes: number
   relativePath?: string
   status: WorkspaceAnalysisStatus
   contract?: AnalysisContract
@@ -306,7 +308,11 @@ export function AnalysisSessionProvider({ children, initialResults = [] }: { chi
   }, [providerInstanceId])
 
   useEffect(() => {
-    const available = ANALYSIS_CONCURRENCY - running.current.size
+    const active = internalWorkspace.analyses.filter((item) =>
+      item.submissionState === 'SUBMITTING' ||
+      (item.submissionState === 'SUBMITTED' && ['QUEUED', 'PROCESSING'].includes(item.status)),
+    ).length
+    const available = MAX_ACTIVE_ANALYSES - active
     if (available <= 0) return
     const next = internalWorkspace.analyses
       .filter((item) => item.submissionState === 'SELECTED' && !item.jobId && !running.current.has(item.clientUploadId))
@@ -341,6 +347,7 @@ export function AnalysisSessionProvider({ children, initialResults = [] }: { chi
         clientUploadId: localId('restored'),
         analysisId: result.analysis_id,
         filename: asString(result.file.name) ?? 'Evidência sem nome',
+        sizeBytes: asNumber(result.file.size_bytes) ?? 0,
         status: resultStatus(result),
         contract: result,
         persisted,
@@ -374,8 +381,9 @@ export function AnalysisSessionProvider({ children, initialResults = [] }: { chi
         clientUploadId: localId('upload'),
         analysisId: localId('queued'),
         filename: file.name,
+        sizeBytes: file.size,
         relativePath,
-        status: 'QUEUED',
+        status: 'WAITING',
         persisted: !options.privateSession && options.retentionMode === 'RESULT_ONLY',
         file,
         request: options,
@@ -433,7 +441,7 @@ export function AnalysisSessionProvider({ children, initialResults = [] }: { chi
     updateWorkspace((current) => ({
       ...current,
       analyses: current.analyses.map((item) => item.clientUploadId === clientUploadId && item.submissionState === 'FAILED'
-        ? { ...item, jobId: undefined, status: 'QUEUED', submissionState: 'SELECTED', error: undefined, errorCode: undefined }
+        ? { ...item, jobId: undefined, status: 'WAITING', submissionState: 'SELECTED', error: undefined, errorCode: undefined }
         : item),
     }))
     analysisDiagnostic('upload.transition', {
@@ -461,6 +469,7 @@ export function AnalysisSessionProvider({ children, initialResults = [] }: { chi
       analysisId: item.analysisId,
       jobId: item.jobId,
       filename: item.filename,
+      sizeBytes: item.sizeBytes,
       relativePath: item.relativePath,
       status: item.status,
       contract: item.contract,

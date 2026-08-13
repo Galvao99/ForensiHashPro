@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { App } from '../App'
 import {
-  ANALYSIS_CONCURRENCY,
+  MAX_ACTIVE_ANALYSES,
   AnalysisSessionProvider,
   safeRelativePath,
   useAnalysisSession,
@@ -107,7 +107,37 @@ describe('workspace de análises individuais', () => {
     expect(within(tablist).getByRole('tab', { name: /biometria\.json/i })).toHaveAttribute('aria-selected', 'true')
   })
 
-  it('limita concorrência a dois e inicia o próximo quando uma análise termina', async () => {
+  it('mostra todos os arquivos da pasta imediatamente, mas mantém somente um job remoto ativo', async () => {
+    const fetchMock = vi.fn((input: string | URL | Request, init?: RequestInit) => {
+      const url = String(input)
+      if (url.includes('/auth/me')) return Promise.resolve(response(authFixture))
+      if (url.endsWith('/analysis-jobs')) {
+        const file = (init?.body as FormData).get('file') as File
+        return Promise.resolve(response({ job_id: `job-${file.name}`, status: 'QUEUED' }))
+      }
+      return Promise.resolve(response({ job_id: 'job-contrato.pdf', status: 'PROCESSING', current_stage: 'ANALYZING' }))
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    window.history.pushState({}, '', '/app/analysis')
+    const rendered = render(<App />)
+    const files = [
+      folderFile('contrato.pdf', 'Caso/contrato.pdf'),
+      folderFile('selfie.jpg', 'Caso/selfie.jpg'),
+      folderFile('logs.json', 'Caso/logs.json'),
+    ]
+
+    await userEvent.upload(await screen.findByLabelText('Selecionar pasta'), files)
+
+    expect(await screen.findByRole('heading', { name: 'Processamento do workspace' })).toBeInTheDocument()
+    expect(screen.getByText('3 artefatos · fila local controlada')).toBeInTheDocument()
+    expect(screen.getByText('1 analisando')).toBeInTheDocument()
+    expect(screen.getByText('2 na fila')).toBeInTheDocument()
+    expect(screen.getAllByText('aguardando')).toHaveLength(2)
+    expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith('/api/v1/analysis-jobs'))).toHaveLength(1)
+    rendered.unmount()
+  })
+
+  it('mantém um único job remoto ativo e inicia o próximo somente após terminal', async () => {
     const pending: Array<{ file: File; resolve: (value: Response) => void }> = []
     let active = 0
     let maximum = 0
@@ -128,13 +158,15 @@ describe('workspace de análises individuais', () => {
     render(<AnalysisSessionProvider><Harness files={files} /></AnalysisSessionProvider>)
 
     await userEvent.click(screen.getByRole('button', { name: 'Enfileirar privado' }))
-    await waitFor(() => expect(pending).toHaveLength(ANALYSIS_CONCURRENCY))
-    expect(screen.getByText('three.txt:QUEUED')).toBeInTheDocument()
+    await waitFor(() => expect(pending).toHaveLength(MAX_ACTIVE_ANALYSES))
+    expect(screen.getByText('two.txt:WAITING')).toBeInTheDocument()
+    expect(screen.getByText('three.txt:WAITING')).toBeInTheDocument()
 
     results.set('job-1', contractFor(pending[0].file, 1)); pending[0].resolve(response({ job_id: 'job-1', status: 'QUEUED' }))
-    await waitFor(() => expect(pending).toHaveLength(3))
-    expect(maximum).toBe(ANALYSIS_CONCURRENCY)
+    await waitFor(() => expect(pending).toHaveLength(2))
+    expect(maximum).toBe(MAX_ACTIVE_ANALYSES)
     results.set('job-2', contractFor(pending[1].file, 2)); pending[1].resolve(response({ job_id: 'job-2', status: 'QUEUED' }))
+    await waitFor(() => expect(pending).toHaveLength(3))
     results.set('job-3', contractFor(pending[2].file, 3)); pending[2].resolve(response({ job_id: 'job-3', status: 'QUEUED' }))
     await waitFor(() => expect(screen.getAllByText(/:SUCCESS$/)).toHaveLength(3))
   })
