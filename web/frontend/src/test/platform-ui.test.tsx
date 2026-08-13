@@ -51,7 +51,7 @@ describe('plataforma autenticada', () => {
     expect(await screen.findByRole('checkbox', { name: /sessão privada/i })).toBeChecked()
     view.unmount()
     render(<ResultView result={analysisFixture} />)
-    expect(screen.getByRole('heading', { name: 'Hashes' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Identificação e hashes' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: /dados técnicos completos/i })).toBeInTheDocument()
     expect(screen.getByText(/expandir JSON/i)).toBeInTheDocument()
     expect(screen.getAllByText('Indisponível').length).toBeGreaterThan(0)

@@ -126,7 +126,7 @@ export function FactsResultView({ facts }: { facts: Array<Record<string, unknown
 
 export function FindingsResultView({ findings }: { findings: Array<Record<string, unknown>> }) {
   if (!findings.length) return <EmptyState>Nenhum finding foi reportado.</EmptyState>
-  return <div className="technical-card-list">{findings.map((finding, index) => <article className="technical-card finding-card" key={String(finding.finding_id ?? finding.id ?? index)}><header><h3>{String(finding.title ?? finding.kind ?? `Finding ${index + 1}`)}</h3>{present(finding.severity) && <span className="technical-state">{String(finding.severity)}</span>}</header><KeyValueGrid value={finding} /></article>)}</div>
+  return <div className="technical-card-list">{findings.map((finding, index) => <details className="technical-card finding-card expandable-finding" key={String(finding.finding_id ?? finding.id ?? index)}><summary><span aria-hidden="true">{String(finding.severity ?? '').toLowerCase() === 'error' ? '✕' : '⚠'}</span><strong>{String(finding.title ?? finding.kind ?? `Finding ${index + 1}`)}</strong>{present(finding.severity) && <span className="technical-state">{String(finding.severity)}</span>}</summary>{present(finding.statement) && <p>{String(finding.statement)}</p>}<KeyValueGrid value={Object.fromEntries(Object.entries(finding).filter(([key]) => key !== 'title' && key !== 'statement'))} /></details>)}</div>
 }
 
 export function ArchiveResultView({ archive }: { archive: Record<string, unknown> | null }) {
@@ -171,6 +171,8 @@ export function TimelineResultView({ timeline, aggregate }: { timeline: Analysis
       <label>Tipo<select aria-label="Filtrar por tipo" value={kind} onChange={(event) => setKind(event.target.value)}><option value="all">Todos</option><option value="temporal">Temporal</option><option value="structural">Estrutural</option></select></label>
     </div>
     {warnings.length > 0 && <section className="timeline-warnings" aria-label="Warnings da Timeline"><h3>Warnings técnicos</h3>{warnings.map((warning, index) => <article key={String(warning.warning_id ?? index)}><strong>⚠ {String(warning.title ?? 'Warning temporal')}</strong><p>{String(warning.description ?? '')}</p><details><summary>Ver detalhes</summary><KeyValueGrid value={warning} /></details></article>)}</section>}
+    {visible.some((event) => event.temporal_status !== 'structural_only') && <h3 className="timeline-group-title">Eventos com data conhecida</h3>}
+    {visible.some((event) => event.temporal_status === 'structural_only') && <h3 className="timeline-group-title">Eventos sem data determinável</h3>}
     <ol className="timeline-list">{visible.map((event, index) => {
       const structural = event.temporal_status === 'structural_only'
       return <li key={String(event.event_id ?? index)} className={structural ? 'structural' : 'temporal'}><span className="timeline-marker" aria-hidden="true">{structural ? '◆' : '●'}</span><article><time>{structural ? 'Data não determinada' : String(event.timestamp ?? event.raw_timestamp ?? 'Data não determinada')}</time><h3>{String(event.title ?? 'Evento técnico')}</h3><p>{String(event.description ?? '')}</p><small>{String(event.source_type ?? 'fonte não informada')} · {String(event.filename ?? event.evidence_ref ?? 'evidência')}</small><details className="technical-details"><summary>Ver detalhes</summary><KeyValueGrid value={event} /></details></article></li>
