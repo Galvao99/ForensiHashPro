@@ -19,6 +19,23 @@ describe('homepage institucional ARQEN', () => {
     expect(screen.getByRole('link', { name: /conhecer ForensiHash/i })).toHaveAttribute('href', '/forensihash')
   })
 
+  it('mantém o ciclo da evidência legível em superfície clara e com papéis paralelos', () => {
+    const { container } = renderHome()
+    const title = screen.getByRole('heading', { name: 'Preservar e analisar são papéis distintos.' })
+    const section = title.closest('section')
+    expect(section).toHaveClass('evidence-cycle-section')
+    expect(section).not.toHaveClass('forensi-dark-section')
+    expect(screen.getByText('ARTEFATO DIGITAL')).toBeInTheDocument()
+    expect(screen.getByText('EVIDÊNCIA TÉCNICA')).toBeInTheDocument()
+
+    const branches = screen.getByRole('group', { name: 'Papéis paralelos de DDNA e ForensiHash' })
+    const products = within(branches).getAllByRole('article')
+    expect(products).toHaveLength(2)
+    expect(products[0]).toHaveTextContent('DDNAPreservarproveniência · custódia')
+    expect(products[1]).toHaveTextContent('FORENSIHASHAnalisarinspeção · correlação')
+    expect(container.querySelector('.evidence-cycle-section .cycle-products')).toBe(branches)
+  })
+
   it('mantém CTAs e navegação em rotas existentes', () => {
     renderHome()
     expect(screen.getByRole('link', { name: /conheça nossas soluções/i })).toHaveAttribute('href', '#solutions')

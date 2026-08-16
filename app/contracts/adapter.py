@@ -149,7 +149,11 @@ class LegacyAnalysisAdapter:
                     {"record_type": "limitation", "message": limitation}
                     for limitation in result.timeline_limitations
                 ]
-                if result.timeline_events
+                if (
+                    result.timeline_events
+                    or result.timeline_warnings
+                    or result.timeline_limitations
+                )
                 else None
             ),
             comparison=None,

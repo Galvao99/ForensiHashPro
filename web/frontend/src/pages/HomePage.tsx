@@ -43,9 +43,15 @@ export function HomePage() {
         </div>
       </Section>
 
-      <Section className="arqen-section evidence-cycle-section" eyebrow="CICLO DA EVIDÊNCIA DIGITAL" title="Preservar e analisar são papéis distintos.">
-        <div className="evidence-cycle" role="img" aria-label="Um artefato digital pode ser preservado pelo DDNA e analisado pelo ForensiHash, contribuindo para evidência técnica">
-          <strong>ARTEFATO DIGITAL</strong><div className="cycle-stem" aria-hidden="true" /><div className="cycle-products"><article><span>DDNA</span><b>Preservar</b><small>proveniência · custódia</small></article><article><span>FORENSIHASH</span><b>Analisar</b><small>inspeção · correlação</small></article></div><div className="cycle-output">EVIDÊNCIA TÉCNICA</div>
+      <Section id="evidence-cycle" className="arqen-section evidence-cycle-section" eyebrow="CICLO DA EVIDÊNCIA DIGITAL" title="Preservar e analisar são papéis distintos.">
+        <div className="evidence-cycle" role="group" aria-label="Um artefato digital pode ser preservado pelo DDNA e analisado pelo ForensiHash, contribuindo para evidência técnica">
+          <strong>ARTEFATO DIGITAL</strong>
+          <div className="cycle-stem" aria-hidden="true" />
+          <div className="cycle-products" role="group" aria-label="Papéis paralelos de DDNA e ForensiHash">
+            <article><span>DDNA</span><b>Preservar</b><small>proveniência · custódia</small></article>
+            <article><span>FORENSIHASH</span><b>Analisar</b><small>inspeção · correlação</small></article>
+          </div>
+          <div className="cycle-output">EVIDÊNCIA TÉCNICA</div>
         </div>
         <p className="cycle-note">O DDNA atua na preservação, proveniência e custódia propostas. O ForensiHash atua na inspeção e análise técnica. Um artefato não precisa, necessariamente, passar pelos dois produtos.</p>
       </Section>
