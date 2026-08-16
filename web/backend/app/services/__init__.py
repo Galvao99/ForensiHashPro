@@ -19,6 +19,7 @@ from web.backend.app.services.analysis_jobs import (
 )
 from web.backend.app.services.analysis_sets import AnalysisSetService
 from web.backend.app.services.analysis_profiles import AnalysisEntitlementService
+from web.backend.app.services.ddna_snapshot import DdnaSnapshotService, SnapshotPackage
 
 __all__ = [
     "CapabilitiesService",
@@ -38,4 +39,6 @@ __all__ = [
     "TERMINAL_JOB_STATUSES",
     "AnalysisSetService",
     "AnalysisEntitlementService",
+    "DdnaSnapshotService",
+    "SnapshotPackage",
 ]

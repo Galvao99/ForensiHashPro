@@ -97,6 +97,22 @@ export function getAnalysisSet(setId: string): Promise<AnalysisSetResult> {
   return request(`/api/v1/analysis-sets/${encodeURIComponent(setId)}`)
 }
 
+export async function generateDdnaSnapshot(analysisId: string, csrfToken: string): Promise<{ blob: Blob; filename: string }> {
+  const response = await fetch(`${configuredBase}/api/v1/analyses/${encodeURIComponent(analysisId)}/ddna-snapshot`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'X-CSRF-Token': csrfToken },
+  })
+  if (!response.ok) {
+    let payload: ApiErrorEnvelope = {}
+    try { payload = await response.json() as ApiErrorEnvelope } catch { /* resposta binária inválida */ }
+    throw new ApiError(payload.error?.message ?? 'Não foi possível gerar o DDNA Snapshot.', payload.error?.code, payload.error?.request_id)
+  }
+  const disposition = response.headers.get('Content-Disposition') ?? ''
+  const filename = disposition.match(/filename="?([^";]+)"?/i)?.[1] ?? `forensihash_ddna_snapshot_${analysisId}.zip`
+  return { blob: await response.blob(), filename }
+}
+
 export const authApi = {
   me: () => request<AuthResponse>('/api/v1/auth/me'),
   login: (email: string, password: string) => request<AuthResponse>('/api/v1/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) }),

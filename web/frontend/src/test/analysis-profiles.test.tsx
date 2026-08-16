@@ -49,4 +49,35 @@ describe('perfis Free e Pro', () => {
     expect(screen.getAllByRole('button', { name: 'Analisar este arquivo' })).toHaveLength(2)
     expect(fetchMock.mock.calls.some(([url]) => String(url).endsWith('/analysis-jobs'))).toBe(false)
   })
+
+  it('confirma o escopo e baixa um único ZIP de Snapshot', async () => {
+    const fetchMock = vi.fn((...request: [string | URL | Request, RequestInit?]) => {
+      void request
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        headers: { get: () => 'attachment; filename="forensihash_ddna_snapshot_analysis-test.zip"' },
+        blob: async () => new Blob(['zip'], { type: 'application/zip' }),
+      } as unknown as Response)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const createObjectURL = vi.fn(() => 'blob:snapshot')
+    const revokeObjectURL = vi.fn()
+    Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: createObjectURL })
+    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: revokeObjectURL })
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined)
+    render(<MemoryRouter><ResultView result={analysisFixture} csrfToken="csrf-test" /></MemoryRouter>)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Gerar DDNA Snapshot' }))
+    expect(screen.getByText('relatório técnico em PDF')).toBeInTheDocument()
+    expect(screen.getByText('arquivo SHA-256 do PDF')).toBeInTheDocument()
+    expect(screen.getByText(/não representa cadeia de custódia original/i)).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Gerar Snapshot' }))
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/api/v1/analyses/analysis-test/ddna-snapshot')
+    expect(click).toHaveBeenCalledTimes(1)
+    expect(createObjectURL).toHaveBeenCalledTimes(1)
+    expect(revokeObjectURL).toHaveBeenCalledWith('blob:snapshot')
+  })
 })

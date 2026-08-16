@@ -7,7 +7,7 @@ import inspect
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, File, Form, Request, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, Request, Response, UploadFile, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -38,6 +38,7 @@ from web.backend.app.services import (
     TERMINAL_JOB_STATUSES,
     AnalysisSetService,
     AnalysisEntitlementService,
+    DdnaSnapshotService,
 )
 from web.backend.app.runtime_config import (
     analysis_concurrency,
@@ -73,6 +74,10 @@ def get_capabilities_service() -> CapabilitiesService:
 
 def get_analysis_set_service() -> AnalysisSetService:
     return AnalysisSetService()
+
+
+def get_ddna_snapshot_service() -> DdnaSnapshotService:
+    return DdnaSnapshotService()
 
 
 def _analyze_with_profile(
@@ -230,6 +235,72 @@ def analysis_job_result(job_id: str, user: User = Depends(current_user), db: Ses
         db.commit()
         raise _error(status.HTTP_410_GONE, "result_unavailable", "O resultado privado temporário não está mais disponível.", str(uuid4()))
     return job.result_json
+
+
+@router.post("/analyses/{analysis_id}/ddna-snapshot", response_model=None)
+def create_ddna_snapshot(
+    analysis_id: str,
+    request: Request,
+    user: User = Depends(current_user),
+    db: Session = Depends(get_db),
+    service: DdnaSnapshotService = Depends(get_ddna_snapshot_service),
+) -> Response:
+    """Exporta somente um resultado individual pertencente ao usuário autenticado."""
+    require_csrf(request)
+    request_id = str(uuid4())
+    stored = db.scalar(
+        select(StoredAnalysis).where(
+            StoredAnalysis.id == analysis_id,
+            StoredAnalysis.user_id == user.id,
+        )
+    )
+    contract: dict[str, object] | None = stored.result_json if stored is not None else None
+    if contract is None:
+        job = db.scalar(
+            select(AnalysisJob).where(
+                AnalysisJob.user_id == user.id,
+                (AnalysisJob.id == analysis_id)
+                | (AnalysisJob.result_analysis_id == analysis_id),
+            )
+        )
+        if job is not None:
+            expires = job.result_expires_at
+            if expires is not None and expires.tzinfo is None:
+                expires = expires.replace(tzinfo=timezone.utc)
+            if expires is not None and expires <= datetime.now(timezone.utc):
+                raise _error(
+                    status.HTTP_410_GONE,
+                    "snapshot_source_expired",
+                    "O resultado temporário necessário para gerar o Snapshot expirou.",
+                    request_id,
+                )
+            contract = job.result_json
+    if contract is None:
+        raise _error(
+            status.HTTP_404_NOT_FOUND,
+            "analysis_not_found",
+            "Análise individual não encontrada.",
+            request_id,
+        )
+    package = service.generate(contract)
+    LOGGER.info(
+        "ddna_snapshot_generated",
+        extra={
+            "analysis_id": analysis_id,
+            "snapshot_id": package.snapshot_id,
+            "user_id": user.id,
+            "status": "completed",
+            "pdf_size_bytes": len(package.pdf_bytes),
+        },
+    )
+    return Response(
+        content=package.zip_bytes,
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": f'attachment; filename="{package.base_name}.zip"',
+            "X-ForensiHash-Snapshot-ID": package.snapshot_id,
+        },
+    )
 
 
 @router.post("/analysis-sets", status_code=status.HTTP_201_CREATED, response_model=None)

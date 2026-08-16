@@ -839,7 +839,14 @@ main > .section:first-child, .ddna-page > .section:first-child { padding-top: 10
 .pro-selection ul { display: grid; gap: .5rem; padding: 0; list-style: none; }
 .pro-selection li { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: .7rem; border-bottom: 1px solid var(--border-color, #334155); }
 .free-processing-steps { display: grid; gap: .65rem; margin: 1rem 0; padding-left: 1.4rem; }
+.snapshot-export { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 1.5rem; margin: 1.25rem 0 2rem; padding: 1.25rem; border: 1px solid var(--border-color, #334155); border-radius: .85rem; }
+.snapshot-export h2 { margin: .2rem 0 .4rem; font-size: 1.1rem; }
+.snapshot-export p { margin: 0; }
+.snapshot-confirmation { grid-column: 1 / -1; padding-top: 1rem; border-top: 1px solid var(--border-color, #334155); }
+.snapshot-confirmation ul { margin: .65rem 0; }
+.snapshot-confirmation > div { display: flex; flex-wrap: wrap; gap: .65rem; margin-top: 1rem; }
 
 @media (max-width: 640px) {
   .pro-selection li { align-items: flex-start; flex-direction: column; }
+  .snapshot-export { grid-template-columns: 1fr; align-items: start; }
 }
