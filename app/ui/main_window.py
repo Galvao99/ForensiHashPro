@@ -46,6 +46,7 @@ class MainWindow(QWidget):
         self.analysis_worker: AnalysisWorker | None = None
 
         self.progress_animation = QPropertyAnimation()
+        self._sidebar_before_comparison_focus = False
 
         self.setWindowTitle(
             "ForensiHash Pro"
@@ -321,6 +322,29 @@ class MainWindow(QWidget):
         self.workspace.home_page.open_folder_requested.connect(
             self.select_folder
         )
+        self.workspace.comparison_page.focus_mode_requested.connect(
+            self.set_comparison_focus_mode
+        )
+        self.sidebar.collapsed_changed.connect(
+            self._resize_for_sidebar_state
+        )
+
+    def _resize_for_sidebar_state(self, collapsed: bool) -> None:
+        available = max(1, self.main_splitter.width())
+        sidebar_width = 64 if collapsed else min(300, max(260, available // 4))
+        self.main_splitter.setSizes([sidebar_width, max(1, available - sidebar_width)])
+
+    def set_comparison_focus_mode(self, enabled: bool) -> None:
+        """Amplia a leitura do diff sem alterar o estado da comparação."""
+        if enabled:
+            self._sidebar_before_comparison_focus = self.sidebar.is_collapsed
+            self.sidebar.set_collapsed(True)
+        else:
+            self.sidebar.set_collapsed(self._sidebar_before_comparison_focus)
+        self.page_title.setVisible(not enabled)
+        self.context_label.setVisible(not enabled and self.current_page_key != "general")
+        self.clock_label.setVisible(not enabled)
+        self.progress_container.setVisible(not enabled and self.progress_bar.isVisible())
 
     # ==========================================================
     # NAVEGAÇÃO
@@ -338,6 +362,9 @@ class MainWindow(QWidget):
             page_key
         ):
             return
+
+        if page_key != "comparison" and self.workspace.comparison_page.focus_mode:
+            self.workspace.comparison_page.set_focus_mode(False)
 
         self.current_page_key = page_key
 

@@ -204,3 +204,4 @@ class AnalysisWorkspace(QStackedWidget):
         self.hash_page.update_results(
             results
         )
+        self.comparison_page.update_results(results)
