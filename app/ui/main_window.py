@@ -347,6 +347,12 @@ class MainWindow(QWidget):
             )
         )
 
+        # A Visão Geral já possui um header próprio para o artefato.
+        # Nas páginas técnicas, o contexto compacto continua útil.
+        self.context_label.setVisible(
+            page_key != "general"
+        )
+
         self.sidebar.set_active_page(
             page_key
         )
@@ -365,6 +371,8 @@ class MainWindow(QWidget):
         self.page_title.setText(
             "Área inicial"
         )
+
+        self.context_label.setVisible(True)
 
         self.sidebar.set_active_page(
             None

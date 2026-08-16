@@ -1,4 +1,5 @@
 from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
     QButtonGroup,
     QFrame,
@@ -14,6 +15,7 @@ from PySide6.QtWidgets import (
 )
 
 from app.widgets.file_list import FileList
+from app.ui.theme import DARK_THEME, brand_logo_path
 
 
 class Sidebar(QFrame):
@@ -80,14 +82,14 @@ class Sidebar(QFrame):
 
         self.open_file_button = (
             self._create_action_button(
-                "▣",
+                "FILE",
                 "Abrir arquivo",
             )
         )
 
         self.open_folder_button = (
             self._create_action_button(
-                "▰",
+                "DIR",
                 "Abrir pasta",
             )
         )
@@ -167,7 +169,7 @@ class Sidebar(QFrame):
 
         self.export_button = (
             self._create_action_button(
-                "⇧",
+                "EXP",
                 "Exportar",
             )
         )
@@ -195,17 +197,22 @@ class Sidebar(QFrame):
         )
         layout.setSpacing(1)
 
-        title = QLabel("ForensiHash")
-        title.setObjectName(
-            "SidebarTitle"
-        )
+        self.brand_logo = QLabel()
+        logo_path = brand_logo_path(DARK_THEME)
+        if logo_path is not None:
+            pixmap = QPixmap(str(logo_path))
+            self.brand_logo.setPixmap(
+                pixmap.scaled(178, 38, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            )
+            self.brand_logo.setAccessibleName("ForensiHash")
+        else:
+            self.brand_logo.setText("FORENSIHASH")
+            self.brand_logo.setObjectName("SidebarLogoFallback")
 
-        subtitle = QLabel("PRO")
-        subtitle.setObjectName(
-            "SidebarSubtitle"
-        )
+        subtitle = QLabel("WORKSTATION PERICIAL LOCAL")
+        subtitle.setObjectName("SidebarProductKind")
 
-        layout.addWidget(title)
+        layout.addWidget(self.brand_logo)
         layout.addWidget(subtitle)
 
         return container
@@ -338,39 +345,39 @@ class Sidebar(QFrame):
         )
 
         navigation_items = (
-            ("general", "⌂", "Geral"),
-            ("hashes", "#", "Hashes"),
-            ("metadata", "≡", "Metadados"),
-            ("findings", "⌕", "Vestígios"),
-            ("timeline", "◷", "Timeline"),
+            ("general", "SUM", "Visão geral"),
+            ("hashes", "HASH", "Hashes"),
+            ("metadata", "META", "Metadados"),
+            ("findings", "FIND", "Vestígios técnicos"),
+            ("timeline", "TIME", "Timeline"),
             (
                 "magic_number",
-                "01",
+                "MAG",
                 "Magic Number",
             ),
             (
                 "digital_signature",
-                "✓",
-                "Assinatura digital",
+                "SIGN",
+                "Assinaturas",
             ),
             (
                 "integrity",
-                "◇",
+                "INT",
                 "Integridade",
             ),
             (
                 "ocr",
-                "T",
+                "OCR",
                 "OCR e busca",
             ),
             (
                 "ip",
-                "◎",
+                "IP",
                 "Contexto de IP",
             ),
             (
                 "comparison",
-                "⇄",
+                "CMP",
                 "Comparação",
             ),
         )
