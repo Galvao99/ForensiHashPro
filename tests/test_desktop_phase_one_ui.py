@@ -19,6 +19,7 @@ from app.ui.theme import (
     brand_logo_path,
     load_desktop_stylesheet,
 )
+from app.ui.application_identity import application_icon, application_icon_path
 from app.widgets.analysis_dashboard import AnalysisDashboard
 from app.widgets.file_list import FileListItemWidget
 from app.widgets.status_indicator import StatusIndicator
@@ -105,14 +106,25 @@ def test_file_type_markers_cover_common_artifacts(qt_app) -> None:
 
 
 def test_theme_tokens_and_official_logos_are_available() -> None:
-    assert DARK_THEME.background == "#111315"
+    assert DARK_THEME.background == "#0B0D0F"
     assert DARK_THEME.surface != DARK_THEME.background
     assert LIGHT_THEME.background == "#FFFFFF"
     assert brand_logo_path(DARK_THEME) is not None
     assert brand_logo_path(LIGHT_THEME) is not None
     stylesheet = load_desktop_stylesheet(ApplicationPaths.discover())
-    assert "#111315" in stylesheet
+    assert "#0B0D0F" in stylesheet
+    assert "#0B1120" not in stylesheet
     assert "QFrame#ResultHeader" in stylesheet
+
+
+def test_official_application_icon_uses_central_resource_resolution(qt_app) -> None:
+    paths = ApplicationPaths.discover()
+    icon_path = application_icon_path(paths)
+    assert icon_path == paths.resource(
+        "web/frontend/public/assets/forensihash_icon.png"
+    )
+    assert icon_path.is_file()
+    assert not application_icon(paths).isNull()
 
 
 def test_status_indicator_supports_shared_states(qt_app) -> None:

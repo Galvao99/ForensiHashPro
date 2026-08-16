@@ -160,6 +160,7 @@ class AnalysisTabs(QTabWidget):
         results: list[AnalysisResult],
     ) -> None:
         self.hash_page.update_results(results)
+        self.comparison_page.update_results(results)
 
     def show_comparison_tab(self) -> None:
         self.setCurrentWidget(

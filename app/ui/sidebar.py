@@ -31,6 +31,7 @@ class Sidebar(QFrame):
     """
 
     navigation_requested = Signal(str)
+    collapsed_changed = Signal(bool)
 
     def __init__(self) -> None:
         super().__init__()
@@ -51,6 +52,8 @@ class Sidebar(QFrame):
             str,
             QPushButton,
         ] = {}
+        self.navigation_labels: dict[str, QLabel] = {}
+        self._collapsed = False
 
         self._build_ui()
 
@@ -68,9 +71,14 @@ class Sidebar(QFrame):
         )
         root_layout.setSpacing(10)
 
-        root_layout.addWidget(
-            self._build_brand()
-        )
+        self.collapse_button = QPushButton("‹  Recolher sidebar")
+        self.collapse_button.setObjectName("SidebarCollapseButton")
+        self.collapse_button.setToolTip("Recolher sidebar")
+        self.collapse_button.clicked.connect(self.toggle_collapsed)
+        root_layout.addWidget(self.collapse_button)
+
+        self.brand_widget = self._build_brand()
+        root_layout.addWidget(self.brand_widget)
 
         root_layout.addSpacing(10)
 
@@ -209,11 +217,11 @@ class Sidebar(QFrame):
             self.brand_logo.setText("FORENSIHASH")
             self.brand_logo.setObjectName("SidebarLogoFallback")
 
-        subtitle = QLabel("WORKSTATION PERICIAL LOCAL")
-        subtitle.setObjectName("SidebarProductKind")
+        self.brand_subtitle = QLabel("WORKSTATION PERICIAL LOCAL")
+        self.brand_subtitle.setObjectName("SidebarProductKind")
 
         layout.addWidget(self.brand_logo)
-        layout.addWidget(subtitle)
+        layout.addWidget(self.brand_subtitle)
 
         return container
 
@@ -556,8 +564,45 @@ class Sidebar(QFrame):
         self.navigation_buttons[key] = (
             button
         )
+        self.navigation_labels[key] = text_label
+        button.setToolTip(text)
 
         return button
+
+    @property
+    def is_collapsed(self) -> bool:
+        return self._collapsed
+
+    def toggle_collapsed(self) -> None:
+        self.set_collapsed(not self._collapsed)
+
+    def set_collapsed(self, collapsed: bool) -> None:
+        if self._collapsed == collapsed:
+            return
+        self._collapsed = collapsed
+        self.setProperty("collapsed", collapsed)
+        self.setMinimumWidth(64 if collapsed else 260)
+        self.setMaximumWidth(64 if collapsed else 16777215)
+        self.collapse_button.setText("»" if collapsed else "‹  Recolher sidebar")
+        self.collapse_button.setToolTip("Expandir sidebar" if collapsed else "Recolher sidebar")
+        self.brand_logo.setVisible(not collapsed)
+        self.brand_subtitle.setVisible(not collapsed)
+        self.file_panel.setVisible(not collapsed)
+        self.open_file_button.setText("FILE" if collapsed else "FILE   Abrir arquivo")
+        self.open_file_button.setToolTip("Abrir arquivo")
+        self.open_folder_button.setText("DIR" if collapsed else "DIR   Abrir pasta")
+        self.open_folder_button.setToolTip("Abrir pasta")
+        self.export_button.setText("EXP" if collapsed else "EXP   Exportar")
+        self.export_button.setToolTip("Exportar")
+        for label in self.findChildren(QLabel, "SidebarSectionTitle"):
+            label.setVisible(not collapsed)
+        for label in self.navigation_labels.values():
+            label.setVisible(not collapsed)
+        for button in self.navigation_buttons.values():
+            button.layout().setContentsMargins(8 if collapsed else 10, 7, 8 if collapsed else 10, 7)
+        self.style().unpolish(self)
+        self.style().polish(self)
+        self.collapsed_changed.emit(collapsed)
 
     def _create_separator(self) -> QFrame:
         """
