@@ -189,6 +189,24 @@ def test_metadata_dates_reach_serialized_analysis_contract_timeline() -> None:
     ]
 
 
+def test_timeline_limitations_reach_contract_without_events() -> None:
+    result = _legacy_result()
+    result.timeline_events = []
+    result.timeline_warnings = []
+    result.timeline_limitations = [
+        "A fonte temporal não forneceu eventos normalizáveis."
+    ]
+
+    contract = LegacyAnalysisAdapter().convert(result)
+
+    assert contract.timeline == [
+        {
+            "record_type": "limitation",
+            "message": "A fonte temporal não forneceu eventos normalizáveis.",
+        }
+    ]
+
+
 def test_contract_round_trip_preserves_sections_and_external_results() -> None:
     contract = LegacyAnalysisAdapter().convert(_legacy_result())
     contract = replace(

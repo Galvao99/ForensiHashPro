@@ -29,11 +29,15 @@ class HashEngine: #Colocar mais hashes se necessário
         return hash_object.hexdigest()
 
     def calculate_all(self, file_path: Path) -> HashResult:
-        return HashResult(
-            md5=self.calculate_file_hash(file_path, "md5"),
-            sha1=self.calculate_file_hash(file_path, "sha1"),
-            sha224=self.calculate_file_hash(file_path, "sha224"),
-            sha256=self.calculate_file_hash(file_path, "sha256"),
-            sha384=self.calculate_file_hash(file_path, "sha384"),
-            sha512=self.calculate_file_hash(file_path, "sha512"),
-        )
+        hash_objects = {
+            name: hashlib.new(algorithm)
+            for name, algorithm in self._algorithms.items()
+        }
+        with Path(file_path).open("rb") as file:
+            for chunk in iter(lambda: file.read(1024 * 1024), b""):
+                for hash_object in hash_objects.values():
+                    hash_object.update(chunk)
+        return HashResult(**{
+            name: hash_object.hexdigest()
+            for name, hash_object in hash_objects.items()
+        })
