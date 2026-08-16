@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from web.backend.app.api.dependencies import admin_user, require_csrf
 from web.backend.app.database import get_db
 from web.backend.app.errors import WebApiError
-from web.backend.app.models import User, UserRole
+from web.backend.app.models import User, UserRole, WebAnalysisProfile
 from web.backend.app.schemas.auth import AdminUserPatchRequest, UserResponse
 
 
@@ -41,6 +41,11 @@ def update_user(user_id: str, payload: AdminUserPatchRequest, db: Session = Depe
             user.role = UserRole(payload.role).value
         except ValueError as error:
             raise WebApiError(422, "invalid_role", "Papel inválido.", str(uuid4())) from error
+    if payload.analysis_profile is not None:
+        try:
+            user.analysis_profile = WebAnalysisProfile(payload.analysis_profile).value
+        except ValueError as error:
+            raise WebApiError(422, "invalid_analysis_profile", "Perfil de análise inválido.", str(uuid4())) from error
     if payload.is_active is not None:
         user.is_active = payload.is_active
         if not payload.is_active:

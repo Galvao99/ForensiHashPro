@@ -56,3 +56,6 @@ Findings são controles expansíveis acessíveis. O estado fechado mostra títul
 ## Campos opcionais e limitações
 
 O contrato usa mapas genéricos para `metadata` e `technical_structure`; nomes variam por parser e formato. O resumo reconhece apenas chaves técnicas conhecidas e mantém o restante na camada detalhada. Entidades individuais não possuem um campo dedicado universal: IPs vêm de `ip_addresses`, e outras entidades só aparecem quando entregues como fatos de entidade. A UI não infere validade criptográfica, autoria, autenticidade ou fraude.
+# Experiência por perfil
+
+No resultado Free, áreas de conteúdo, entidades, IP, Timeline avançada, biometria e correlação não são renderizadas como vazias. A análise básica é apresentada como completa dentro de seu escopo e termina com um CTA institucional único para continuidade no Pro. O CTA descreve capacidades possíveis e nunca afirma achados de engines não executadas. O resultado Pro mantém as seções avançadas existentes.

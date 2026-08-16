@@ -79,6 +79,7 @@ class AnalysisResult:
     integrity: IntegrityResult
 
     analysis_id: str = ""
+    analysis_profile: str = "pro"
 
     analyzed_at: datetime = field(
         default_factory=lambda: datetime.now(timezone.utc)

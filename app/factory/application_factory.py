@@ -17,6 +17,11 @@ from app.services.text_extraction_service import TextExtractionService
 from app.evidence import EvidenceManager
 from app.binary.parsers import PdfRawParser
 from app.application import AnalysisCoordinator
+from app.analysis_profiles import (
+    AnalysisCapability,
+    AnalysisProfile,
+    FORENSIHASH_PRO,
+)
 from app.parsers import ArchiveInspectionEngine, ArchiveLimits, ParserRegistry, ZipArtifactParser
 
 
@@ -24,7 +29,9 @@ class ApplicationFactory:
     """Monta as dependências principais da aplicação."""
 
     @staticmethod
-    def create_analysis_service() -> AnalysisService:
+    def create_analysis_service(
+        profile: AnalysisProfile = FORENSIHASH_PRO,
+    ) -> AnalysisService:
         paths = ApplicationPaths.discover()
         settings = SettingsService(paths=paths).load()
         tools = ToolDetector(paths)
@@ -65,13 +72,22 @@ class ApplicationFactory:
             binary_structure_engine=binary_structure_engine,
             biometric_report_service=biometric_report_service,
             parser_registry=parser_registry,
+            profile=profile,
         )
 
-        text_extraction_service = TextExtractionService(
-            tesseract_status=tools.tesseract(enabled=settings.ocr_enabled),
-            poppler_status=tools.poppler(enabled=settings.ocr_enabled),
-            limits=settings.limits,
-        )
+        text_extraction_service = None
+        if profile.allows(AnalysisCapability.CONTENT_EXTRACTION):
+            text_extraction_service = TextExtractionService(
+                tesseract_status=tools.tesseract(
+                    enabled=settings.ocr_enabled
+                    and profile.allows(AnalysisCapability.OCR)
+                ),
+                poppler_status=tools.poppler(
+                    enabled=settings.ocr_enabled
+                    and profile.allows(AnalysisCapability.OCR)
+                ),
+                limits=settings.limits,
+            )
 
         return AnalysisService(
             analyzer,
@@ -80,9 +96,12 @@ class ApplicationFactory:
                 paths.temp_dir / "evidence",
                 max_file_size_bytes=settings.limits.max_file_size_bytes,
             ),
+            profile=profile,
         )
 
     @staticmethod
-    def create_analysis_coordinator() -> AnalysisCoordinator:
+    def create_analysis_coordinator(
+        profile: AnalysisProfile = FORENSIHASH_PRO,
+    ) -> AnalysisCoordinator:
         """Composição reutilizável sem criar QObject, janela ou widget."""
-        return AnalysisCoordinator(ApplicationFactory.create_analysis_service())
+        return AnalysisCoordinator(ApplicationFactory.create_analysis_service(profile))

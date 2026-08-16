@@ -17,6 +17,11 @@ from fastapi import UploadFile
 from app.application import AnalysisCoordinator
 from app.contracts import AnalysisContract
 from app.factory.application_factory import ApplicationFactory
+from app.analysis_profiles import (
+    AnalysisProfile,
+    FORENSIHASH_FREE,
+    analysis_profile,
+)
 from app.settings import ApplicationPaths, SettingsService
 
 
@@ -55,7 +60,7 @@ class WebAnalysisService:
 
     def __init__(
         self,
-        coordinator_factory: Callable[[], AnalysisCoordinator] | None = None,
+        coordinator_factory: Callable[..., AnalysisCoordinator] | None = None,
     ) -> None:
         self.coordinator_factory = (
             coordinator_factory or ApplicationFactory.create_analysis_coordinator
@@ -67,8 +72,14 @@ class WebAnalysisService:
         *,
         staging_sha256: str | None = None,
         analysis_id: str | None = None,
+        profile: AnalysisProfile | str = FORENSIHASH_FREE,
     ) -> AnalysisContract:
-        coordinator = self.coordinator_factory()
+        resolved_profile = analysis_profile(profile)
+        try:
+            coordinator = self.coordinator_factory(resolved_profile)
+        except TypeError:
+            # Compatibilidade com factories injetadas existentes em testes.
+            coordinator = self.coordinator_factory()
         execution = (
             coordinator.execute(Path(path), analysis_id=analysis_id)
             if analysis_id is not None

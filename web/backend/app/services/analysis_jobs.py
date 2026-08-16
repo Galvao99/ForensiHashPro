@@ -96,6 +96,7 @@ def _isolated_analysis_target(
     staged_path: str,
     staging_sha256: str,
     analysis_id: str,
+    analysis_profile: str,
 ) -> None:
     """Entry point picklable do processo; nunca envia detalhes da evidência."""
     try:
@@ -103,6 +104,7 @@ def _isolated_analysis_target(
             Path(staged_path),
             staging_sha256=staging_sha256,
             analysis_id=analysis_id,
+            profile=analysis_profile,
         )
         connection.send(("ok", contract))  # type: ignore[attr-defined]
     except BaseException as error:
@@ -332,7 +334,7 @@ class AnalysisJobExecutor:
                 except (OSError, RuntimeError) as cleanup_error:
                     LOGGER.error("analysis_job_cleanup_failed", extra={"job_id": job.id, "analysis_id": job.id, "stage": "cleanup", "engine": "upload_storage", "status": "failed", "error_type": type(cleanup_error).__name__})
                 db.commit()
-                LOGGER.info("analysis_job_finished", extra={"job_id": job.id, "analysis_id": job.id, "stage": "finished", "engine": "analysis_coordinator", "status": job.status, "duration_ms": int((time.monotonic() - started) * 1000)})
+                LOGGER.info("analysis_job_finished", extra={"job_id": job.id, "analysis_id": job.id, "stage": "finished", "engine": "analysis_coordinator", "status": job.status, "analysis_profile": job.analysis_profile, "duration_ms": int((time.monotonic() - started) * 1000)})
 
     def _execute_analysis(self, job: AnalysisJob, staged_path: Path):
         if not self._isolate_process:
@@ -340,13 +342,17 @@ class AnalysisJobExecutor:
                 staged_path,
                 staging_sha256=job.staging_sha256,
                 analysis_id=job.id,
+                profile=job.analysis_profile,
             )
 
         context = multiprocessing.get_context("spawn")
         receive, send = context.Pipe(duplex=False)
         process = context.Process(
             target=_isolated_analysis_target,
-            args=(send, str(staged_path), job.staging_sha256, job.id),
+            args=(
+                send, str(staged_path), job.staging_sha256, job.id,
+                job.analysis_profile,
+            ),
             name=f"analysis-{job.id}",
         )
         started = False

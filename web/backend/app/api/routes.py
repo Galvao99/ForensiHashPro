@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+import inspect
 from datetime import datetime, timezone
 from uuid import uuid4
 
@@ -12,6 +13,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.application.analysis_coordinator import AnalysisCancelledError
+from app.analysis_profiles import AnalysisCapability, FORENSIHASH_FREE
 from app.evidence import (
     EvidenceAcquisitionError,
     EvidenceIntegrityError,
@@ -35,6 +37,7 @@ from web.backend.app.services import (
     analysis_capacity_snapshot,
     TERMINAL_JOB_STATUSES,
     AnalysisSetService,
+    AnalysisEntitlementService,
 )
 from web.backend.app.runtime_config import (
     analysis_concurrency,
@@ -70,6 +73,22 @@ def get_capabilities_service() -> CapabilitiesService:
 
 def get_analysis_set_service() -> AnalysisSetService:
     return AnalysisSetService()
+
+
+def _analyze_with_profile(
+    service: WebAnalysisService,
+    path,
+    *,
+    staging_sha256: str,
+    profile,
+):
+    parameters = inspect.signature(service.analyze).parameters
+    kwargs = {"staging_sha256": staging_sha256}
+    if "profile" in parameters or any(
+        item.kind is inspect.Parameter.VAR_KEYWORD for item in parameters.values()
+    ):
+        kwargs["profile"] = profile
+    return service.analyze(path, **kwargs)
 
 
 class AnalysisSetRequest(BaseModel):
@@ -152,6 +171,7 @@ async def create_analysis_job(
             analysis_id = str(uuid4())
             job = AnalysisJob(id=analysis_id, user_id=user.id, status=AnalysisJobStatus.QUEUED.value,
                 original_filename=staged.display_name, retention_mode=selected.value,
+                analysis_profile=AnalysisEntitlementService.resolve(user).name.value.upper(),
                 staging_path=str(staged.path), staging_sha256=staged.sha256,
                 size_bytes=staged.size_bytes, current_stage="QUEUED")
             try:
@@ -162,7 +182,7 @@ async def create_analysis_job(
                 storage.cleanup(staged.path)
                 raise
         executor.wake()
-        LOGGER.info("analysis_job_created", extra={"job_id": job.id, "analysis_id": job.id, "stage": "queued", "engine": "job_executor", "status": job.status, "request_id": request_id, "size_bytes": staged.size_bytes})
+        LOGGER.info("analysis_job_created", extra={"job_id": job.id, "analysis_id": job.id, "stage": "queued", "engine": "job_executor", "status": job.status, "request_id": request_id, "size_bytes": staged.size_bytes, "analysis_profile": job.analysis_profile})
         return {
             "job_id": job.id,
             "analysis_id": job.id,
@@ -221,6 +241,15 @@ def create_analysis_set(
     service: AnalysisSetService = Depends(get_analysis_set_service),
 ) -> dict[str, object]:
     require_csrf(request)
+    if not AnalysisEntitlementService.resolve(user).allows(
+        AnalysisCapability.CROSS_ARTIFACT_CORRELATION
+    ):
+        raise _error(
+            status.HTTP_403_FORBIDDEN,
+            "capability_not_enabled",
+            "Análise de conjuntos de evidências está disponível no ForensiHash Pro.",
+            str(uuid4()),
+        )
     return service.create(db, user, payload.job_ids).result_json
 
 
@@ -279,7 +308,13 @@ async def create_analysis(
         async with storage.stage(file) as staged:
             size_bytes = staged.size_bytes
             contract = await asyncio.to_thread(
-                service.analyze, staged.path, staging_sha256=staged.sha256
+                _analyze_with_profile, service, staged.path,
+                staging_sha256=staged.sha256,
+                profile=(
+                    AnalysisEntitlementService.resolve(user)
+                    if user is not None
+                    else FORENSIHASH_FREE
+                ),
             )
             payload = presenter.present(contract, display_name=staged.display_name)
             if user is not None and selected_retention is RetentionMode.RESULT_ONLY:

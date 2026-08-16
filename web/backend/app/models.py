@@ -20,6 +20,11 @@ class UserRole(str, Enum):
     ADMIN = "ADMIN"
 
 
+class WebAnalysisProfile(str, Enum):
+    FREE = "FREE"
+    PRO = "PRO"
+
+
 class RetentionMode(str, Enum):
     PRIVATE = "PRIVATE"
     RESULT_ONLY = "RESULT_ONLY"
@@ -48,6 +53,9 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(320), unique=True, index=True)
     password_hash: Mapped[str] = mapped_column(Text)
     role: Mapped[str] = mapped_column(String(16), default=UserRole.USER.value)
+    analysis_profile: Mapped[str] = mapped_column(
+        String(16), default=WebAnalysisProfile.FREE.value
+    )
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     session_version: Mapped[int] = mapped_column(default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
@@ -100,6 +108,9 @@ class AnalysisJob(Base):
     status: Mapped[str] = mapped_column(String(24), default=AnalysisJobStatus.QUEUED.value, index=True)
     original_filename: Mapped[str] = mapped_column(String(255))
     retention_mode: Mapped[str] = mapped_column(String(24))
+    analysis_profile: Mapped[str] = mapped_column(
+        String(16), default=WebAnalysisProfile.FREE.value
+    )
     staging_path: Mapped[str | None] = mapped_column(Text)
     staging_sha256: Mapped[str] = mapped_column(String(64))
     size_bytes: Mapped[int] = mapped_column()

@@ -161,3 +161,6 @@ O Overview autenticado representa o workspace corrente, não uma lista truncada 
 ### Identidade visual interna
 
 O shell autenticado utiliza os assets existentes `forensihash_logo_preto.png` no tema claro e `forensihash_logo_branco.png` no tema escuro. Os arquivos não foram renomeados nem recriados. A identidade pública ARQEN permanece inalterada.
+# Perfis de execução
+
+Cada job persiste `analysis_profile`, resolvido server-side a partir do usuário no momento da admissão. O worker usa esse snapshot no processo isolado. Jobs Free não inicializam OCR e registram etapas Pro como `skipped/capability_not_enabled`. O navegador nunca concede Pro enviando um campo no upload. Consulte `FORENSIHASH_ANALYSIS_PROFILES.md`.

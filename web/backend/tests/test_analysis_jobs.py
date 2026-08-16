@@ -15,7 +15,7 @@ from app.contracts import AnalysisContract, AnalysisState
 from app.evidence import EvidenceSizeLimitError
 from web.backend.app.api.routes import get_analysis_job_executor, get_upload_storage, get_web_analysis_service
 from web.backend.app.main import app
-from web.backend.app.models import AnalysisJob, AnalysisJobStatus, StoredAnalysis
+from web.backend.app.models import AnalysisJob, AnalysisJobStatus, StoredAnalysis, User
 from web.backend.app.database import Base, get_db
 from web.backend.app.services import AnalysisJobExecutor, UploadStorage
 
@@ -186,6 +186,10 @@ def test_limit_exceeded_is_terminal_and_does_not_persist_result(platform) -> Non
 def test_analysis_set_uses_completed_jobs_without_reopening_files(platform) -> None:
     client, factory, tmp_path = platform
     auth = client.post("/api/v1/auth/register", json={"name": "Set", "email": "set@example.test", "password": "correct-horse-42", "accept_terms": True, "accept_privacy": True}).json()
+    with factory() as db:
+        user = db.scalar(select(User).where(User.email == "set@example.test"))
+        user.analysis_profile = "PRO"
+        db.commit()
     storage = UploadStorage(root=tmp_path / "jobs", max_file_size_bytes=32)
     app.dependency_overrides[get_upload_storage] = lambda: storage
     app.dependency_overrides[get_analysis_job_executor] = WakeOnly
@@ -218,6 +222,10 @@ def test_analysis_set_uses_completed_jobs_without_reopening_files(platform) -> N
 def test_failed_job_is_analysis_set_limitation(platform) -> None:
     client, factory, tmp_path = platform
     auth = client.post("/api/v1/auth/register", json={"name": "Partial", "email": "partial-set@example.test", "password": "correct-horse-42", "accept_terms": True, "accept_privacy": True}).json()
+    with factory() as db:
+        user = db.scalar(select(User).where(User.email == "partial-set@example.test"))
+        user.analysis_profile = "PRO"
+        db.commit()
     storage = UploadStorage(root=tmp_path / "jobs", max_file_size_bytes=32)
     app.dependency_overrides[get_upload_storage] = lambda: storage
     app.dependency_overrides[get_analysis_job_executor] = WakeOnly
@@ -241,8 +249,12 @@ def test_failed_job_is_analysis_set_limitation(platform) -> None:
 
 
 def test_analysis_set_rejects_foreign_or_running_jobs(platform) -> None:
-    client, _factory, tmp_path = platform
+    client, factory, tmp_path = platform
     owner = client.post("/api/v1/auth/register", json={"name": "Owner Set", "email": "owner-set@example.test", "password": "correct-horse-42", "accept_terms": True, "accept_privacy": True}).json()
+    with factory() as db:
+        user = db.scalar(select(User).where(User.email == "owner-set@example.test"))
+        user.analysis_profile = "PRO"
+        db.commit()
     storage = UploadStorage(root=tmp_path / "jobs", max_file_size_bytes=32)
     app.dependency_overrides[get_upload_storage] = lambda: storage
     app.dependency_overrides[get_analysis_job_executor] = WakeOnly
@@ -251,5 +263,9 @@ def test_analysis_set_rejects_foreign_or_running_jobs(platform) -> None:
     assert not_ready.status_code == 409
     client.cookies.clear()
     other = client.post("/api/v1/auth/register", json={"name": "Other Set", "email": "other-set@example.test", "password": "correct-horse-42", "accept_terms": True, "accept_privacy": True}).json()
+    with factory() as db:
+        user = db.scalar(select(User).where(User.email == "other-set@example.test"))
+        user.analysis_profile = "PRO"
+        db.commit()
     foreign = client.post("/api/v1/analysis-sets", json={"job_ids": [job]}, headers={"X-CSRF-Token": other["csrf_token"]})
     assert foreign.status_code == 404

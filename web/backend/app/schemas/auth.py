@@ -23,6 +23,7 @@ class UserResponse(BaseModel):
     name: str
     email: str
     role: str
+    analysis_profile: str
     is_active: bool
     created_at: datetime
     last_login_at: datetime | None
@@ -35,6 +36,7 @@ class UserPatchRequest(BaseModel):
 class AdminUserPatchRequest(BaseModel):
     name: str | None = Field(default=None, min_length=2, max_length=160)
     role: str | None = None
+    analysis_profile: str | None = None
     is_active: bool | None = None
 
 

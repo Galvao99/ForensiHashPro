@@ -18,6 +18,7 @@ from web.backend.app.services.analysis_jobs import (
     analysis_capacity_snapshot,
 )
 from web.backend.app.services.analysis_sets import AnalysisSetService
+from web.backend.app.services.analysis_profiles import AnalysisEntitlementService
 
 __all__ = [
     "CapabilitiesService",
@@ -36,4 +37,5 @@ __all__ = [
     "PRIVATE_RESULT_TTL",
     "TERMINAL_JOB_STATUSES",
     "AnalysisSetService",
+    "AnalysisEntitlementService",
 ]
