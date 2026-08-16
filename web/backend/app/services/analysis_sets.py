@@ -17,6 +17,8 @@ from web.backend.app.models import (
     AnalysisSetRecord,
     User,
 )
+from web.backend.app.services.analysis_profiles import AnalysisEntitlementService
+from app.analysis_profiles import AnalysisCapability
 
 
 SET_RESULT_TTL = timedelta(hours=1)
@@ -34,6 +36,15 @@ class AnalysisSetService:
 
     def create(self, db: Session, user: User, job_ids: list[str]) -> AnalysisSetRecord:
         request_id = str(uuid4())
+        if not AnalysisEntitlementService.resolve(user).allows(
+            AnalysisCapability.CROSS_ARTIFACT_CORRELATION
+        ):
+            raise WebApiError(
+                403,
+                "capability_not_enabled",
+                "Análise de conjuntos de evidências está disponível no ForensiHash Pro.",
+                request_id,
+            )
         unique_ids = list(dict.fromkeys(job_ids))
         if not unique_ids or len(unique_ids) > 50:
             raise WebApiError(422, "invalid_analysis_set", "O conjunto deve conter entre 1 e 50 jobs.", request_id)

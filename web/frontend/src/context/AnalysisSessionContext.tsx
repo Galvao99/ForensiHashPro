@@ -2,6 +2,7 @@ import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, 
 import { ApiError, createAnalysisJob, createAnalysisSet, getAnalysisJob, getAnalysisJobResult } from '../lib/api'
 import { analysisDiagnostic, nextProviderInstanceId, nextSubmissionAttemptId } from '../lib/analysisDiagnostics'
 import type { AnalysisContract, AnalysisSetResult, AnalysisSummary } from '../types/api'
+import type { AnalysisProfileName } from '../types/api'
 
 export const MAX_ACTIVE_ANALYSES = 1
 export const MAX_WORKSPACE_FILES = 50
@@ -140,7 +141,8 @@ function resultStatus(result: AnalysisContract): WorkspaceAnalysisStatus {
   return 'FAILED'
 }
 
-export function AnalysisSessionProvider({ children, initialResults = [] }: { children: ReactNode; initialResults?: AnalysisContract[] }) {
+export function AnalysisSessionProvider({ children, initialResults = [], analysisProfile = 'PRO' }: { children: ReactNode; initialResults?: AnalysisContract[]; analysisProfile?: AnalysisProfileName }) {
+  const isPro = analysisProfile === 'PRO'
   const [providerInstanceId] = useState(nextProviderInstanceId)
   const [analyses, setAnalyses] = useState<SessionEntry[]>(() => initialResults.map((result) => ({ result, summary: summarizeAnalysis(result), persisted: false })))
   const [internalWorkspace, setInternalWorkspace] = useState<InternalWorkspace>(() => ({
@@ -329,6 +331,7 @@ export function AnalysisSessionProvider({ children, initialResults = [] }: { chi
   }, [internalWorkspace, submitUpload])
 
   useEffect(() => {
+    if (!isPro) return
     const items = internalWorkspace.analyses
     const terminal = new Set<WorkspaceAnalysisStatus>(['SUCCESS', 'PARTIAL', 'FAILED', 'LIMIT_EXCEEDED', 'CANCELLED'])
     if (!items.length) return
@@ -344,7 +347,7 @@ export function AnalysisSessionProvider({ children, initialResults = [] }: { chi
         }
       })
       .catch(() => undefined)
-  }, [internalWorkspace])
+  }, [internalWorkspace, isPro])
 
   const addAnalysis = useCallback((result: AnalysisContract, options?: { persisted?: boolean; openInWorkspace?: boolean }) => {
     const persisted = options?.persisted ?? false
@@ -376,6 +379,13 @@ export function AnalysisSessionProvider({ children, initialResults = [] }: { chi
   }, [addAnalysis])
 
   const enqueueFiles = useCallback((files: File[], options: EnqueueOptions) => {
+    if (!isPro && files.length > 1) {
+      return {
+        accepted: 0,
+        rejected: files.length,
+        message: 'Análise de conjuntos de evidências está disponível no ForensiHash Pro. Selecione um arquivo para a análise Free.',
+      }
+    }
     const capacity = Math.max(0, MAX_WORKSPACE_FILES - workspaceRef.current.analyses.length)
     const accepted: InternalWorkspaceAnalysis[] = []
     let rejected = 0
@@ -417,7 +427,7 @@ export function AnalysisSessionProvider({ children, initialResults = [] }: { chi
       ? `Foram recusados ${rejected} arquivo(s) por caminho relativo inseguro ou pelo limite de ${MAX_WORKSPACE_FILES} abas.`
       : undefined
     return { accepted: accepted.length, rejected, message }
-  }, [providerInstanceId, updateWorkspace])
+  }, [isPro, providerInstanceId, updateWorkspace])
 
   const setActiveAnalysis = useCallback((analysisId: string) => {
     updateWorkspace((current) => current.analyses.some((item) => item.analysisId === analysisId) ? { ...current, activeAnalysisId: analysisId } : current)

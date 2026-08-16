@@ -29,6 +29,11 @@ from app.processing import ProcessingImpact
 from app.evidence.models import CaptureState, EvidenceSource
 from app.parsers import ParserRegistry, identify_artifact
 from app.parsers.models import ParsedArtifact
+from app.analysis_profiles import (
+    AnalysisCapability,
+    AnalysisProfile,
+    FORENSIHASH_PRO,
+)
 
 
 class UnacquiredEvidenceError(RuntimeError):
@@ -61,7 +66,9 @@ class FileAnalyzer:
         binary_structure_engine: BinaryStructureEngine | None = None,
         biometric_report_service: BiometricReportService | None = None,
         parser_registry: ParserRegistry | None = None,
+        profile: AnalysisProfile = FORENSIHASH_PRO,
     ) -> None:
+        self.profile = profile
         self.hash_engine = hash_engine
         self.metadata_engine = metadata_engine
         self.findings_engine = findings_engine
@@ -260,13 +267,24 @@ class FileAnalyzer:
             pdf_structure=pdf_structure,
         )
 
-        json_step = self._analyze_json(
-            file_path
+        json_step = (
+            self._analyze_json(file_path)
+            if self.profile.allows(AnalysisCapability.SPECIALIZED_PARSERS)
+            else self._capability_skipped(
+                "json_analysis", "json", AnalysisCapability.SPECIALIZED_PARSERS
+            )
         )
         processing_steps.append(json_step)
         json_analysis = json_step.value
 
-        biometric_step = self._analyze_biometric_report(file_path)
+        biometric_step = (
+            self._analyze_biometric_report(file_path)
+            if self.profile.allows(AnalysisCapability.BIOMETRIC_ANALYSIS)
+            else self._capability_skipped(
+                "biometric_analysis", "biometric",
+                AnalysisCapability.BIOMETRIC_ANALYSIS,
+            )
+        )
         processing_steps.append(biometric_step)
         biometric_report = biometric_step.value
 
@@ -468,6 +486,23 @@ class FileAnalyzer:
             user_message=message,
             value=value,
             issues=issues or [],
+        )
+
+    @staticmethod
+    def _capability_skipped(
+        code: str, component: str, capability: AnalysisCapability
+    ) -> StepResult:
+        message = "Etapa não executada porque a capability não está habilitada no perfil de análise."
+        return StepResult(
+            code=code,
+            component=component,
+            status=ProcessingStatus.SKIPPED,
+            technical_message=message,
+            user_message=message,
+            safe_details={
+                "reason": "capability_not_enabled",
+                "capability": capability.value,
+            },
         )
 
     def _build_integrity_result(

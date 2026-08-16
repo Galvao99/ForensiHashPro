@@ -12,6 +12,7 @@ import { ProductPage } from './pages/ProductPage'
 import { ReferencesPage } from './pages/ReferencesPage'
 import { ResultPage } from './pages/ResultPage'
 import { AuthProvider } from './context/AuthContext'
+import { useAuth } from './context/AuthContext'
 import { ThemeProvider } from './context/ThemeContext'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { AccountPage } from './pages/AccountPage'
@@ -33,7 +34,7 @@ export function App() {
           <Route path="/terms" element={<TermsPage />} />
           <Route path="/privacy" element={<PrivacyPage />} />
         </Route>
-        <Route element={<ProtectedRoute />}><Route path="/app" element={<AnalysisSessionProvider><AppShell /></AnalysisSessionProvider>}>
+        <Route element={<ProtectedRoute />}><Route path="/app" element={<AuthorizedWorkspace />}>
           <Route index element={<DashboardPage />} />
           <Route path="analysis" element={<AnalysisPage />} />
           <Route path="result" element={<ResultPage />} />
@@ -48,4 +49,9 @@ export function App() {
       </Routes>
     </ThemeProvider></AuthProvider></BrowserRouter>
   )
+}
+
+function AuthorizedWorkspace() {
+  const { user } = useAuth()
+  return <AnalysisSessionProvider analysisProfile={user?.analysis_profile ?? 'PRO'}><AppShell /></AnalysisSessionProvider>
 }

@@ -88,6 +88,7 @@ export function EntitySummary({ result }: { result: AnalysisContract }) {
 }
 
 export function ForensicSummary({ result }: { result: AnalysisContract }) {
+  const isPro = String(result.execution.analysis_profile ?? 'pro').toLowerCase() === 'pro'
   useEffect(() => {
     const navigation = document.querySelector<HTMLElement>('.result-nav')
     if (!navigation) return
@@ -111,5 +112,5 @@ export function ForensicSummary({ result }: { result: AnalysisContract }) {
     links.forEach((link) => { const section = document.querySelector(link.hash); if (section) observer?.observe(section) })
     return () => { links.forEach((link) => link.removeEventListener('click', onClick)); observer?.disconnect() }
   }, [])
-  return <section id="summary" className="forensic-summary" aria-labelledby="forensic-summary-title"><header><p className="eyebrow">CAMADA 1</p><h2 id="forensic-summary-title">Resumo forense</h2><p>Leitura sintética de fatos disponibilizados pelo AnalysisContract.</p></header><div className="forensic-summary-grid"><IdentificationSummary result={result} /><StructureSummary result={result} /><MetadataSummary metadata={result.metadata} /><SignatureSummary signatures={result.signatures} /><EntitySummary result={result} /></div></section>
+  return <section id="summary" className="forensic-summary" aria-labelledby="forensic-summary-title"><header><p className="eyebrow">CAMADA 1</p><h2 id="forensic-summary-title">Resumo forense</h2><p>Leitura sintética de fatos disponibilizados pelo AnalysisContract.</p></header><div className="forensic-summary-grid"><IdentificationSummary result={result} /><StructureSummary result={result} /><MetadataSummary metadata={result.metadata} /><SignatureSummary signatures={result.signatures} />{isPro && <EntitySummary result={result} />}</div></section>
 }

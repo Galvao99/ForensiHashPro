@@ -18,6 +18,7 @@ from app.contracts.analysis import (
 )
 from app.models import AnalysisResult
 from app.processing import ProcessingStatus
+from app.analysis_profiles import analysis_profile
 
 
 def _id(analysis_id: str, category: str, code: str, index: int) -> str:
@@ -163,6 +164,16 @@ class LegacyAnalysisAdapter:
                 for index, step in enumerate(result.processing_steps)
             ] + self._scope_steps(result, analysis_id),
             execution={
+                "analysis_profile": result.analysis_profile,
+                "capabilities_enabled": sorted(
+                    capability.value
+                    for capability in analysis_profile(result.analysis_profile).capabilities
+                ),
+                "capabilities_skipped": sorted({
+                    str(step.safe_details.get("capability"))
+                    for step in result.processing_steps
+                    if step.safe_details.get("reason") == "capability_not_enabled"
+                }),
                 "started_at": result.analyzed_at,
                 "finished_at": result.completed_at or datetime.now(timezone.utc),
                 "engine_versions": {"legacy_adapter": "1"},
@@ -315,7 +326,9 @@ class LegacyAnalysisAdapter:
                 "not_executed",
             ),
         ]
-        if not result.timeline_events:
+        if not result.timeline_events and not any(
+            step.code == "timeline" for step in result.processing_steps
+        ):
             sections.append(
                 (
                     "timeline",

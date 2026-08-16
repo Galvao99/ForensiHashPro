@@ -1,5 +1,5 @@
 import { ChangeEvent, DragEvent, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { FileUp, FolderUp } from 'lucide-react'
 import { Button } from '../components/ui'
 import { MAX_WORKSPACE_FILES, useAnalysisSession } from '../context/AnalysisSessionContext'
@@ -9,12 +9,20 @@ export function AnalysisPage() {
   const fileInput = useRef<HTMLInputElement>(null)
   const folderInput = useRef<HTMLInputElement>(null)
   const [error, setError] = useState('')
+  const [proSelection, setProSelection] = useState<File[]>([])
   const navigate = useNavigate()
   const { enqueueFiles, workspace } = useAnalysisSession()
-  const { privacy, csrfToken } = useAuth()
+  const { privacy, csrfToken, user } = useAuth()
+  const isPro = user?.analysis_profile !== 'FREE'
   const [privateSession, setPrivateSession] = useState(privacy?.retention_mode === 'PRIVATE')
 
   function enqueue(files: File[]) {
+    if (!isPro && files.length > 1) {
+      setProSelection(files)
+      setError('')
+      return
+    }
+    setProSelection([])
     const result = enqueueFiles(files, {
       retentionMode: privacy?.retention_mode,
       privateSession,
@@ -39,6 +47,7 @@ export function AnalysisPage() {
   return (
     <div className="app-page">
       <div className="page-heading"><div><p className="eyebrow">NOVA ANÁLISE</p><h1>Analisar evidências</h1><p>Cada arquivo será adquirido e analisado individualmente pelo núcleo.</p></div></div>
+      <p className="analysis-profile-badge" aria-label="Plano atual">FORENSIHASH {isPro ? 'PRO' : 'FREE'}</p>
       <div className="drop-zone" onDragOver={(event) => event.preventDefault()} onDrop={drop}>
         <input ref={fileInput} type="file" onChange={select} aria-label="Selecionar arquivo" />
         <input ref={folderInput} type="file" multiple onChange={select} aria-label="Selecionar pasta" {...directoryAttributes} />
@@ -47,8 +56,15 @@ export function AnalysisPage() {
           <Button type="button" className="button-secondary" onClick={() => fileInput.current?.click()}><FileUp size={16} />Selecionar arquivo</Button>
           <Button type="button" className="button-secondary" onClick={() => folderInput.current?.click()}><FolderUp size={16} />Selecionar pasta</Button>
         </div>
-        <small>Até {MAX_WORKSPACE_FILES} arquivos por workspace; no máximo 2 análises simultâneas.</small>
+        <small>{isPro ? `Até ${MAX_WORKSPACE_FILES} arquivos por workspace.` : 'O perfil Free analisa um artefato por vez.'}</small>
       </div>
+      {proSelection.length > 0 && <section className="app-panel pro-selection" aria-labelledby="pro-selection-title">
+        <p className="eyebrow">ANALYSIS SET — PRO</p>
+        <h2 id="pro-selection-title">Análise de conjuntos de evidências está disponível no ForensiHash Pro.</h2>
+        <p>Os arquivos não foram enviados nem processados. Escolha um artefato para analisar gratuitamente ou conheça a análise cross-artifact.</p>
+        <ul>{proSelection.map((file, index) => <li key={`${file.name}-${file.size}-${index}`}><span>{file.name}</span><button type="button" onClick={() => enqueue([file])}>Analisar este arquivo</button></li>)}</ul>
+        <Link className="button-link" to="/forensihash">Continuar com ForensiHash Pro</Link>
+      </section>}
       <label className="private-session"><input type="checkbox" checked={privateSession} onChange={(event) => setPrivateSession(event.target.checked)} /><span><strong>Sessão privada</strong><small>Contratos concluídos não serão adicionados ao histórico.</small></span></label>
       {workspace.analyses.length > 0 && <p className="compact-message">{workspace.analyses.length} análise(s) aberta(s). Novas seleções serão adicionadas ao workspace atual.</p>}
       {error && <p role="alert" className="error-panel">{error}</p>}

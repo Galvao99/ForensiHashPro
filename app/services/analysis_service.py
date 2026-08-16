@@ -26,6 +26,11 @@ from app.processing.logging import log_step
 from app.entities.service import EntityExtractionService
 from app.services.text_extraction_service import TextExtractionResult
 from app.services.timeline_service import TimelineService
+from app.analysis_profiles import (
+    AnalysisCapability,
+    AnalysisProfile,
+    FORENSIHASH_PRO,
+)
 
 
 LOGGER = logging.getLogger("forensihash.processing")
@@ -45,7 +50,9 @@ class AnalysisService:
         evidence_manager: EvidenceManager | None = None,
         entity_extraction_service: EntityExtractionService | None = None,
         timeline_service: TimelineService | None = None,
+        profile: AnalysisProfile = FORENSIHASH_PRO,
     ) -> None:
+        self.profile = profile
         self.analyzer = analyzer
 
         self.correlation_service = (
@@ -54,17 +61,23 @@ class AnalysisService:
             else CorrelationService()
         )
 
-        self.text_extraction_service = (
-            text_extraction_service
-            if text_extraction_service is not None
-            else TextExtractionService()
-        )
+        self.text_extraction_service = text_extraction_service
+        if self.text_extraction_service is None and profile.allows(
+            AnalysisCapability.CONTENT_EXTRACTION
+        ):
+            self.text_extraction_service = TextExtractionService()
 
         self.evidence_manager = evidence_manager or EvidenceManager()
-        self.entity_extraction_service = (
-            entity_extraction_service or EntityExtractionService()
-        )
-        self.timeline_service = timeline_service or TimelineService()
+        self.entity_extraction_service = entity_extraction_service
+        if self.entity_extraction_service is None and profile.allows(
+            AnalysisCapability.ENTITY_EXTRACTION
+        ):
+            self.entity_extraction_service = EntityExtractionService()
+        self.timeline_service = timeline_service
+        if self.timeline_service is None and profile.allows(
+            AnalysisCapability.TEMPORAL_ANALYSIS
+        ):
+            self.timeline_service = TimelineService()
 
     def analyze(
         self,
@@ -84,10 +97,21 @@ class AnalysisService:
             working_path = evidence.working_path
             result = self.analyzer.analyze_acquired(evidence)
             result.analysis_id = analysis_id
+            result.analysis_profile = self.profile.name.value
             result.analyzed_at = started_at
 
             extract_step = getattr(self.text_extraction_service, "extract", None)
-            if callable(extract_step):
+            if not self.profile.allows(AnalysisCapability.CONTENT_EXTRACTION):
+                text_step = self._capability_skipped(
+                    "text_extraction", "text_extraction",
+                    AnalysisCapability.CONTENT_EXTRACTION,
+                )
+                result.processing_steps.append(text_step)
+                result.processing_steps.append(self._capability_skipped(
+                    "ocr", "ocr", AnalysisCapability.OCR,
+                ))
+                result.extracted_text = ""
+            elif callable(extract_step):
                 text_step = extract_step(working_path)
                 result.processing_steps.append(text_step)
                 result.extracted_text = (
@@ -165,56 +189,67 @@ class AnalysisService:
                 ),
             )
 
-            try:
-                text_result = (
-                    text_step.value
-                    if isinstance(text_step.value, TextExtractionResult)
-                    else None
-                )
-                resolution = self.entity_extraction_service.resolve_analysis(
-                    result,
-                    text_result=text_result,
-                )
-                result.resolved_entities = list(resolution.entities)
-                result.processing_steps.append(
-                    StepResult(
-                        code="entity_resolution",
-                        component="entity_extraction",
-                        status=(
-                            ProcessingStatus.SUCCESS
-                            if resolution.entities
-                            else ProcessingStatus.NO_FINDINGS
-                        ),
-                        technical_message="Candidatos de entidade avaliados pelo resolver V2.",
-                        user_message="Extração de entidades concluída.",
-                        value=resolution,
-                        safe_details={
-                            "candidate_count": len(resolution.candidates),
-                            "entity_count": len(resolution.entities),
-                        },
+            if not self.profile.allows(AnalysisCapability.ENTITY_EXTRACTION):
+                result.processing_steps.append(self._capability_skipped(
+                    "entity_resolution", "entity_extraction",
+                    AnalysisCapability.ENTITY_EXTRACTION,
+                ))
+            else:
+                try:
+                    text_result = (
+                        text_step.value
+                        if isinstance(text_step.value, TextExtractionResult)
+                        else None
                     )
-                )
-            except Exception as error:
-                issue = ProcessingIssue(
-                    code="entity_resolution_failed",
-                    status=ProcessingStatus.FAILED,
-                    technical_message="O Entity Resolver V2 não concluiu o processamento.",
-                    user_message="A extração estruturada de entidades não pôde ser concluída.",
-                    component="entity_extraction",
-                    details={"error_type": type(error).__name__},
-                    impact=ProcessingImpact.ANALYSIS_PARTIAL,
-                    original_exception=error,
-                )
-                result.processing_steps.append(
-                    StepResult(
-                        code="entity_resolution",
-                        component="entity_extraction",
+                    resolution = self.entity_extraction_service.resolve_analysis(  # type: ignore[union-attr]
+                        result,
+                        text_result=text_result,
+                    )
+                    result.resolved_entities = list(resolution.entities)
+                    result.processing_steps.append(
+                        StepResult(
+                            code="entity_resolution",
+                            component="entity_extraction",
+                            status=(
+                                ProcessingStatus.SUCCESS
+                                if resolution.entities
+                                else ProcessingStatus.NO_FINDINGS
+                            ),
+                            technical_message="Candidatos de entidade avaliados pelo resolver V2.",
+                            user_message="Extração de entidades concluída.",
+                            value=resolution,
+                            safe_details={
+                                "candidate_count": len(resolution.candidates),
+                                "entity_count": len(resolution.entities),
+                            },
+                        )
+                    )
+                except Exception as error:
+                    issue = ProcessingIssue(
+                        code="entity_resolution_failed",
                         status=ProcessingStatus.FAILED,
-                        technical_message=issue.technical_message,
-                        user_message=issue.user_message,
-                        issues=[issue],
+                        technical_message="O Entity Resolver V2 não concluiu o processamento.",
+                        user_message="A extração estruturada de entidades não pôde ser concluída.",
+                        component="entity_extraction",
+                        details={"error_type": type(error).__name__},
+                        impact=ProcessingImpact.ANALYSIS_PARTIAL,
+                        original_exception=error,
                     )
-                )
+                    result.processing_steps.append(
+                        StepResult(
+                            code="entity_resolution",
+                            component="entity_extraction",
+                            status=ProcessingStatus.FAILED,
+                            technical_message=issue.technical_message,
+                            user_message=issue.user_message,
+                            issues=[issue],
+                        )
+                    )
+
+            if not self.profile.allows(AnalysisCapability.IP_ANALYSIS):
+                result.processing_steps.append(self._capability_skipped(
+                    "ip_context", "ip_analysis", AnalysisCapability.IP_ANALYSIS,
+                ))
 
             if evidence.capture_state is CaptureState.COMPROMISED:
                 raise EvidenceIntegrityError(
@@ -225,8 +260,13 @@ class AnalysisService:
                 )
 
             result.completed_at = datetime.now(timezone.utc)
-            try:
-                timeline = self.timeline_service.build(result)
+            if not self.profile.allows(AnalysisCapability.TEMPORAL_ANALYSIS):
+                result.processing_steps.append(self._capability_skipped(
+                    "timeline", "timeline", AnalysisCapability.TEMPORAL_ANALYSIS,
+                ))
+            else:
+              try:
+                timeline = self.timeline_service.build(result)  # type: ignore[union-attr]
                 result.timeline_events = timeline.events
                 result.timeline_warnings = timeline.warnings
                 result.timeline_limitations = timeline.limitations
@@ -245,7 +285,7 @@ class AnalysisService:
                         safe_details=timeline.summary,
                     )
                 )
-            except Exception as error:
+              except Exception as error:
                 issue = ProcessingIssue(
                     code="timeline_failed",
                     status=ProcessingStatus.PARTIAL,
@@ -283,6 +323,8 @@ class AnalysisService:
         Executa a investigação sobre um ou mais arquivos.
         """
 
+        if not self.profile.allows(AnalysisCapability.CROSS_ARTIFACT_CORRELATION):
+            raise PermissionError("Correlação entre artefatos não habilitada neste perfil.")
         result_list = list(results)
 
         compromised = next(
@@ -402,4 +444,23 @@ class AnalysisService:
         return aliases.get(
             normalized,
             normalized or "info",
+        )
+
+    @staticmethod
+    def _capability_skipped(
+        code: str,
+        component: str,
+        capability: AnalysisCapability,
+    ) -> StepResult:
+        message = "Etapa não executada porque a capability não está habilitada no perfil de análise."
+        return StepResult(
+            code=code,
+            component=component,
+            status=ProcessingStatus.SKIPPED,
+            technical_message=message,
+            user_message=message,
+            safe_details={
+                "reason": "capability_not_enabled",
+                "capability": capability.value,
+            },
         )
