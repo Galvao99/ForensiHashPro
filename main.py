@@ -4,6 +4,7 @@ from PySide6.QtWidgets import QApplication
 
 from app.factory.application_factory import ApplicationFactory
 from app.ui.main_window import MainWindow
+from app.ui.theme import load_desktop_stylesheet
 from app.settings import ApplicationPaths
 
 
@@ -11,9 +12,7 @@ def main() -> None:
     app = QApplication(sys.argv)
 
     paths = ApplicationPaths.discover()
-    style_path = paths.resource("app/ui/style.qss")
-    if style_path.exists():
-        app.setStyleSheet(style_path.read_text(encoding="utf-8"))
+    app.setStyleSheet(load_desktop_stylesheet(paths))
 
     service = ApplicationFactory.create_analysis_service()
     window = MainWindow(service)

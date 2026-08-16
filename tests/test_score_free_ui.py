@@ -332,20 +332,27 @@ def test_findings_page_reflows_filters_and_details_panel(qt_app) -> None:
     page.close()
 
 
-def test_general_dashboard_stacks_cards_at_compact_width(qt_app) -> None:
+def test_general_dashboard_stacks_summary_sections_at_compact_width(
+    qt_app, analysis_result: AnalysisResult
+) -> None:
     dashboard = AnalysisDashboard()
+    dashboard.update_analysis(analysis_result)
     dashboard.resize(700, 800)
     dashboard.show()
     qt_app.processEvents()
-    compact_position = dashboard.cards_grid.getItemPosition(
-        dashboard.cards_grid.indexOf(dashboard.findings_preview_card)
+    compact_position = dashboard.forensic_summary.sections_layout.getItemPosition(
+        dashboard.forensic_summary.sections_layout.indexOf(
+            dashboard.forensic_summary._sections[1]
+        )
     )
     assert compact_position[:2] == (1, 0)
 
     dashboard.resize(1100, 800)
     qt_app.processEvents()
-    wide_position = dashboard.cards_grid.getItemPosition(
-        dashboard.cards_grid.indexOf(dashboard.findings_preview_card)
+    wide_position = dashboard.forensic_summary.sections_layout.getItemPosition(
+        dashboard.forensic_summary.sections_layout.indexOf(
+            dashboard.forensic_summary._sections[1]
+        )
     )
     assert wide_position[:2] == (0, 1)
     dashboard.close()

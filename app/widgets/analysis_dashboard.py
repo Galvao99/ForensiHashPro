@@ -1,77 +1,48 @@
 from PySide6.QtCore import QEvent, Qt
-from PySide6.QtWidgets import (
-    QFrame,
-    QGridLayout,
-    QLabel,
-    QScrollArea,
-    QVBoxLayout,
-    QWidget,
-)
+from PySide6.QtWidgets import QFrame, QLabel, QScrollArea, QVBoxLayout, QWidget
 
-from app.knowledge.summary_builder import SummaryBuilder
 from app.models import AnalysisResult
-from app.widgets.file_info_card import FileInfoCard
 from app.widgets.finding_preview_card import FindingsPreviewCard
-from app.widgets.summary_card import SummaryCard
+from app.widgets.forensic_summary import ForensicSummary
+from app.widgets.result_header import ResultHeader
 
 
 class AnalysisDashboard(QWidget):
-    """Painel geral da análise.
-
-    A aba Geral deve funcionar como uma visão executiva:
-    - resumo pericial;
-    - informações principais do arquivo;
-    - prévia dos vestígios;
-    - sem excesso de dados brutos.
-    """
+    """Síntese factual do artefato selecionado."""
 
     RESPONSIVE_BREAKPOINT = 900
 
     def __init__(self) -> None:
         super().__init__()
-
-        self.summary_builder = SummaryBuilder()
         self.current_result: AnalysisResult | None = None
         self.correlation_count: int | None = None
 
-        self.title_label = QLabel("Nenhum arquivo selecionado.")
-        self.title_label.setObjectName("DashboardTitle")
-        self.subtitle_label = QLabel(
-            "Síntese factual da análise do arquivo atualmente selecionado."
+        self.result_header = ResultHeader()
+        self.summary_eyebrow = QLabel("ANÁLISE ATUAL")
+        self.summary_eyebrow.setObjectName("SummaryEyebrow")
+        self.summary_title = QLabel("Resumo Forense")
+        self.summary_title.setObjectName("ForensicSummaryTitle")
+        self.summary_description = QLabel(
+            "Síntese dos fatos técnicos observados. Os detalhes permanecem nas páginas específicas."
         )
-        self.subtitle_label.setObjectName("DashboardSubtitle")
-        self.subtitle_label.setWordWrap(True)
-
-        self.summary_card = SummaryCard()
-        self.file_info_card = FileInfoCard()
+        self.summary_description.setObjectName("ForensicSummaryDescription")
+        self.summary_description.setWordWrap(True)
+        self.forensic_summary = ForensicSummary()
         self.findings_preview_card = FindingsPreviewCard()
-
-        self.cards_grid = QGridLayout()
-        self.cards_grid.setSpacing(16)
-
-        self.cards_grid.addWidget(self.file_info_card, 0, 0)
-        self.cards_grid.addWidget(self.findings_preview_card, 0, 1)
-        self.cards_grid.setColumnStretch(0, 1)
-        self.cards_grid.setColumnStretch(1, 1)
 
         content = QWidget()
         content.setObjectName("DashboardContent")
-        content_layout = QVBoxLayout(content)
-        content_layout.setContentsMargins(4, 4, 8, 12)
-        content_layout.setSpacing(16)
-
-        header = QFrame()
-        header.setObjectName("DashboardHeader")
-        header_layout = QVBoxLayout(header)
-        header_layout.setContentsMargins(18, 15, 18, 15)
-        header_layout.setSpacing(4)
-        header_layout.addWidget(self.title_label)
-        header_layout.addWidget(self.subtitle_label)
-
-        content_layout.addWidget(header)
-        content_layout.addWidget(self.summary_card)
-        content_layout.addLayout(self.cards_grid)
-        content_layout.addStretch()
+        self.content_layout = QVBoxLayout(content)
+        self.content_layout.setContentsMargins(4, 4, 10, 18)
+        self.content_layout.setSpacing(14)
+        self.content_layout.addWidget(self.result_header)
+        self.content_layout.addSpacing(4)
+        self.content_layout.addWidget(self.summary_eyebrow)
+        self.content_layout.addWidget(self.summary_title)
+        self.content_layout.addWidget(self.summary_description)
+        self.content_layout.addWidget(self.forensic_summary)
+        self.content_layout.addWidget(self.findings_preview_card)
+        self.content_layout.addStretch()
 
         scroll = QScrollArea()
         scroll.setObjectName("DashboardScroll")
@@ -86,34 +57,16 @@ class AnalysisDashboard(QWidget):
 
     def resizeEvent(self, event: QEvent) -> None:
         compact = event.size().width() < self.RESPONSIVE_BREAKPOINT
-        target = (1, 0) if compact else (0, 1)
-        index = self.cards_grid.indexOf(self.findings_preview_card)
-        current = self.cards_grid.getItemPosition(index)[:2]
-        if current != target:
-            self.cards_grid.removeWidget(self.findings_preview_card)
-            self.cards_grid.addWidget(self.findings_preview_card, *target)
+        self.forensic_summary.set_compact(compact)
+        self.forensic_summary.sections_layout.setHorizontalSpacing(8 if compact else 12)
         super().resizeEvent(event)
 
     def update_analysis(self, result: AnalysisResult) -> None:
         self.current_result = result
         self.correlation_count = None
-        self.title_label.setText(f"Arquivo atual: {result.file_info.name}")
-
-        summary = self.summary_builder.build(
-            result,
-            correlation_count=self.correlation_count,
-        )
-        self.summary_card.update_summary(summary)
-
-        self.file_info_card.update_analysis(result)
+        self.result_header.update_analysis(result)
+        self.forensic_summary.update_analysis(result)
         self.findings_preview_card.update_findings(result.findings)
 
     def update_correlation_count(self, count: int) -> None:
         self.correlation_count = count
-        if self.current_result is not None:
-            self.summary_card.update_summary(
-                self.summary_builder.build(
-                    self.current_result,
-                    correlation_count=count,
-                )
-            )

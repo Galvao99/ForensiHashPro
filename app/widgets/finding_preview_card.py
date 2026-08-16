@@ -25,7 +25,7 @@ class FindingsPreviewCard(QWidget):
         card_layout.setContentsMargins(18, 14, 18, 14)
         card_layout.setSpacing(10)
 
-        title = QLabel("🧩 Principais Vestígios")
+        title = QLabel("PRINCIPAIS VESTÍGIOS")
         title.setObjectName("findingsPreviewTitle")
 
         subtitle = QLabel("Prévia dos achados mais relevantes. A análise completa fica na aba Vestígios.")
@@ -49,7 +49,7 @@ class FindingsPreviewCard(QWidget):
             return
 
         for finding in findings[:3]:
-            item = QLabel(f"{self._severity_icon(finding)} {finding.title}")
+            item = QLabel(f"{self._severity_label(finding)}  {finding.title}")
             item.setObjectName("findingsPreviewText")
             item.setWordWrap(True)
             self.container.addWidget(item)
@@ -59,16 +59,16 @@ class FindingsPreviewCard(QWidget):
             more.setObjectName("findingsPreviewMuted")
             self.container.addWidget(more)
 
-    def _severity_icon(self, finding: Finding) -> str:
+    def _severity_label(self, finding: Finding) -> str:
         severity = getattr(finding.severity, "value", "").lower()
 
         if severity == "critical":
-            return "❌"
+            return "CRÍTICO"
         if severity == "warning":
-            return "⚠"
+            return "ATENÇÃO"
         if severity == "success":
-            return "✅"
-        return "ℹ"
+            return "OK"
+        return "INFO"
 
     def _clear_layout(self) -> None:
         while self.container.count():

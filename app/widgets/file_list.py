@@ -139,13 +139,7 @@ class FileListItemWidget(QWidget):
             self.file_path.suffix.lower()
         )
 
-        text_extensions = {
-            ".txt",
-            ".csv",
-            ".json",
-            ".xml",
-            ".log",
-        }
+        text_extensions = {".txt", ".csv", ".xml", ".log"}
 
         image_extensions = {
             ".jpg",
@@ -166,20 +160,11 @@ class FileListItemWidget(QWidget):
             ".gz",
         }
 
-        office_extensions = {
-            ".doc",
-            ".docx",
-            ".xls",
-            ".xlsx",
-            ".ppt",
-            ".pptx",
-        }
-
         if extension == ".pdf":
             return "PDF"
 
         if extension in image_extensions:
-            return "IMG"
+            return extension.removeprefix(".").upper()[:4]
 
         if extension in archive_extensions:
             return "ZIP"
@@ -187,8 +172,20 @@ class FileListItemWidget(QWidget):
         if extension in text_extensions:
             return "TXT"
 
-        if extension in office_extensions:
+        if extension == ".json":
+            return "JSON"
+
+        if extension in {".html", ".htm"}:
+            return "HTML"
+
+        if extension in {".doc", ".docx"}:
             return "DOC"
+
+        if extension in {".xls", ".xlsx"}:
+            return "XLS"
+
+        if extension in {".ppt", ".pptx"}:
+            return "PPT"
 
         return "FILE"
 
