@@ -110,3 +110,66 @@ class StructureReport:
             occurrences=tuple(value["occurrences"]),
             parser_warnings=tuple(ParserWarning(**item) for item in value["parser_warnings"]),
         )
+
+
+@dataclass(frozen=True, slots=True)
+class JpegSegment:
+    index: int
+    marker: int
+    marker_hex: str
+    marker_name: str
+    offset: int
+    marker_offset: int
+    payload_offset: int
+    declared_length: int | None
+    payload_length: int
+    end_offset: int
+    category: str
+    summary: str
+    metadata: dict[str, Any] | None
+
+
+@dataclass(frozen=True, slots=True)
+class JpegPhysicalInfo:
+    file_size: int
+    soi_offset: int
+    eoi_offset: int | None
+    trailing_bytes_offset: int | None
+    trailing_bytes_length: int
+    segment_count: int
+    scan_count: int
+
+
+@dataclass(frozen=True, slots=True)
+class JpegStructureReport:
+    format: str
+    structure_version: str
+    parser: str
+    physical_info: JpegPhysicalInfo
+    segments: tuple[JpegSegment, ...]
+    scans: tuple[dict[str, Any], ...]
+    frames: tuple[dict[str, Any], ...]
+    quantization_tables: tuple[dict[str, Any], ...]
+    huffman_tables: tuple[dict[str, Any], ...]
+    exif: tuple[dict[str, Any], ...]
+    xmp: tuple[dict[str, Any], ...]
+    icc: tuple[dict[str, Any], ...]
+    visual_assets: tuple[dict[str, Any], ...]
+    comments: tuple[dict[str, Any], ...]
+    warnings: tuple[ParserWarning, ...]
+    capabilities: dict[str, bool]
+
+    @classmethod
+    def from_dict(cls, value: dict[str, Any]) -> JpegStructureReport:
+        return cls(
+            format=value["format"], structure_version=value["structure_version"], parser=value["parser"],
+            physical_info=JpegPhysicalInfo(**value["physical_info"]),
+            segments=tuple(JpegSegment(**item) for item in value["segments"]),
+            scans=tuple(value["scans"]), frames=tuple(value["frames"]),
+            quantization_tables=tuple(value["quantization_tables"]),
+            huffman_tables=tuple(value["huffman_tables"]), exif=tuple(value["exif"]),
+            xmp=tuple(value["xmp"]), icc=tuple(value["icc"]),
+            visual_assets=tuple(value["visual_assets"]), comments=tuple(value["comments"]),
+            warnings=tuple(ParserWarning(**item) for item in value["warnings"]),
+            capabilities=dict(value["capabilities"]),
+        )

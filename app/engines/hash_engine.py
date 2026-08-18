@@ -28,6 +28,14 @@ class HashEngine: #Colocar mais hashes se necessário
 
         return hash_object.hexdigest()
 
+    def calculate_bytes_hash(self, data: bytes | bytearray | memoryview, algorithm: str) -> str:
+        """Calcula o digest de uma região já limitada em memória."""
+        if algorithm not in self._algorithms:
+            raise ValueError(f"Algoritmo de hash não suportado: {algorithm}")
+        hash_object = hashlib.new(self._algorithms[algorithm])
+        hash_object.update(data)
+        return hash_object.hexdigest()
+
     def calculate_all(self, file_path: Path) -> HashResult:
         hash_objects = {
             name: hashlib.new(algorithm)

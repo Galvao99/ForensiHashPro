@@ -1,3 +1,5 @@
+mod jpeg;
+mod jpeg_models;
 mod models;
 mod pdf;
 mod visual;
@@ -23,3 +25,5 @@ impl std::fmt::Display for StructureError {
 }
 
 impl std::error::Error for StructureError {}
+pub use jpeg::{JpegLimits, JpegStructureParser};
+pub use jpeg_models::*;

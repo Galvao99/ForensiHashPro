@@ -104,6 +104,8 @@ class AnalysisWorkspace(QStackedWidget):
             return False
 
         self.setCurrentWidget(page)
+        if page is self.home_page:
+            self.deep_file_explorer_page.release_analysis()
         if page is self.deep_file_explorer_page:
             page.ensure_loaded()
         return True
