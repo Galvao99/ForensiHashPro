@@ -8,6 +8,7 @@ from app.investigation.investigation_context import (
 from app.models import AnalysisResult
 from app.pages.comparison_workspace import ComparisonWorkspace
 from app.pages.digital_signature_pages import DigitalSignaturePage
+from app.pages.deep_file_explorer_page import DeepFileExplorerPage
 from app.pages.finding_page import FindingPage
 from app.pages.general_page import GeneralPage
 from app.pages.hash_page import HashPage
@@ -37,6 +38,7 @@ class AnalysisWorkspace(QStackedWidget):
         "timeline": "Linha temporal",
         "magic_number": "Magic Number",
         "digital_signature": "Assinatura digital",
+        "deep_file_explorer": "Deep File Explorer",
         "integrity": "Integridade",
         "comparison": "Comparação",
         "ocr": "OCR e busca",
@@ -59,6 +61,7 @@ class AnalysisWorkspace(QStackedWidget):
         self.timeline_page = TimelinePage()
         self.magic_number_page = MagicNumberPage()
         self.digital_signature_page = DigitalSignaturePage()
+        self.deep_file_explorer_page = DeepFileExplorerPage()
         self.integrity_page = IntegrityPage()
         # self.binary_structure_page = BinaryStructurePage()
 
@@ -78,6 +81,7 @@ class AnalysisWorkspace(QStackedWidget):
             "timeline": self.timeline_page,
             "magic_number": self.magic_number_page,
             "digital_signature": self.digital_signature_page,
+            "deep_file_explorer": self.deep_file_explorer_page,
             "integrity": self.integrity_page,
             "comparison": self.comparison_page,
             "ocr": self.ocr_page,
@@ -100,6 +104,8 @@ class AnalysisWorkspace(QStackedWidget):
             return False
 
         self.setCurrentWidget(page)
+        if page is self.deep_file_explorer_page:
+            page.ensure_loaded()
         return True
 
     def page_title(
@@ -124,6 +130,7 @@ class AnalysisWorkspace(QStackedWidget):
                 "Assinatura digital",
                 self.digital_signature_page,
             ),
+            ("Deep File Explorer", self.deep_file_explorer_page),
             ("Integridade", self.integrity_page),
             ("OCR", self.ocr_page),
             ("IP", self.ip_page),

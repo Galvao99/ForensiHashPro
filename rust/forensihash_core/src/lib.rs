@@ -15,6 +15,9 @@ use serde::de::{
 use serde::Serialize;
 use serde_json::Value;
 
+mod deep_structure;
+use deep_structure::PdfStructureParser;
+
 
 // ================================================================
 // MODELOS DE SAÍDA
@@ -760,6 +763,152 @@ fn parse_json_file(
 }
 
 
+#[pyclass(name = "DeepStructureSession")]
+struct PyDeepStructureSession {
+    parsed: deep_structure::ParsedStructure,
+    max_decoded_stream_bytes: usize,
+    preview_limits: deep_structure::PreviewLimits,
+    max_embedded_file_bytes: usize,
+    max_preview_cache_bytes: usize,
+    preview_cache: std::sync::Mutex<(std::collections::HashMap<String, Vec<u8>>, usize)>,
+}
+
+#[pymethods]
+impl PyDeepStructureSession {
+    fn report_json(&self) -> PyResult<String> {
+        serde_json::to_string(&self.parsed.report)
+            .map_err(|error| PyRuntimeError::new_err(error.to_string()))
+    }
+
+    fn get_object(&self, object_id: &str) -> PyResult<String> {
+        let id = parse_pdf_object_id(object_id)?;
+        let normalized = format!("{}_{}", id.0, id.1);
+        let object = self.parsed.report.objects.iter().find(|item| item.id == normalized)
+            .ok_or_else(|| PyValueError::new_err(format!("PDF object not found: {object_id}")))?;
+        serde_json::to_string(object).map_err(|error| PyRuntimeError::new_err(error.to_string()))
+    }
+
+    fn get_raw_object(&self, object_id: &str) -> PyResult<Vec<u8>> {
+        let id = parse_pdf_object_id(object_id)?;
+        let normalized = format!("{}_{}", id.0, id.1);
+        let object = self.parsed.report.objects.iter().find(|item| item.id == normalized)
+            .ok_or_else(|| PyValueError::new_err(format!("PDF object not found: {object_id}")))?;
+        let start = object.offset.ok_or_else(|| PyRuntimeError::new_err(
+            format!("Raw bytes are unavailable for object {object_id}")
+        ))? as usize;
+        let length = object.raw_length.ok_or_else(|| PyRuntimeError::new_err(
+            format!("Raw length is unavailable for object {object_id}")
+        ))? as usize;
+        let end = start.checked_add(length).filter(|end| *end <= self.parsed.source_data.len())
+            .ok_or_else(|| PyRuntimeError::new_err(format!("Raw object range is invalid: {object_id}")))?;
+        Ok(self.parsed.source_data[start..end].to_vec())
+    }
+
+    fn get_raw_stream(&self, object_id: &str) -> PyResult<Vec<u8>> {
+        let id = parse_pdf_object_id(object_id)?;
+        let stream = self.parsed.document.get_object(id).ok()
+            .and_then(|object| object.as_stream().ok())
+            .ok_or_else(|| PyValueError::new_err(format!("PDF stream not found: {object_id}")))?;
+        Ok(stream.content.clone())
+    }
+
+    fn get_decoded_stream(&self, object_id: &str) -> PyResult<Vec<u8>> {
+        let id = parse_pdf_object_id(object_id)?;
+        let stream = self.parsed.document.get_object(id).ok()
+            .and_then(|object| object.as_stream().ok())
+            .ok_or_else(|| PyValueError::new_err(format!("PDF stream not found: {object_id}")))?;
+        stream.decompressed_content_with_limit(self.max_decoded_stream_bytes)
+            .map_err(|error| PyRuntimeError::new_err(format!("Unable to decode stream {object_id}: {error}")))
+    }
+
+    fn get_visual_asset(&self, object_id: &str) -> PyResult<String> {
+        let id = parse_pdf_object_id(object_id)?;
+        let result = deep_structure::visual_asset(&self.parsed.document, id, self.preview_limits)
+            .map_err(PyRuntimeError::new_err)?;
+        serde_json::to_string(&result.asset).map_err(|error| PyRuntimeError::new_err(error.to_string()))
+    }
+
+    fn get_preview(&self, object_id: &str) -> PyResult<Vec<u8>> {
+        let id = parse_pdf_object_id(object_id)?;
+        let key = format!("preview:{}_{}", id.0, id.1);
+        if let Some(bytes) = self.preview_cache.lock().map_err(|_| PyRuntimeError::new_err("Preview cache lock failed"))?.0.get(&key).cloned() { return Ok(bytes); }
+        let result = deep_structure::visual_asset(&self.parsed.document, id, self.preview_limits).map_err(PyRuntimeError::new_err)?;
+        let bytes = result.bytes.ok_or_else(|| PyRuntimeError::new_err(
+            result.asset.warnings.first().map(|warning| warning.message.clone()).unwrap_or_else(|| "Preview is unavailable".into())
+        ))?;
+        self.cache_preview(key, &bytes)?;
+        Ok(bytes)
+    }
+
+    fn get_composite_preview(&self, object_id: &str) -> PyResult<Vec<u8>> {
+        let id = parse_pdf_object_id(object_id)?;
+        let key = format!("composite:{}_{}", id.0, id.1);
+        if let Some(bytes) = self.preview_cache.lock().map_err(|_| PyRuntimeError::new_err("Preview cache lock failed"))?.0.get(&key).cloned() { return Ok(bytes); }
+        let bytes = deep_structure::composite_preview(&self.parsed.document, id, self.preview_limits).map_err(PyRuntimeError::new_err)?;
+        self.cache_preview(key, &bytes)?;
+        Ok(bytes)
+    }
+
+    fn get_embedded_file(&self, object_id: &str) -> PyResult<Vec<u8>> {
+        let bytes = self.get_decoded_stream(object_id)?;
+        if bytes.len() > self.max_embedded_file_bytes { return Err(PyRuntimeError::new_err("Embedded file exceeds configured size limit")); }
+        Ok(bytes)
+    }
+
+    fn get_metadata_text(&self, object_id: &str) -> PyResult<String> {
+        let bytes = self.get_decoded_stream(object_id)?;
+        Ok(String::from_utf8_lossy(&bytes).into_owned())
+    }
+}
+
+impl PyDeepStructureSession {
+    fn cache_preview(&self, key: String, bytes: &[u8]) -> PyResult<()> {
+        if bytes.len() > self.max_preview_cache_bytes { return Ok(()); }
+        let mut cache = self.preview_cache.lock().map_err(|_| PyRuntimeError::new_err("Preview cache lock failed"))?;
+        if cache.1.saturating_add(bytes.len()) > self.max_preview_cache_bytes { cache.0.clear(); cache.1 = 0; }
+        cache.1 = cache.1.saturating_add(bytes.len());
+        cache.0.insert(key, bytes.to_vec());
+        Ok(())
+    }
+}
+
+fn parse_pdf_object_id(value: &str) -> PyResult<(u32, u16)> {
+    let normalized = value.strip_prefix("pdf_object_").unwrap_or(value);
+    let parts = normalized.split('_').collect::<Vec<_>>();
+    if parts.len() != 2 {
+        return Err(PyValueError::new_err(
+            "object_id must use '<number>_<generation>' or 'pdf_object_<number>_<generation>'"
+        ));
+    }
+    let number = parts[0].parse().map_err(|_| PyValueError::new_err("invalid object number"))?;
+    let generation = parts[1].parse().map_err(|_| PyValueError::new_err("invalid generation number"))?;
+    Ok((number, generation))
+}
+
+#[pyfunction(signature = (path, max_file_bytes=536_870_912, max_decoded_stream_bytes=67_108_864, max_preview_width=16384, max_preview_height=16384, max_preview_pixels=100_000_000, max_nested_resource_depth=16, max_embedded_file_bytes=134_217_728, max_preview_cache_bytes=134_217_728))]
+fn analyze_pdf(path: &str, max_file_bytes: usize, max_decoded_stream_bytes: usize, max_preview_width: u32, max_preview_height: u32, max_preview_pixels: u64, max_nested_resource_depth: usize, max_embedded_file_bytes: usize, max_preview_cache_bytes: usize) -> PyResult<PyDeepStructureSession> {
+    if max_file_bytes == 0 || max_decoded_stream_bytes == 0 || max_preview_width == 0 || max_preview_height == 0 || max_preview_pixels == 0 || max_nested_resource_depth == 0 || max_embedded_file_bytes == 0 || max_preview_cache_bytes == 0 {
+        return Err(PyValueError::new_err("size limits must be greater than zero"));
+    }
+    let file_path = Path::new(path);
+    let metadata = std::fs::metadata(file_path)
+        .map_err(|error| PyValueError::new_err(format!("Unable to inspect PDF: {error}")))?;
+    if !metadata.is_file() { return Err(PyValueError::new_err("The supplied path is not a file")); }
+    if metadata.len() > max_file_bytes as u64 {
+        return Err(PyValueError::new_err(format!("PDF exceeds configured file limit of {max_file_bytes} bytes")));
+    }
+    let data = std::fs::read(file_path)
+        .map_err(|error| PyRuntimeError::new_err(format!("Unable to read PDF: {error}")))?;
+    let parsed = PdfStructureParser.parse_with_depth(&data, max_nested_resource_depth)
+        .map_err(|error| PyRuntimeError::new_err(error.to_string()))?;
+    Ok(PyDeepStructureSession {
+        parsed, max_decoded_stream_bytes,
+        preview_limits: deep_structure::PreviewLimits { max_width: max_preview_width, max_height: max_preview_height, max_pixels: max_preview_pixels, max_decoded_bytes: max_decoded_stream_bytes },
+        max_embedded_file_bytes, max_preview_cache_bytes,
+        preview_cache: std::sync::Mutex::new((std::collections::HashMap::new(), 0)),
+    })
+}
+
 #[pymodule]
 fn forensihash_core(
     module: &Bound<'_, PyModule>,
@@ -770,6 +919,9 @@ fn forensihash_core(
             module
         )?,
     )?;
+
+    module.add_function(wrap_pyfunction!(analyze_pdf, module)?)?;
+    module.add_class::<PyDeepStructureSession>()?;
 
     Ok(())
 }
