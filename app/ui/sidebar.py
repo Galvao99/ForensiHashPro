@@ -369,6 +369,11 @@ class Sidebar(QFrame):
                 "Assinaturas",
             ),
             (
+                "deep_file_explorer",
+                "DEEP",
+                "Deep File Explorer",
+            ),
+            (
                 "integrity",
                 "INT",
                 "Integridade",

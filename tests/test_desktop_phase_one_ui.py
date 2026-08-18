@@ -87,7 +87,7 @@ def test_sidebar_keeps_navigation_keys_and_uses_uniform_markers(qt_app) -> None:
     assert set(sidebar.navigation_buttons) == {
         "general", "hashes", "metadata", "findings", "timeline",
         "magic_number", "digital_signature", "integrity", "ocr", "ip",
-        "comparison",
+        "comparison", "deep_file_explorer",
     }
     sidebar.set_active_page("metadata")
     assert sidebar.navigation_buttons["metadata"].isChecked()
