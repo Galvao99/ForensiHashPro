@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 from typing import Any, Protocol
 
-from .models import StructureReport
+from .models import JpegStructureReport, StructureReport
 
 
 class DeepStructureError(RuntimeError):
@@ -62,6 +62,27 @@ class DeepStructureSession:
         return self._native.get_metadata_text(object_id)
 
 
+class JpegDeepStructureSession:
+    """Keeps JPEG source bytes and its stable structural inventory available lazily."""
+
+    def __init__(self, native: Any) -> None:
+        self._native = native
+        self.report = JpegStructureReport.from_dict(json.loads(native.report_json()))
+
+    def get_segment(self, index: int) -> dict[str, Any]: return json.loads(self._native.get_segment(index))
+    def get_segment_raw(self, index: int) -> bytes: return bytes(self._native.get_segment_raw(index))
+    def get_scan(self, index: int) -> dict[str, Any]: return json.loads(self._native.get_scan(index))
+    def get_scan_raw(self, index: int) -> bytes: return bytes(self._native.get_scan_raw(index))
+    def get_exif_ifd(self, path: str) -> dict[str, Any]: return json.loads(self._native.get_exif_ifd(path))
+    def get_exif_entry(self, path: str, tag_id: int) -> dict[str, Any]: return json.loads(self._native.get_exif_entry(path, tag_id))
+    def get_visual_asset(self, asset_id: str) -> bytes: return bytes(self._native.get_visual_asset(asset_id))
+    def get_preview(self, asset_id: str = "jpeg_main") -> bytes: return bytes(self._native.get_preview(asset_id))
+    def get_xmp_text(self, packet_id: str) -> str: return self._native.get_xmp_text(packet_id)
+    def get_xmp_raw(self, packet_id: str) -> bytes: return bytes(self._native.get_xmp_raw(packet_id))
+    def get_icc_profile(self) -> bytes: return bytes(self._native.get_icc_profile())
+    def get_trailing_bytes(self) -> bytes: return bytes(self._native.get_trailing_bytes())
+
+
 class DeepFileStructureEngine:
     def __init__(self, *, max_file_bytes: int = 512 * 1024 * 1024, max_decoded_stream_bytes: int = 64 * 1024 * 1024,
                  max_preview_width: int = 16_384, max_preview_height: int = 16_384, max_preview_pixels: int = 100_000_000,
@@ -101,6 +122,27 @@ class DeepFileStructureEngine:
             raise DeepStructureError(category, message) from error
         return DeepStructureSession(native)
 
+    def analyze_jpeg(self, path: str | Path, *, max_segments: int = 100_000,
+                     max_app_payload_bytes: int = 64 * 1024 * 1024, max_exif_ifds: int = 128,
+                     max_exif_entries: int = 100_000, max_exif_depth: int = 16,
+                     max_icc_bytes: int = 128 * 1024 * 1024, max_xmp_bytes: int = 64 * 1024 * 1024,
+                     max_thumbnail_bytes: int = 64 * 1024 * 1024, max_scans: int = 4096) -> JpegDeepStructureSession:
+        limits = (max_segments, max_app_payload_bytes, max_exif_ifds, max_exif_entries, max_exif_depth,
+                  max_icc_bytes, max_xmp_bytes, max_thumbnail_bytes, max_scans)
+        if any(value <= 0 for value in limits): raise ValueError("size limits must be greater than zero")
+        core: Any = importlib.import_module("forensihash_core")
+        try:
+            native = core.analyze_jpeg(str(Path(path)), self.max_file_bytes, *limits)
+        except (RuntimeError, ValueError) as error:
+            message = str(error); normalized = message.lower()
+            category = "limit_exceeded" if "limit" in normalized else ("unsupported" if "soi/marker" in normalized else "malformed")
+            raise DeepStructureError(category, message) from error
+        return JpegDeepStructureSession(native)
+
 
 def analyze_pdf(path: str | Path) -> DeepStructureSession:
     return DeepFileStructureEngine().analyze_pdf(path)
+
+
+def analyze_jpeg(path: str | Path) -> JpegDeepStructureSession:
+    return DeepFileStructureEngine().analyze_jpeg(path)

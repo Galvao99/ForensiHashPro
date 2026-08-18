@@ -32,6 +32,7 @@ from app.models.binary_finding import BinaryFinding
 from app.models.binary_region import BinaryRegion
 from app.models.binary_string import BinaryString
 from app.models.entropy_region import EntropyRegion
+from app.models.extracted_artifact import ExtractedArtifact
 from app.models.pdf_raw_analysis_result import (
     PdfRawAnalysisResult,
     PdfRawObject,
@@ -75,6 +76,7 @@ __all__ = [
     "BinaryRegion",
     "BinaryString",
     "EntropyRegion",
+    "ExtractedArtifact",
     "PdfRawAnalysisResult",
     "PdfRawObject",
     "PdfStartXref",

@@ -105,6 +105,7 @@ class FakeSession:
 
     def get_object(self, object_id): self.calls.append(("object", object_id)); return {"id": object_id, "dictionary": {}}
     def get_raw_object(self, object_id): self.calls.append(("raw", object_id)); return b"7 0 obj\nendobj"
+    def get_raw_stream(self, object_id): self.calls.append(("raw", object_id)); return b"stream"
     def get_decoded_stream(self, object_id): self.calls.append(("decoded", object_id)); return b"q /Im1 Do Q"
     def get_preview(self, object_id): self.calls.append(("preview", object_id)); return PNG
     def get_visual_asset(self, object_id):
@@ -161,6 +162,7 @@ def test_inspector_loads_preview_decoded_raw_and_metadata_lazily(qt_app) -> None
     inspector.set_session(session)
     image = SimpleNamespace(object_id="7_0", kind="resource_image", payload={})
     inspector.select_node(image)
+    inspector.setCurrentIndex(0)
     assert ("preview", "7_0") in session.calls
     inspector.setCurrentIndex(2)
     assert ("decoded", "7_0") in session.calls
@@ -185,7 +187,7 @@ def test_page_handles_non_pdf_without_parsing(qt_app, tmp_path: Path) -> None:
     result = SimpleNamespace(file_info=SimpleNamespace(path=tmp_path / "a.txt", name="a.txt", size_bytes=1),
                              hashes=SimpleNamespace(sha256="abc"))
     page.update_analysis(result)
-    assert "suporta PDF" in page.status_label.text()
+    assert "indisponível" in page.status_label.text()
 
 
 @pytest.mark.parametrize("category", ["malformed", "limit_exceeded"])
