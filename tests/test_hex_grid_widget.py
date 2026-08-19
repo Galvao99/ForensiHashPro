@@ -164,6 +164,14 @@ def test_header_body_and_hit_testing_share_cell_positions(qt_app) -> None:
     assert widget.offset_at(QPoint(gap_x, body_y)) is None
 
 
+def test_zone_titles_are_limited_to_fixed_header_height(qt_app) -> None:
+    widget = grid(qt_app, 4096); geometry = widget.grid_geometry()
+    for zone in (geometry.offset_rect, geometry.ascii_rect):
+        header = widget._header_rect(zone)
+        assert header.getRect() == (zone.left(), 0, zone.width(), widget.HEADER_HEIGHT)
+        assert header.bottom() < widget.cell_rect(0).bottom()
+
+
 def test_small_viewport_scrolls_horizontally_instead_of_overlapping(qt_app) -> None:
     widget = grid(qt_app, 256); widget.resize(420, 300); qt_app.processEvents()
     geometry = widget.grid_geometry()

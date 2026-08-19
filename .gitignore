@@ -62,3 +62,7 @@ config/settings.local.json
 
 # Relatórios biométricos reais / dados sensíveis
 info.txt
+
+# Markdown documentation
+*.md
+!/README.md
