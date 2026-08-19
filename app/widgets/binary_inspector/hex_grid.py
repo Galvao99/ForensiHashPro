@@ -411,8 +411,10 @@ class HexGridWidget(QAbstractScrollArea):
         painter.drawLine(geometry.hex_rect.right() + self.HEX_ASCII_GAP // 2, 0,
                          geometry.hex_rect.right() + self.HEX_ASCII_GAP // 2, self.viewport().height())
         painter.setPen(palette.color(QPalette.Text))
+        offset_header = self._header_rect(geometry.offset_rect)
+        ascii_header = self._header_rect(geometry.ascii_rect)
         painter.save(); painter.setClipRect(geometry.offset_rect)
-        painter.drawText(geometry.offset_rect.adjusted(self.OFFSET_PADDING, 0, -self.OFFSET_PADDING, 0),
+        painter.drawText(offset_header.adjusted(self.OFFSET_PADDING, 0, -self.OFFSET_PADDING, 0),
                          Qt.AlignVCenter | Qt.AlignRight, "OFFSET")
         painter.restore()
         painter.save(); painter.setClipRect(geometry.hex_rect)
@@ -420,8 +422,11 @@ class HexGridWidget(QAbstractScrollArea):
             painter.drawText(cell, Qt.AlignCenter, f"{index:02X}")
         painter.restore()
         painter.save(); painter.setClipRect(geometry.ascii_rect)
-        painter.drawText(geometry.ascii_rect, Qt.AlignCenter, "ASCII")
+        painter.drawText(ascii_header, Qt.AlignCenter, "ASCII")
         painter.restore()
+
+    def _header_rect(self, zone_rect: QRect) -> QRect:
+        return QRect(zone_rect.left(), 0, zone_rect.width(), self.HEADER_HEIGHT)
 
     def _paint_row(self, painter: QPainter, geometry: HexGridGeometry, y: int,
                    offset: int, palette: QPalette) -> None:
