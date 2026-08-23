@@ -364,6 +364,15 @@ class AnalysisService:
     ) -> CorrelationResult:
         return self.correlate(results)
 
+    def correlate_case(
+        self,
+        case_id: str,
+        results: Sequence[AnalysisResult],
+    ) -> CorrelationResult:
+        if not self.profile.allows(AnalysisCapability.CROSS_ARTIFACT_CORRELATION):
+            raise PermissionError("Correlação entre artefatos não habilitada neste perfil.")
+        return self.correlation_service.update_case(case_id, results)
+
     def build_investigation_context(
         self,
         results: Sequence[AnalysisResult],

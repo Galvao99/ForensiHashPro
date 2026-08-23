@@ -38,6 +38,9 @@ class MainWindow(QWidget):
         self.current_result: AnalysisResult | None = None
         self.analysis_results: list[AnalysisResult] = []
         self.correlation_result = None
+        self._case_result_cache: dict[str, dict[str, AnalysisResult]] = {}
+        self._case_file_states: dict[str, str] = {}
+        self._case_progress: dict[str, object] = {}
 
         self.current_page_key = "home"
         self.current_folder_path: Path | None = None
@@ -530,6 +533,40 @@ class MainWindow(QWidget):
         self.current_result = None
         self.correlation_result = None
 
+        case_id = (
+            str(self.current_folder_path.resolve())
+            if self.current_folder_path is not None
+            else ""
+        )
+        cached_results = self._case_result_cache.get(case_id, {})
+        current_keys = {str(path.resolve()) for path in files}
+        cached_results = {
+            key: value for key, value in cached_results.items()
+            if key in current_keys and self._is_cached_result_valid(value)
+        }
+        if case_id:
+            self._case_result_cache[case_id] = cached_results
+        self._case_file_states = {
+            str(path.resolve()): (
+                "analyzed" if str(path.resolve()) in cached_results else "pending"
+            )
+            for path in files
+        }
+        for path, status in self._case_file_states.items():
+            self.sidebar.file_list.set_file_status(path, status)
+        self._case_progress = {
+            "case_name": self.current_folder_path.name if self.current_folder_path else files[0].name,
+            "is_case": self.current_folder_path is not None,
+            "total": len(files),
+            "analyzed": len(cached_results),
+            "analyzing": 0,
+            "pending": len(files) - len(cached_results),
+            "failed": 0,
+            "current_file": "",
+            "file_paths": [str(path) for path in files],
+        }
+        self._refresh_case_overview()
+
         # Limpa IPs e dados investigativos da análise anterior.
         self.workspace.update_investigation_context(
             None
@@ -551,6 +588,8 @@ class MainWindow(QWidget):
         self.analysis_worker = AnalysisWorker(
             analysis_service=self.analysis_service,
             files=files,
+            case_id=case_id or None,
+            cached_results=cached_results,
         )
 
         self.analysis_worker.moveToThread(
@@ -571,6 +610,12 @@ class MainWindow(QWidget):
 
         self.analysis_worker.file_failed.connect(
             self._on_file_failed
+        )
+        self.analysis_worker.file_state_changed.connect(
+            self._on_file_state_changed
+        )
+        self.analysis_worker.case_progress_changed.connect(
+            self._on_case_progress_changed
         )
 
         self.analysis_worker.investigation_completed.connect(
@@ -611,9 +656,15 @@ class MainWindow(QWidget):
         Recebe cada arquivo analisado.
         """
 
-        self.analysis_results.append(
-            result
-        )
+        result_key = str(Path(result.file_info.path).resolve())
+        if not any(
+            str(Path(item.file_info.path).resolve()) == result_key
+            for item in self.analysis_results
+        ):
+            self.analysis_results.append(result)
+        if self.current_folder_path is not None:
+            case_id = str(self.current_folder_path.resolve())
+            self._case_result_cache.setdefault(case_id, {})[result_key] = result
 
         if self.current_result is None:
             self.current_result = result
@@ -625,6 +676,7 @@ class MainWindow(QWidget):
             self.context_label.setText(
                 result.file_info.name
             )
+        self._refresh_case_overview()
 
     def _on_file_failed(
         self,
@@ -660,6 +712,7 @@ class MainWindow(QWidget):
                 correlation_result
             ),
         )
+        self._refresh_case_overview()
 
     def _on_analysis_completed(
         self,
@@ -680,8 +733,16 @@ class MainWindow(QWidget):
             )
             return
 
-        self.current_result = (
-            self.analysis_results[0]
+        selected_key = (
+            str(Path(self.current_result.file_info.path).resolve())
+            if self.current_result is not None else ""
+        )
+        self.current_result = next(
+            (
+                item for item in self.analysis_results
+                if str(Path(item.file_info.path).resolve()) == selected_key
+            ),
+            self.analysis_results[0],
         )
 
         self.workspace.update_hashes(
@@ -716,6 +777,7 @@ class MainWindow(QWidget):
                     self.correlation_result
                 ),
             )
+        self._refresh_case_overview()
 
         if self.current_folder_path is not None:
             self.context_label.setText(
@@ -840,9 +902,46 @@ class MainWindow(QWidget):
 
                 return
 
-        self._start_analysis(
-            files=[file_path]
+        # Arquivos pendentes ou com falha permanecem sob responsabilidade
+        # do lote do Caso. Selecioná-los nunca inicia análise.
+        return
+
+    def _on_file_state_changed(self, file_path: str, status: str) -> None:
+        self._case_file_states[str(Path(file_path).resolve())] = status
+        self.sidebar.file_list.set_file_status(file_path, status)
+        self._refresh_case_overview()
+
+    def _on_case_progress_changed(self, progress: object) -> None:
+        if not isinstance(progress, dict):
+            return
+        self._case_progress.update(progress)
+        self._case_progress["analyzing"] = sum(
+            status == "analyzing" for status in self._case_file_states.values()
         )
+        self._refresh_case_overview()
+
+    def _refresh_case_overview(self) -> None:
+        if not self._case_progress:
+            return
+        self.workspace.update_case(
+            dict(self._case_progress),
+            list(self.analysis_results),
+            self.correlation_result,
+        )
+
+    @staticmethod
+    def _is_cached_result_valid(result: AnalysisResult) -> bool:
+        path = Path(result.file_info.path)
+        try:
+            stat = path.stat()
+        except OSError:
+            return False
+        if stat.st_size != result.file_info.size_bytes:
+            return False
+        modified_at = result.file_info.modified_at
+        if modified_at is None:
+            return True
+        return abs(stat.st_mtime - modified_at.timestamp()) < 0.001
 
     # ==========================================================
     # PROGRESSO
@@ -956,13 +1055,8 @@ class MainWindow(QWidget):
             enabled
         )
 
-        self.sidebar.file_list.setEnabled(
-            enabled
-        )
-
-        self.sidebar.file_search.setEnabled(
-            enabled
-        )
+        self.sidebar.file_list.setEnabled(True)
+        self.sidebar.file_search.setEnabled(True)
 
     # ==========================================================
     # ENCERRAMENTO

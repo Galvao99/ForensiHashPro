@@ -92,7 +92,10 @@ class CorrelationEngine:
                     for item in finding.evidence
                 )
             )
-            seed = f"{finding.rule_id}|{finding.category}|{evidence}|{finding.source_file}|{finding.target_file}"
+            seed = (
+                f"{finding.rule_id}|{finding.category}|{finding.title}|{evidence}|"
+                f"{finding.source_file}|{finding.target_file}"
+            )
             finding.finding_id = str(uuid5(NAMESPACE_URL, seed))
 
     def _remove_duplicates(

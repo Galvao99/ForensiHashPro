@@ -214,3 +214,11 @@ class AnalysisWorkspace(QStackedWidget):
             results
         )
         self.comparison_page.update_results(results)
+
+    def update_case(
+        self,
+        state: dict[str, object],
+        results: list[AnalysisResult],
+        correlation_result: CorrelationResult | None,
+    ) -> None:
+        self.general_page.update_case(state, results, correlation_result)

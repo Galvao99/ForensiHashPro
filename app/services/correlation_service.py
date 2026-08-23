@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Sequence
 
 from app.investigation.correlation_engine import (
@@ -35,6 +36,7 @@ from app.models import AnalysisResult
 from app.investigation.investigation_context import (
     InvestigationContext,
 )
+from app.investigation.case_correlation_index import CaseCorrelationIndex
 
 
 class CorrelationService:
@@ -60,6 +62,7 @@ class CorrelationService:
                 IpContextRule(),
             ]
         )
+        self._case_indexes: dict[str, CaseCorrelationIndex] = {}
 
     def build_context(
         self,
@@ -85,3 +88,36 @@ class CorrelationService:
         return self.engine.evaluate(
             context
         )
+
+    def update_case(
+        self,
+        case_id: str,
+        results: Sequence[AnalysisResult],
+    ) -> CorrelationResult:
+        """Substitui os membros do Caso e correlaciona resultados em cache."""
+        index = self._case_index(case_id)
+        return self.engine.evaluate(index.replace(results))
+
+    def add_to_case(
+        self,
+        case_id: str,
+        result: AnalysisResult,
+    ) -> CorrelationResult:
+        return self.engine.evaluate(self._case_index(case_id).add(result))
+
+    def remove_from_case(
+        self,
+        case_id: str,
+        file_path: Path | str,
+    ) -> CorrelationResult:
+        return self.engine.evaluate(self._case_index(case_id).remove(file_path))
+
+    def _case_index(self, case_id: str) -> CaseCorrelationIndex:
+        normalized = str(case_id).strip()
+        if not normalized:
+            raise ValueError("case_id must not be empty")
+        index = self._case_indexes.get(normalized)
+        if index is None:
+            index = CaseCorrelationIndex(normalized, self.context_builder)
+            self._case_indexes[normalized] = index
+        return index

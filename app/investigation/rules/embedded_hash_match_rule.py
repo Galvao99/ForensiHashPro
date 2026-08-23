@@ -14,48 +14,57 @@ class EmbeddedHashMatchRule(BaseCorrelationRule):
 
     def evaluate(self, context: InvestigationContext) -> list[CorrelationFinding]:
         findings: list[CorrelationFinding] = []
-        lookup = {
-            value.lower(): (key, algorithm)
-            for key, hashes in context.calculated_hashes.items()
-            for algorithm, value in hashes.items()
-        }
+        lookup: dict[tuple[str, str], list[str]] = {}
+        for key in sorted(context.calculated_hashes):
+            for algorithm, value in context.calculated_hashes[key].items():
+                lookup.setdefault(
+                    (algorithm.upper(), value.lower()), []
+                ).append(key)
         for source_key, occurrences in context.declared_hashes.items():
             for occurrence in occurrences:
                 if not occurrence.declared:
                     continue
-                match = lookup.get(occurrence.value)
-                if match is None or match[0] == source_key:
-                    continue
-                target_key, algorithm = match
-                findings.append(CorrelationFinding(
-                    title="Hash declarado correspondente",
-                    description=(
-                        f"Hash {algorithm} declarado em {occurrence.filename} corresponde "
-                        f"ao conteúdo calculado de {context.display_name_for(target_key)}."
-                    ),
-                    severity="ok",
-                    rule_id=self.rule_id,
-                    category="embedded_hash_match",
-                    source_file=source_key,
-                    target_file=target_key,
-                    evidence=[
-                        CorrelationEvidence(
-                            occurrence.evidence_ref, occurrence.filename,
-                            source_type=occurrence.source_type, page=occurrence.page,
-                            start=occurrence.start, end=occurrence.end,
-                            field_path=occurrence.field_path, context=occurrence.context,
-                            raw_value=occurrence.value, normalized_value=occurrence.value,
-                            extractor=occurrence.extractor,
+                algorithm = occurrence.algorithm.upper()
+                targets = lookup.get((algorithm, occurrence.value), [])
+                for target_key in targets:
+                    if target_key == source_key:
+                        continue
+                    findings.append(CorrelationFinding(
+                        title="Hash declarado correspondente",
+                        description=(
+                            f"Hash {algorithm} declarado em {occurrence.filename} corresponde "
+                            f"ao conteúdo calculado de {context.display_name_for(target_key)}."
                         ),
-                        CorrelationEvidence(
-                            target_key, context.display_name_for(target_key),
-                            role="calculated_hash", normalized_value=occurrence.value,
-                            extractor="hash_engine",
-                        ),
-                    ],
-                    confidence=1.0,
-                    metadata={"algorithm": algorithm, "hash": occurrence.value},
-                ))
+                        severity="ok",
+                        rule_id=self.rule_id,
+                        category="embedded_hash_match",
+                        source_file=source_key,
+                        target_file=target_key,
+                        evidence=[
+                            CorrelationEvidence(
+                                occurrence.evidence_ref, occurrence.filename,
+                                source_type=occurrence.source_type, page=occurrence.page,
+                                start=occurrence.start, end=occurrence.end,
+                                field_path=occurrence.field_path, context=occurrence.context,
+                                raw_value=occurrence.value, normalized_value=occurrence.value,
+                                extractor=occurrence.extractor,
+                            ),
+                            CorrelationEvidence(
+                                target_key, context.display_name_for(target_key),
+                                role="calculated_hash", normalized_value=occurrence.value,
+                                extractor="hash_engine",
+                            ),
+                        ],
+                        confidence=1.0,
+                        metadata={
+                            "algorithm": algorithm,
+                            "hash": occurrence.value,
+                            "source_file": occurrence.filename,
+                            "matched_file": context.display_name_for(target_key),
+                            "calculated_hash": occurrence.value,
+                            "match_type": "exact_cryptographic_match",
+                        },
+                    ))
         findings.extend(self._cross_file_matches(context))
         return findings
 
