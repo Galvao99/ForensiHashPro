@@ -41,6 +41,63 @@ Esta documentação distingue:
 - **Arquitetura definida:** princípios e contratos conceituais documentados, ainda sem cobertura executável completa.
 - **Planejado:** direção futura, não disponível como funcionalidade atual.
 
+## Fluxo de análise dos arquivos
+
+```mermaid
+flowchart TD
+    CASE["Caso / Pasta"] --> FILES["Arquivos individuais"]
+    FILES --> ACQ["EvidenceManager<br/>aquisição e cópia de trabalho"]
+    ACQ --> PIPE["AnalysisCoordinator + AnalysisService"]
+
+    subgraph IMPLEMENTADO["IMPLEMENTADO"]
+        PIPE --> COMMON["FileAnalyzer<br/>engines comuns"]
+        COMMON --> HASH["HashEngine"]
+        COMMON --> META["MetadataEngine / ExifTool"]
+        COMMON --> MAGIC["MagicNumberEngine"]
+        COMMON --> SIGN["DigitalSignatureEngine"]
+        COMMON --> BINARY["BinaryStructureEngine"]
+        MAGIC --> IDENT["identify_artifact"]
+        IDENT --> REGISTRY["ParserRegistry"]
+        REGISTRY --> SPECIAL["Parsers especializados<br/>PDF raw · JSON/Rust · ZIP · biometria"]
+        COMMON --> TEXT["TextExtractionService<br/>texto nativo e OCR"]
+        HASH --> RESULTS["AnalysisResult / AnalysisContract<br/>resultados técnicos e Facts existentes"]
+        META --> RESULTS
+        SIGN --> RESULTS
+        BINARY --> RESULTS
+        SPECIAL --> RESULTS
+        TEXT --> RESULTS
+        RESULTS --> FINDINGS["FindingsEngine<br/>Findings por arquivo"]
+        RESULTS --> CORR["CorrelationService / CorrelationEngine"]
+        FINDINGS --> CORR
+        CORR --> DET["Regras determinísticas"]
+        DET --> CASEF["Findings do Caso"]
+    end
+
+    subgraph ARCH["ARQUITETURA DEFINIDA / PLANEJADA"]
+        RESULTS -. "normalização e provenance ampliadas" .-> NFACTS["Facts normalizados"]
+        NFACTS -.-> GRAPH["Evidence Graph"]
+        FINDINGS -.-> GRAPH
+        GRAPH -.-> FCORR["Correlation Engine avançado"]
+        FCORR -.-> DRULES["Deterministic Rules"]
+        FCORR -.-> MLRULES["ML Rules"]
+        DRULES -.-> SCORES["Scores explicáveis"]
+        MLRULES -.-> SCORES
+        SCORES -.-> FUTUREF["Findings do Caso rastreáveis"]
+    end
+
+    CASEF --> EXAM["Avaliação do examinador"]
+    FUTUREF -.-> EXAM
+
+    classDef implemented fill:#e8f5e9,stroke:#2e7d32,color:#102a13;
+    classDef architecture fill:#fff8e1,stroke:#f9a825,color:#3d3000,stroke-dasharray: 5 5;
+    classDef human fill:#e3f2fd,stroke:#1565c0,color:#0d2d4d;
+    class ACQ,PIPE,COMMON,HASH,META,MAGIC,SIGN,BINARY,IDENT,REGISTRY,SPECIAL,TEXT,RESULTS,FINDINGS,CORR,DET,CASEF implemented;
+    class NFACTS,GRAPH,FCORR,DRULES,MLRULES,SCORES,FUTUREF architecture;
+    class EXAM human;
+```
+
+Linhas contínuas e nós verdes representam o fluxo implementado. Linhas tracejadas e nós amarelos representam arquitetura definida ou planejada, ainda sem cobertura executável completa. Parsers especializados são executados conforme o tipo de arquivo identificado e o suporte disponível na versão e no ambiente.
+
 ## Núcleo de análise — implementado
 
 - `EvidenceManager`: aquisição, SHA-256 durante a cópia, cópia de trabalho somente leitura e verificação posterior da fonte e da cópia.
