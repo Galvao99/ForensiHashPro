@@ -38,6 +38,7 @@ from app.services.export_service import ExportService
 from app.services.timeline_service import TimelineService
 from app.workers.analysis_worker import AnalysisWorker
 from app.entities import EntitySource, EntitySourceType, EntityType, NormalizedEntity
+from app.investigation.correlation_result import CorrelationResult
 
 
 UTC_NOW = datetime(2026, 8, 5, 12, 0, tzinfo=timezone.utc)
@@ -315,6 +316,105 @@ def test_desktop_worker_emits_legacy_and_central_contract() -> None:
     assert len(legacy_results) == 1
     assert len(contracts) == 1
     assert contracts[0].analysis_id == legacy_results[0].analysis_id
+
+
+class _FakeCaseService(_FakeService):
+    def __init__(self) -> None:
+        self.analyzed_paths: list[Path] = []
+        self.correlation_sizes: list[int] = []
+
+    def analyze(self, path: Path, *, analysis_id: str) -> AnalysisResult:
+        self.analyzed_paths.append(path)
+        value = super().analyze(path, analysis_id=analysis_id)
+        stat = path.stat()
+        value.file_info = replace(
+            value.file_info,
+            name=path.name,
+            path=path,
+            size_bytes=stat.st_size,
+            modified_at=datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc),
+        )
+        return value
+
+    def correlate_case(self, _case_id: str, results) -> CorrelationResult:
+        self.correlation_sizes.append(len(results))
+        return CorrelationResult()
+
+
+def test_folder_batch_schedules_all_files_without_selection(tmp_path: Path) -> None:
+    paths = [tmp_path / f"evidence-{index}.bin" for index in range(10)]
+    for path in paths:
+        path.write_bytes(b"evidence")
+    service = _FakeCaseService()
+    worker = AnalysisWorker(
+        analysis_service=service, files=paths, case_id="case-1"
+    )
+    emitted = []
+    worker.file_analyzed.connect(emitted.append)
+
+    worker.run()
+
+    assert service.analyzed_paths == paths
+    assert len(emitted) == 10
+    assert service.correlation_sizes == list(range(0, 11))
+
+
+def test_folder_batch_reuses_valid_results_and_reports_progress(tmp_path: Path) -> None:
+    cached_path = tmp_path / "cached.bin"
+    pending_path = tmp_path / "pending.bin"
+    cached_path.write_bytes(b"cached")
+    pending_path.write_bytes(b"pending")
+    service = _FakeCaseService()
+    cached = service.analyze(cached_path, analysis_id="cached-analysis")
+    service.analyzed_paths.clear()
+    worker = AnalysisWorker(
+        analysis_service=service,
+        files=[cached_path, pending_path],
+        case_id="case-1",
+        cached_results={str(cached_path.resolve()): cached},
+    )
+    progress = []
+    worker.case_progress_changed.connect(progress.append)
+
+    worker.run()
+
+    assert service.analyzed_paths == [pending_path]
+    assert progress[-1] == {
+        "total": 2,
+        "analyzed": 2,
+        "failed": 0,
+        "pending": 0,
+        "current_file": "",
+    }
+
+
+def test_folder_batch_progress_counts_failures(tmp_path: Path) -> None:
+    good = tmp_path / "good.bin"
+    bad = tmp_path / "bad.bin"
+    good.write_bytes(b"good")
+    bad.write_bytes(b"bad")
+
+    class FailingService(_FakeCaseService):
+        def analyze(self, path: Path, *, analysis_id: str) -> AnalysisResult:
+            if path == bad:
+                raise RuntimeError("technical failure")
+            return super().analyze(path, analysis_id=analysis_id)
+
+    worker = AnalysisWorker(
+        analysis_service=FailingService(), files=[good, bad], case_id="case-1"
+    )
+    progress = []
+    states = []
+    worker.case_progress_changed.connect(progress.append)
+    worker.file_state_changed.connect(lambda path, state: states.append((path, state)))
+
+    worker.run()
+
+    assert progress[-1]["total"] == 2
+    assert progress[-1]["analyzed"] == 1
+    assert progress[-1]["pending"] == 0
+    assert progress[-1]["failed"] == 1
+    assert states[-1] == (str(bad.resolve()), "failed")
 
 
 def test_export_service_writes_utf8_versioned_contract(tmp_path: Path) -> None:

@@ -5,6 +5,8 @@ from app.models import AnalysisResult
 from app.widgets.finding_preview_card import FindingsPreviewCard
 from app.widgets.forensic_summary import ForensicSummary
 from app.widgets.result_header import ResultHeader
+from app.widgets.case_overview import CaseOverview
+from app.investigation.correlation_result import CorrelationResult
 
 
 class AnalysisDashboard(QWidget):
@@ -16,9 +18,10 @@ class AnalysisDashboard(QWidget):
         super().__init__()
         self.current_result: AnalysisResult | None = None
         self.correlation_count: int | None = None
+        self.case_overview = CaseOverview()
 
         self.result_header = ResultHeader()
-        self.summary_eyebrow = QLabel("ANÁLISE ATUAL")
+        self.summary_eyebrow = QLabel("ARQUIVO SELECIONADO")
         self.summary_eyebrow.setObjectName("SummaryEyebrow")
         self.summary_title = QLabel("Resumo Forense")
         self.summary_title.setObjectName("ForensicSummaryTitle")
@@ -35,6 +38,7 @@ class AnalysisDashboard(QWidget):
         self.content_layout = QVBoxLayout(content)
         self.content_layout.setContentsMargins(4, 4, 10, 18)
         self.content_layout.setSpacing(14)
+        self.content_layout.addWidget(self.case_overview)
         self.content_layout.addWidget(self.result_header)
         self.content_layout.addSpacing(4)
         self.content_layout.addWidget(self.summary_eyebrow)
@@ -70,3 +74,11 @@ class AnalysisDashboard(QWidget):
 
     def update_correlation_count(self, count: int) -> None:
         self.correlation_count = count
+
+    def update_case(
+        self,
+        state: dict[str, object],
+        results: list[AnalysisResult],
+        correlation: CorrelationResult | None,
+    ) -> None:
+        self.case_overview.update_case(state, results, correlation)

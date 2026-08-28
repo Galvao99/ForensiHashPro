@@ -87,6 +87,9 @@ class FileListItemWidget(QWidget):
         self.details_label.setObjectName(
             "SidebarFileDetails"
         )
+        self.status_label = QLabel("PENDENTE")
+        self.status_label.setObjectName("SidebarFileStatus")
+        self.status_label.setProperty("status", "pending")
 
         information_layout.addWidget(
             self.name_label
@@ -94,6 +97,7 @@ class FileListItemWidget(QWidget):
         information_layout.addWidget(
             self.details_label
         )
+        information_layout.addWidget(self.status_label)
 
         root_layout.addWidget(
             self.type_label,
@@ -360,3 +364,24 @@ class FileList(QListWidget):
             return None
 
         return Path(str(raw_path))
+
+    def set_file_status(self, file_path: Path | str, status: str) -> None:
+        key = str(Path(file_path).resolve())
+        labels = {
+            "pending": "PENDENTE",
+            "analyzing": "ANALISANDO",
+            "analyzed": "ANALISADO",
+            "failed": "FALHA",
+        }
+        for index in range(self.count()):
+            item = self.item(index)
+            raw_path = item.data(Qt.UserRole)
+            if raw_path is None or str(Path(str(raw_path)).resolve()) != key:
+                continue
+            widget = self.itemWidget(item)
+            if isinstance(widget, FileListItemWidget):
+                widget.status_label.setText(labels.get(status, status.upper()))
+                widget.status_label.setProperty("status", status)
+                widget.status_label.style().unpolish(widget.status_label)
+                widget.status_label.style().polish(widget.status_label)
+            return

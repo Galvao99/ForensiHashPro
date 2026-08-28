@@ -3,7 +3,8 @@ from datetime import datetime
 from dataclasses import replace
 
 import pytest
-from PySide6.QtWidgets import QApplication, QLabel
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QApplication, QLabel, QListWidgetItem
 
 from app.models import (
     AnalysisResult, DigitalSignatureResult, FileInfo, HashResult,
@@ -147,4 +148,57 @@ def test_general_navigation_avoids_duplicate_shell_context(qt_app) -> None:
     assert window.context_label.isHidden()
     window.show_workspace_page("hashes")
     assert not window.context_label.isHidden()
+    window.close()
+
+
+def test_case_overview_precedes_selected_file_summary(qt_app, analysis_result) -> None:
+    dashboard = AnalysisDashboard()
+    dashboard.update_case(
+        {
+            "case_name": "04-Objeto da Perícia",
+            "is_case": True,
+            "total": 1,
+            "analyzed": 1,
+            "pending": 0,
+            "analyzing": 0,
+            "failed": 0,
+            "current_file": "",
+        },
+        [analysis_result],
+        None,
+    )
+    dashboard.update_analysis(analysis_result)
+
+    assert dashboard.content_layout.indexOf(dashboard.case_overview) < dashboard.content_layout.indexOf(
+        dashboard.result_header
+    )
+    assert "04-Objeto da Perícia" in _text(dashboard.case_overview)
+    assert "1 / 1 arquivos analisados" in _text(dashboard.case_overview)
+    assert dashboard.summary_eyebrow.text() == "ARQUIVO SELECIONADO"
+
+
+def test_sidebar_file_states_are_explicit(qt_app, tmp_path: Path) -> None:
+    path = tmp_path / "evidence.pdf"
+    path.write_bytes(b"pdf")
+    sidebar = Sidebar()
+    sidebar.file_list.add_files([path])
+    widget = sidebar.file_list.itemWidget(sidebar.file_list.item(0))
+    assert widget.status_label.text() == "PENDENTE"
+    sidebar.file_list.set_file_status(path, "analyzing")
+    assert widget.status_label.text() == "ANALISANDO"
+    sidebar.file_list.set_file_status(path, "analyzed")
+    assert widget.status_label.text() == "ANALISADO"
+
+
+def test_selecting_unavailable_result_never_starts_analysis(qt_app, tmp_path: Path) -> None:
+    window = MainWindow(analysis_service=object())
+    path = tmp_path / "pending.pdf"
+    item = QListWidgetItem()
+    item.setData(Qt.ItemDataRole.UserRole, str(path))
+    calls = []
+    window._start_analysis = lambda **kwargs: calls.append(kwargs)
+
+    window.analyze_selected_file(item)
+
+    assert calls == []
     window.close()
