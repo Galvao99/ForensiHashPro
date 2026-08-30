@@ -18,6 +18,9 @@ from web.backend.app.models import (
     User,
 )
 from web.backend.app.services.analysis_profiles import AnalysisEntitlementService
+from web.backend.app.services.analysis_results import (
+    resolve_analysis_job_contract_payloads,
+)
 from app.analysis_profiles import AnalysisCapability
 
 
@@ -56,13 +59,21 @@ class AnalysisSetService:
             raise WebApiError(404, "analysis_set_job_not_found", "Um ou mais jobs não foram encontrados.", request_id)
         if any(job.status not in _TERMINAL for job in jobs):
             raise WebApiError(409, "analysis_set_not_ready", "Todos os jobs devem estar em estado terminal.", request_id)
+        contract_payloads = resolve_analysis_job_contract_payloads(
+            db,
+            jobs,
+            owner_id=user.id,
+        )
         artifacts: list[AnalysisSetArtifact] = []
         for job_id in unique_ids:
             job = by_id[job_id]
             contract = None
             limitation = None
-            if job.status in _SUCCESS and job.result_json is not None:
-                contract = AnalysisContractJson.loads(json.dumps(job.result_json, ensure_ascii=False))
+            contract_payload = contract_payloads.get(job.id)
+            if contract_payload is not None:
+                contract = AnalysisContractJson.loads(
+                    json.dumps(contract_payload, ensure_ascii=False)
+                )
             else:
                 limitation = f"O artefato {job.original_filename} não produziu contrato utilizável ({job.status})."
             artifacts.append(AnalysisSetArtifact(
