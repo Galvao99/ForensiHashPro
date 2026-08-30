@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
 from app.models import AnalysisResult
 from app.services.analysis_service import AnalysisService
 from app.ui.sidebar import Sidebar
+from app.ui.current_case_selection import CurrentCaseSelection
 from app.widgets.analysis_workspace import AnalysisWorkspace
 from app.workers.analysis_worker import AnalysisWorker
 
@@ -36,10 +37,12 @@ class MainWindow(QWidget):
         self.analysis_service = analysis_service
 
         self.current_result: AnalysisResult | None = None
+        self.current_selection: CurrentCaseSelection | None = None
         self.analysis_results: list[AnalysisResult] = []
         self.correlation_result = None
         self._case_result_cache: dict[str, dict[str, AnalysisResult]] = {}
         self._case_file_states: dict[str, str] = {}
+        self._case_file_errors: dict[str, str] = {}
         self._case_progress: dict[str, object] = {}
 
         self.current_page_key = "home"
@@ -531,6 +534,7 @@ class MainWindow(QWidget):
 
         self.analysis_results = []
         self.current_result = None
+        self._case_file_errors = {}
         self.correlation_result = None
 
         case_id = (
@@ -552,6 +556,16 @@ class MainWindow(QWidget):
             )
             for path in files
         }
+        selected_path = self.sidebar.file_list.selected_file_path()
+        self.current_selection = (
+            CurrentCaseSelection(
+                case_id=case_id,
+                file_path=selected_path,
+                status=self._case_file_states.get(str(selected_path.resolve()), "pending"),
+                result=cached_results.get(str(selected_path.resolve())),
+            )
+            if selected_path is not None else None
+        )
         for path, status in self._case_file_states.items():
             self.sidebar.file_list.set_file_status(path, status)
         self._case_progress = {
@@ -666,16 +680,11 @@ class MainWindow(QWidget):
             case_id = str(self.current_folder_path.resolve())
             self._case_result_cache.setdefault(case_id, {})[result_key] = result
 
-        if self.current_result is None:
-            self.current_result = result
-
-            self.workspace.update_analysis(
-                result
-            )
-
-            self.context_label.setText(
-                result.file_info.name
-            )
+        if self.current_selection is not None and self.current_selection.key == result_key:
+            self.current_selection.status = "analyzed"
+            self.current_selection.result = result
+            self.current_selection.error = None
+            self._display_selected_result(result)
         self._refresh_case_overview()
 
     def _on_file_failed(
@@ -691,6 +700,16 @@ class MainWindow(QWidget):
             f"Erro ao analisar {file_path}: "
             f"{error}"
         )
+        key = str(Path(file_path).resolve())
+        self._case_file_errors[key] = error
+        if self.current_selection is not None and self.current_selection.key == key:
+            self.current_selection.status = "failed"
+            self.current_selection.result = None
+            self.current_selection.error = error
+            self.current_result = None
+            self.workspace.clear_selected_analysis(Path(file_path), "failed", error)
+            self.context_label.setText(f"{Path(file_path).name} • FALHA")
+        self._refresh_case_overview()
 
     def _on_investigation_completed(
         self,
@@ -733,25 +752,15 @@ class MainWindow(QWidget):
             )
             return
 
-        selected_key = (
-            str(Path(self.current_result.file_info.path).resolve())
-            if self.current_result is not None else ""
-        )
-        self.current_result = next(
-            (
-                item for item in self.analysis_results
-                if str(Path(item.file_info.path).resolve()) == selected_key
-            ),
-            self.analysis_results[0],
-        )
+        selected_result = self._selected_cached_result()
+        self.current_result = selected_result
 
         self.workspace.update_hashes(
             self.analysis_results
         )
 
-        self.workspace.update_analysis(
-            self.current_result
-        )
+        if selected_result is not None:
+            self._display_selected_result(selected_result)
 
         # Monta o contexto completo com OCR, IPs, hashes,
         # metadados, datas e demais dados estruturados.
@@ -780,13 +789,16 @@ class MainWindow(QWidget):
         self._refresh_case_overview()
 
         if self.current_folder_path is not None:
-            self.context_label.setText(
-                (
-                    f"{self.current_folder_path.name} • "
-                    f"{len(self.analysis_results)} "
-                    "arquivo(s)"
+            if self.current_selection is not None:
+                self.context_label.setText(
+                    self.current_selection.file_path.name
+                    if self.current_result is not None
+                    else f"{self.current_selection.file_path.name} • {self.current_selection.status.upper()}"
                 )
-            )
+            else:
+                self.context_label.setText(
+                    f"{self.current_folder_path.name} • {len(self.analysis_results)} arquivo(s)"
+                )
 
             self.workspace.home_page.update_workspace(
                 file_count=len(
@@ -799,12 +811,12 @@ class MainWindow(QWidget):
 
         else:
             self.context_label.setText(
-                self.current_result.file_info.name
+                self.current_result.file_info.name if self.current_result is not None else "Nenhum resultado"
             )
 
             self.workspace.home_page.update_workspace(
                 file_name=(
-                    self.current_result.file_info.name
+                    self.current_result.file_info.name if self.current_result is not None else "Nenhum resultado"
                 )
             )
 
@@ -866,50 +878,72 @@ class MainWindow(QWidget):
             str(raw_file_path)
         )
 
-        for result in self.analysis_results:
-            result_path = Path(
-                result.file_info.path
-            )
+        key = str(file_path.resolve())
+        status = self._case_file_states.get(key, "pending")
+        result = self._result_for_key(key)
+        if result is not None:
+            status = "analyzed"
+        self.current_selection = CurrentCaseSelection(
+            case_id=str(self.current_folder_path.resolve()) if self.current_folder_path else "",
+            file_path=file_path,
+            status=status,
+            result=result,
+            error=self._case_file_errors.get(key),
+        )
+        if result is not None:
+            self._display_selected_result(result)
+            return
 
-            if result_path == file_path:
-                self.current_result = result
-
-                self.workspace.update_analysis(
-                    result
-                )
-
-                self.workspace.update_hashes(
-                    self.analysis_results
-                )
-
-                if self.correlation_result is not None:
-                    self.workspace.update_investigation(
-                        current_result=result,
-                        correlation_result=(
-                            self.correlation_result
-                        ),
-                    )
-
-                self.context_label.setText(
-                    result.file_info.name
-                )
-
-                self.workspace.home_page.update_workspace(
-                    file_name=(
-                        result.file_info.name
-                    )
-                )
-
-                return
-
-        # Arquivos pendentes ou com falha permanecem sob responsabilidade
-        # do lote do Caso. Selecioná-los nunca inicia análise.
-        return
+        self.current_result = None
+        self.workspace.clear_selected_analysis(file_path, status, self.current_selection.error)
+        label = "FALHA" if status == "failed" else ("EM ANÁLISE" if status == "analyzing" else "PENDENTE")
+        self.context_label.setText(f"{file_path.name} • {label}")
 
     def _on_file_state_changed(self, file_path: str, status: str) -> None:
-        self._case_file_states[str(Path(file_path).resolve())] = status
+        key = str(Path(file_path).resolve())
+        self._case_file_states[key] = status
         self.sidebar.file_list.set_file_status(file_path, status)
+        if self.current_selection is not None and self.current_selection.key == key:
+            self.current_selection.status = status
+            if status != "analyzed":
+                self.current_selection.result = None
+                self.current_result = None
+                self.workspace.clear_selected_analysis(
+                    Path(file_path), status, self._case_file_errors.get(key)
+                )
         self._refresh_case_overview()
+
+    def _result_for_key(self, key: str) -> AnalysisResult | None:
+        if self.current_folder_path is not None:
+            case_id = str(self.current_folder_path.resolve())
+            cached = self._case_result_cache.get(case_id, {}).get(key)
+            if cached is not None:
+                return cached
+        return next(
+            (result for result in self.analysis_results
+             if str(Path(result.file_info.path).resolve()) == key),
+            None,
+        )
+
+    def _selected_cached_result(self) -> AnalysisResult | None:
+        if self.current_selection is None:
+            return None
+        return self._result_for_key(self.current_selection.key)
+
+    def _display_selected_result(self, result: AnalysisResult) -> None:
+        self.current_result = result
+        if self.current_selection is not None:
+            self.current_selection.result = result
+            self.current_selection.status = "analyzed"
+        self.workspace.update_analysis(result)
+        self.workspace.update_hashes(self.analysis_results)
+        if self.correlation_result is not None:
+            self.workspace.update_investigation(
+                current_result=result,
+                correlation_result=self.correlation_result,
+            )
+        self.context_label.setText(result.file_info.name)
+        self.workspace.home_page.update_workspace(file_name=result.file_info.name)
 
     def _on_case_progress_changed(self, progress: object) -> None:
         if not isinstance(progress, dict):

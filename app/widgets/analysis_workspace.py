@@ -1,4 +1,7 @@
-from PySide6.QtWidgets import QStackedWidget
+from pathlib import Path
+
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QLabel, QStackedWidget
 
 from app.investigation.correlation_result import CorrelationResult
 from app.investigation.investigation_context import (
@@ -89,8 +92,16 @@ class AnalysisWorkspace(QStackedWidget):
             # "binary_structure": self.binary_structure_page,
         }
 
+        self.selection_placeholder = QLabel()
+        self.selection_placeholder.setObjectName("FileSelectionPlaceholder")
+        self.selection_placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.selection_placeholder.setWordWrap(True)
+        self._selection_message: str | None = None
+        self._requested_page_key = "home"
+
         for page in self.pages.values():
             self.addWidget(page)
+        self.addWidget(self.selection_placeholder)
 
         self.show_page("home")
 
@@ -103,7 +114,11 @@ class AnalysisWorkspace(QStackedWidget):
         if page is None:
             return False
 
-        self.setCurrentWidget(page)
+        self._requested_page_key = page_key
+        if page_key != "home" and self._selection_message is not None:
+            self.setCurrentWidget(self.selection_placeholder)
+        else:
+            self.setCurrentWidget(page)
         if page is self.home_page:
             self.deep_file_explorer_page.release_analysis()
         if page is self.deep_file_explorer_page:
@@ -123,6 +138,11 @@ class AnalysisWorkspace(QStackedWidget):
         self,
         result: AnalysisResult,
     ) -> None:
+        self._selection_message = None
+        requested_page = self.pages.get(self._requested_page_key)
+        if requested_page is not None:
+            self.setCurrentWidget(requested_page)
+
         pages = (
             ("Geral", self.general_page),
             ("Metadados", self.metadata_page),
@@ -167,6 +187,22 @@ class AnalysisWorkspace(QStackedWidget):
                 "Erro ao atualizar a página "
                 f"'Vestígios': {error}"
             )
+
+    def clear_selected_analysis(self, file_path: Path, status: str, error: str | None = None) -> None:
+        """Hide stale file-scoped content while retaining case-wide batch data."""
+        self.deep_file_explorer_page.release_analysis()
+        labels = {
+            "pending": "Pendente",
+            "analyzing": "Em análise",
+            "failed": "Falha na análise",
+        }
+        detail = f"\n\n{error}" if error else ""
+        self._selection_message = (
+            f"{file_path.name}\n\n{labels.get(status, status.title())}{detail}"
+        )
+        self.selection_placeholder.setText(self._selection_message)
+        if self._requested_page_key != "home":
+            self.setCurrentWidget(self.selection_placeholder)
 
     def update_investigation(
         self,
