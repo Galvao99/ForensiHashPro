@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone
@@ -11,13 +12,22 @@ from sqlalchemy import select
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.contracts import AnalysisContract, AnalysisState
+from app.contracts import AnalysisContract, AnalysisContractJson, AnalysisState, Fact
 from app.evidence import EvidenceSizeLimitError
 from web.backend.app.api.routes import get_analysis_job_executor, get_upload_storage, get_web_analysis_service
 from web.backend.app.main import app
-from web.backend.app.models import AnalysisJob, AnalysisJobStatus, StoredAnalysis, User
+from web.backend.app.models import (
+    AnalysisJob,
+    AnalysisJobStatus,
+    RetentionMode,
+    StoredAnalysis,
+    User,
+)
 from web.backend.app.database import Base, get_db
 from web.backend.app.services import AnalysisJobExecutor, UploadStorage
+from web.backend.app.services.analysis_results import (
+    resolve_analysis_job_contract_payload,
+)
 
 
 class WakeOnly:
@@ -217,6 +227,161 @@ def test_analysis_set_uses_completed_jobs_without_reopening_files(platform) -> N
     assert payload["correlation_result"]["findings"][0]["category"] == "cross_file_match"
     assert "\\" not in str(payload)
     assert client.get(f"/api/v1/analysis-sets/{payload['set_id']}").json() == payload
+
+
+def test_analysis_set_resolves_result_only_contracts_from_stored_analysis(platform) -> None:
+    client, factory, tmp_path = platform
+    auth = client.post(
+        "/api/v1/auth/register",
+        json={
+            "name": "Retained Set",
+            "email": "retained-set@example.test",
+            "password": "correct-horse-42",
+            "accept_terms": True,
+            "accept_privacy": True,
+        },
+    ).json()
+    with factory() as db:
+        user = db.scalar(select(User).where(User.email == "retained-set@example.test"))
+        user.analysis_profile = "PRO"
+        db.commit()
+    storage = UploadStorage(root=tmp_path / "jobs", max_file_size_bytes=32)
+    app.dependency_overrides[get_upload_storage] = lambda: storage
+    app.dependency_overrides[get_analysis_job_executor] = WakeOnly
+    first = create_job(client, auth["csrf_token"], retention="RESULT_ONLY").json()["job_id"]
+    second = create_job(client, auth["csrf_token"], retention="RESULT_ONLY").json()["job_id"]
+    retained_fact = Fact(
+        fact_id="fact-retained",
+        kind="hashes",
+        source="hash_engine",
+        data={"sha256": "d" * 64},
+    )
+    values = iter(
+        [
+            replace(
+                contract(analysis_id="retained-a"),
+                evidence_id="ev-retained-a",
+                file={"name": "retained-a.bin"},
+                hashes={"sha256": "d" * 64},
+                facts=[retained_fact],
+            ),
+            replace(
+                contract(AnalysisState.PARTIAL, "retained-b"),
+                evidence_id="ev-retained-b",
+                file={"name": "retained-b.bin"},
+                hashes={"sha256": "d" * 64},
+            ),
+        ]
+    )
+
+    class Service:
+        def analyze(self, *_args, **_kwargs):
+            return next(values)
+
+    executor = AnalysisJobExecutor(
+        factory,
+        storage=storage,
+        analysis_service_factory=Service,
+    )
+    executor.process_next()
+    executor.process_next()
+
+    with factory() as db:
+        user = db.scalar(select(User).where(User.email == "retained-set@example.test"))
+        first_job = db.get(AnalysisJob, first)
+        second_job = db.get(AnalysisJob, second)
+        assert first_job.status == AnalysisJobStatus.SUCCESS.value
+        assert second_job.status == AnalysisJobStatus.PARTIAL.value
+        assert first_job.result_json is None
+        assert second_job.result_json is None
+        assert first_job.result_analysis_id == "retained-a"
+        assert second_job.result_analysis_id == "retained-b"
+        assert db.get(StoredAnalysis, "retained-a") is not None
+        payload = resolve_analysis_job_contract_payload(
+            db,
+            first_job,
+            owner_id=user.id,
+        )
+        restored = AnalysisContractJson.loads(json.dumps(payload))
+        assert restored.facts == [retained_fact]
+
+    response = client.post(
+        "/api/v1/analysis-sets",
+        json={"job_ids": [first, second]},
+        headers={"X-CSRF-Token": auth["csrf_token"]},
+    )
+
+    assert response.status_code == 201
+    result = response.json()
+    assert result["state"] == "completed"
+    assert {item["evidence_ref"] for item in result["artifacts"]} == {
+        "ev-retained-a",
+        "ev-retained-b",
+    }
+    assert result["correlation_result"]["findings"][0]["category"] == "cross_file_match"
+
+
+def test_contract_resolver_rejects_missing_foreign_and_expired_storage(platform) -> None:
+    _client, factory, _tmp_path = platform
+    with factory() as db:
+        owner = User(
+            id="resolver-owner",
+            name="Owner",
+            email="resolver-owner@example.test",
+            password_hash="hash",
+        )
+        other = User(
+            id="resolver-other",
+            name="Other",
+            email="resolver-other@example.test",
+            password_hash="hash",
+        )
+        job = AnalysisJob(
+            id="resolver-job",
+            user_id=owner.id,
+            status=AnalysisJobStatus.SUCCESS.value,
+            original_filename="sample.txt",
+            retention_mode="RESULT_ONLY",
+            staging_sha256="a" * 64,
+            size_bytes=4,
+            result_analysis_id="resolver-analysis",
+        )
+        db.add_all([owner, other, job])
+        db.commit()
+
+        assert resolve_analysis_job_contract_payload(
+            db, job, owner_id=owner.id
+        ) is None
+
+        stored = StoredAnalysis(
+            id="resolver-analysis",
+            user_id=other.id,
+            filename="sample.txt",
+            sha256="a" * 64,
+            status="completed",
+            retention_mode="RESULT_ONLY",
+            result_json={"analysis_id": "resolver-analysis"},
+        )
+        db.add(stored)
+        db.commit()
+        assert resolve_analysis_job_contract_payload(
+            db, job, owner_id=owner.id
+        ) is None
+
+        stored.expires_at = None
+        stored.retention_mode = RetentionMode.PRIVATE.value
+        db.commit()
+        assert resolve_analysis_job_contract_payload(
+            db, job, owner_id=owner.id
+        ) is None
+
+        stored.user_id = owner.id
+        stored.retention_mode = RetentionMode.RESULT_ONLY.value
+        stored.expires_at = datetime.now(timezone.utc) - timedelta(seconds=1)
+        db.commit()
+        assert resolve_analysis_job_contract_payload(
+            db, job, owner_id=owner.id
+        ) is None
 
 
 def test_failed_job_is_analysis_set_limitation(platform) -> None:

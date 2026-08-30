@@ -45,6 +45,9 @@ from web.backend.app.runtime_config import (
     analysis_queue_capacity,
     job_worker_enabled,
 )
+from web.backend.app.services.analysis_results import (
+    resolve_analysis_job_contract_payload,
+)
 
 
 LOGGER = logging.getLogger("forensihash.web")
@@ -223,18 +226,16 @@ def analysis_job_result(job_id: str, user: User = Depends(current_user), db: Ses
         raise _error(status.HTTP_409_CONFLICT, "result_not_ready", "O resultado ainda não está disponível.", str(uuid4()))
     if job.status not in {AnalysisJobStatus.SUCCESS.value, AnalysisJobStatus.PARTIAL.value}:
         raise _error(status.HTTP_409_CONFLICT, job.error_code or "result_unavailable", job.safe_error_message or "O resultado não está disponível.", str(uuid4()))
-    if job.retention_mode == RetentionMode.RESULT_ONLY.value and job.result_analysis_id:
-        stored = db.get(StoredAnalysis, job.result_analysis_id)
-        if stored is not None and stored.user_id == user.id:
-            return stored.result_json
-    expires = job.result_expires_at
-    if expires is not None and expires.tzinfo is None:
-        expires = expires.replace(tzinfo=timezone.utc)
-    if job.result_json is None or (expires is not None and expires <= datetime.now(timezone.utc)):
+    payload = resolve_analysis_job_contract_payload(
+        db,
+        job,
+        owner_id=user.id,
+    )
+    if payload is None:
         job.result_json = None
         db.commit()
         raise _error(status.HTTP_410_GONE, "result_unavailable", "O resultado privado temporário não está mais disponível.", str(uuid4()))
-    return job.result_json
+    return payload
 
 
 @router.post("/analyses/{analysis_id}/ddna-snapshot", response_model=None)
