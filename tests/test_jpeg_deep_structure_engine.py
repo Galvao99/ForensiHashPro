@@ -63,6 +63,19 @@ def test_non_jpeg_native_error_is_unsupported(monkeypatch: pytest.MonkeyPatch, t
     assert captured.value.category == "unsupported"
 
 
+def test_native_oserror_is_wrapped_and_keeps_cause(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    def fail(*_args):
+        raise OSError(22, "Invalid argument")
+
+    monkeypatch.setitem(sys.modules, "forensihash_core", SimpleNamespace(analyze_jpeg=fail))
+    path = tmp_path / "0000.jpg"
+    path.write_bytes(b"\xff\xd8\xff\xd9")
+    with pytest.raises(DeepStructureError) as captured:
+        DeepFileStructureEngine().analyze_jpeg(path)
+    assert captured.value.category == "malformed"
+    assert isinstance(captured.value.__cause__, OSError)
+
+
 def test_jpeg_limits_must_be_positive(tmp_path: Path) -> None:
     with pytest.raises(ValueError): DeepFileStructureEngine().analyze_jpeg(tmp_path / "x", max_scans=0)
 

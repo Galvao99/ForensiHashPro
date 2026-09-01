@@ -26,6 +26,7 @@ from app.processing.logging import log_step
 from app.entities.service import EntityExtractionService
 from app.services.text_extraction_service import TextExtractionResult
 from app.services.timeline_service import TimelineService
+from app.services.filesystem_timestamps import read_filesystem_timestamp
 from app.analysis_profiles import (
     AnalysisCapability,
     AnalysisProfile,
@@ -169,25 +170,59 @@ class AnalysisService:
                 lease.source = evidence
 
             result.evidence_source = evidence
+            original_timestamps = (
+                read_filesystem_timestamp(
+                    "st_ctime", evidence.original_identity.changed_ns / 1_000_000_000
+                ),
+                read_filesystem_timestamp(
+                    "st_mtime", evidence.original_identity.modified_ns / 1_000_000_000
+                ),
+                read_filesystem_timestamp(
+                    "st_atime", evidence.original_identity.accessed_ns / 1_000_000_000
+                ),
+            )
             result.file_info = replace(
                 result.file_info,
                 name=evidence.original_name,
                 path=evidence.original_path,
                 extension=evidence.original_path.suffix.lower(),
                 size_bytes=evidence.size_bytes,
-                created_at=datetime.fromtimestamp(
-                    evidence.original_identity.changed_ns / 1_000_000_000,
-                    tz=timezone.utc,
-                ),
-                modified_at=datetime.fromtimestamp(
-                    evidence.original_identity.modified_ns / 1_000_000_000,
-                    tz=timezone.utc,
-                ),
-                accessed_at=datetime.fromtimestamp(
-                    evidence.original_identity.accessed_ns / 1_000_000_000,
-                    tz=timezone.utc,
-                ),
+                created_at=original_timestamps[0].value,
+                modified_at=original_timestamps[1].value,
+                accessed_at=original_timestamps[2].value,
             )
+            original_timestamp_issues = [
+                ProcessingIssue(
+                    code="filesystem_timestamp_invalid",
+                    status=ProcessingStatus.PARTIAL,
+                    technical_message=(
+                        f"Timestamp original indisponível: {item.operation}."
+                    ),
+                    user_message="Um timestamp do filesystem original não pôde ser representado.",
+                    component="filesystem_metadata",
+                    details={
+                        "field": item.field,
+                        "operation": item.operation,
+                        "error_type": type(item.error).__name__,
+                        "errno": getattr(item.error, "errno", None),
+                    },
+                    impact=ProcessingImpact.ANALYSIS_PARTIAL,
+                    original_exception=item.error,
+                )
+                for item in original_timestamps
+                if item.error is not None
+            ]
+            if original_timestamp_issues:
+                result.processing_steps.append(StepResult(
+                    code="original_filesystem_timestamps",
+                    component="filesystem_metadata",
+                    status=ProcessingStatus.PARTIAL,
+                    technical_message=(
+                        "Conversão de timestamp da fonte original parcialmente indisponível."
+                    ),
+                    user_message="Parte dos timestamps do filesystem está indisponível.",
+                    issues=original_timestamp_issues,
+                ))
 
             if not self.profile.allows(AnalysisCapability.ENTITY_EXTRACTION):
                 result.processing_steps.append(self._capability_skipped(

@@ -187,7 +187,7 @@ def test_page_handles_non_pdf_without_parsing(qt_app, tmp_path: Path) -> None:
     result = SimpleNamespace(file_info=SimpleNamespace(path=tmp_path / "a.txt", name="a.txt", size_bytes=1),
                              hashes=SimpleNamespace(sha256="abc"))
     page.update_analysis(result)
-    assert "indisponível" in page.status_label.text()
+    assert page.status_label.text() == "Formato ainda não suportado pelo Deep File Explorer."
 
 
 @pytest.mark.parametrize("category", ["malformed", "limit_exceeded"])

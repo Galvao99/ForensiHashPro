@@ -23,6 +23,7 @@ from app.analysis_profiles import (
     FORENSIHASH_PRO,
 )
 from app.parsers import ArchiveInspectionEngine, ArchiveLimits, ParserRegistry, ZipArtifactParser
+from app.observability import HealthCheckService, ObservabilityService
 
 
 class ApplicationFactory:
@@ -89,7 +90,7 @@ class ApplicationFactory:
                 limits=settings.limits,
             )
 
-        return AnalysisService(
+        service = AnalysisService(
             analyzer,
             text_extraction_service=text_extraction_service,
             evidence_manager=EvidenceManager(
@@ -98,6 +99,12 @@ class ApplicationFactory:
             ),
             profile=profile,
         )
+        # Observabilidade é uma dependência operacional lateral. O pipeline não a
+        # consulta e mantém comportamento idêntico quando ela não é consumida.
+        service.observability = ObservabilityService()
+        service.health_checks = HealthCheckService(tools)
+        service.observability.set_components(service.health_checks.run())
+        return service
 
     @staticmethod
     def create_analysis_coordinator(

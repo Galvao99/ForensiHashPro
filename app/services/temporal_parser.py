@@ -3,6 +3,10 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from typing import TypeAlias
+
+
+TemporalOrderKey: TypeAlias = tuple[int, tuple[int, int, int, int, int, int, int], str]
 
 
 _ISO = re.compile(
@@ -64,6 +68,26 @@ class TemporalParser:
         except ValueError:
             return None
         return self._from_datetime(raw, dt, precision)
+
+    def order_key(self, value: object) -> TemporalOrderKey | None:
+        """Return a total ordering key without assigning a zone to naive evidence.
+
+        Explicitly zoned values belong to the UTC-instant domain. Values whose
+        artifact did not declare a zone remain in a separate civil-time domain.
+        The domain discriminator makes mixed input deterministic while avoiding
+        a forensic claim that a naive value represents UTC or local system time.
+        """
+        parsed = value if isinstance(value, ParsedTimestamp) else self.parse(value)
+        if parsed is None:
+            return None
+        comparable = parsed.comparable
+        aware = comparable.utcoffset() is not None
+        ordered = comparable.astimezone(timezone.utc).replace(tzinfo=None) if aware else comparable
+        components = (
+            ordered.year, ordered.month, ordered.day, ordered.hour, ordered.minute,
+            ordered.second, ordered.microsecond,
+        )
+        return (0 if aware else 1, components, parsed.normalized)
 
     @staticmethod
     def _precision(parts: dict[str, str | None]) -> str:

@@ -11,6 +11,7 @@ from app.engines.magic_number_engine import MagicNumberEngine
 from app.engines.digital_signature_engine import DigitalSignatureEngine
 from app.contracts import AnalysisState, LegacyAnalysisAdapter
 from app.processing import ProcessingStatus, StepResult
+from app.services.filesystem_timestamps import FilesystemTimestamp
 
 
 class TestFileAnalyzer:
@@ -91,3 +92,50 @@ class TestFileAnalyzer:
             step["component"] == "magic_number" and step["status"] == "failed"
             for step in contract.processing_steps
         )
+
+    def test_invalid_filesystem_timestamp_keeps_analysis_partial(
+        self, tmp_path: Path, monkeypatch
+    ) -> None:
+        test_file = tmp_path / "0000.jpg"
+        test_file.write_bytes(b"\xff\xd8\xff\xd9")
+        real_reader = __import__(
+            "app.services.filesystem_timestamps", fromlist=["read_filesystem_timestamp"]
+        ).read_filesystem_timestamp
+
+        def timestamp_reader(field, raw_seconds):
+            if field == "st_mtime":
+                error = OSError(22, "Invalid argument")
+                return FilesystemTimestamp(
+                    field,
+                    "datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc)",
+                    raw_seconds,
+                    None,
+                    error,
+                )
+            return real_reader(field, raw_seconds)
+
+        monkeypatch.setattr("app.engines.file_analyzer.read_filesystem_timestamp", timestamp_reader)
+        analyzer = FileAnalyzer(
+            hash_engine=HashEngine(), metadata_engine=MetadataEngine(),
+            findings_engine=FindingsEngine(), magic_number_engine=MagicNumberEngine(),
+            digital_signature_engine=DigitalSignatureEngine(),
+            pdf_structure_engine=PDFStructureEngine(),
+        )
+
+        result = analyzer.analyze_fixture(test_file)
+        result.analysis_id = "invalid-filesystem-time"
+        contract = LegacyAnalysisAdapter().convert(result)
+
+        assert result.hashes.sha256
+        assert result.file_info.modified_at is None
+        assert contract.state is AnalysisState.PARTIAL
+        issue = next(
+            issue
+            for step in result.processing_steps
+            for issue in step.issues
+            if issue.code == "filesystem_timestamp_invalid"
+        )
+        assert issue.details["operation"] == (
+            "datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc)"
+        )
+        assert issue.details["errno"] == 22

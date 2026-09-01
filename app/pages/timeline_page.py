@@ -4,6 +4,7 @@ from datetime import datetime
 from PySide6.QtWidgets import QLabel, QHBoxLayout, QVBoxLayout, QWidget
 
 from app.widgets.technical_timeline import TechnicalTimeline, TimelineSidePanel
+from app.services.temporal_parser import TemporalParser
 
 
 class TimelinePage(QWidget):
@@ -43,14 +44,13 @@ class TimelinePage(QWidget):
         for result in results:
             events.extend(self._extract_events(result))
 
-        events = sorted(
-            events,
-            key=lambda event: (
-                event.get("temporal_status") == "structural_only",
-                str(event.get("timestamp") or ""),
-                int(event.get("structural_sequence") or 0),
-            ),
-        )
+        parser = TemporalParser()
+        events = sorted(events, key=lambda event: (
+            event.get("temporal_status") == "structural_only",
+            parser.order_key(event.get("timestamp")) or (2, (), ""),
+            int(event.get("structural_sequence") or 0),
+            str(event.get("event_id") or event.get("title") or ""),
+        ))
 
         self.timeline.update_events(events)
         self.side_panel.update_summary(events)
@@ -226,6 +226,7 @@ class TimelinePage(QWidget):
             "source": str(getattr(event, "source", "ForensiHash")),
             "temporal_status": str(getattr(event, "temporal_status", "timestamped")),
             "structural_sequence": getattr(event, "structural_sequence", None),
+            "event_id": str(getattr(event, "event_id", "")),
         }
 
     def _metadata_to_dict(self, metadata) -> dict:

@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from app.services.temporal_parser import TemporalParser
 
 
 class TechnicalTimeline(QWidget):
@@ -325,14 +326,15 @@ class TimelineSidePanel(QWidget):
         )
 
         parsed_dates = [
-            self._parse_date(event.get("timestamp"))
+            (key, parsed)
             for event in events
-            if self._parse_date(event.get("timestamp"))
+            if (parsed := self._parse_date(event.get("timestamp"))) is not None
+            if (key := TemporalParser().order_key(parsed)) is not None
         ]
 
         if parsed_dates:
-            first = min(parsed_dates)
-            last = max(parsed_dates)
+            first = min(parsed_dates, key=lambda item: item[0])[1]
+            last = max(parsed_dates, key=lambda item: item[0])[1]
 
             self.period.set_lines(
                 [

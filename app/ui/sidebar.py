@@ -186,6 +186,14 @@ class Sidebar(QFrame):
             self.export_button
         )
 
+        self.diagnostics_button = self._create_action_button(
+            "DIAG", "Configurações · Diagnóstico"
+        )
+        self.diagnostics_button.clicked.connect(
+            lambda: self.navigation_requested.emit("diagnostics")
+        )
+        root_layout.addWidget(self.diagnostics_button)
+
     def _build_brand(self) -> QWidget:
         """
         Cria o bloco da marca.
@@ -599,6 +607,10 @@ class Sidebar(QFrame):
         self.open_folder_button.setToolTip("Abrir pasta")
         self.export_button.setText("EXP" if collapsed else "EXP   Exportar")
         self.export_button.setToolTip("Exportar")
+        self.diagnostics_button.setText(
+            "DIAG" if collapsed else "DIAG   Configurações · Diagnóstico"
+        )
+        self.diagnostics_button.setToolTip("Configurações · Diagnóstico")
         for label in self.findChildren(QLabel, "SidebarSectionTitle"):
             label.setVisible(not collapsed)
         for label in self.navigation_labels.values():

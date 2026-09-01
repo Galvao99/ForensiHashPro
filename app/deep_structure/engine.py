@@ -2,10 +2,14 @@ from __future__ import annotations
 
 import importlib
 import json
+import logging
 from pathlib import Path
 from typing import Any, Protocol
 
 from .models import JpegStructureReport, StructureReport
+
+
+LOGGER = logging.getLogger("forensihash.deep_structure")
 
 
 class DeepStructureError(RuntimeError):
@@ -110,7 +114,15 @@ class DeepFileStructureEngine:
                 self.max_preview_width, self.max_preview_height, self.max_preview_pixels,
                 self.max_nested_resource_depth, self.max_embedded_file_bytes, self.max_preview_cache_bytes,
             )
-        except (RuntimeError, ValueError) as error:
+        except (OSError, RuntimeError, ValueError) as error:
+            LOGGER.exception(
+                "deep_structure_failed",
+                extra={
+                    "engine": "deep_structure",
+                    "operation": "analyze_pdf",
+                    "file": str(source),
+                },
+            )
             message = str(error)
             normalized = message.lower()
             if "limit" in normalized or "exceeds" in normalized:
@@ -129,13 +141,27 @@ class DeepFileStructureEngine:
                      max_thumbnail_bytes: int = 64 * 1024 * 1024, max_scans: int = 4096) -> JpegDeepStructureSession:
         limits = (max_segments, max_app_payload_bytes, max_exif_ifds, max_exif_entries, max_exif_depth,
                   max_icc_bytes, max_xmp_bytes, max_thumbnail_bytes, max_scans)
-        if any(value <= 0 for value in limits): raise ValueError("size limits must be greater than zero")
+        if any(value <= 0 for value in limits):
+            raise ValueError("size limits must be greater than zero")
         core: Any = importlib.import_module("forensihash_core")
         try:
             native = core.analyze_jpeg(str(Path(path)), self.max_file_bytes, *limits)
-        except (RuntimeError, ValueError) as error:
-            message = str(error); normalized = message.lower()
-            category = "limit_exceeded" if "limit" in normalized else ("unsupported" if "soi/marker" in normalized else "malformed")
+        except (OSError, RuntimeError, ValueError) as error:
+            LOGGER.exception(
+                "deep_structure_failed",
+                extra={
+                    "engine": "deep_structure",
+                    "operation": "analyze_jpeg",
+                    "file": str(Path(path)),
+                },
+            )
+            message = str(error)
+            normalized = message.lower()
+            category = (
+                "limit_exceeded"
+                if "limit" in normalized
+                else ("unsupported" if "soi/marker" in normalized else "malformed")
+            )
             raise DeepStructureError(category, message) from error
         return JpegDeepStructureSession(native)
 
