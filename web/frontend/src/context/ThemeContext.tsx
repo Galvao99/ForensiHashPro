@@ -27,7 +27,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const { pathname } = useLocation()
   const [preferredTheme, setPreferredTheme] = useState<ThemePreference>(storedPreference)
   const [systemDark, setSystemDark] = useState(() => matchMedia(DARK_QUERY).matches)
-  const isProtectedArea = pathname === '/app' || pathname.startsWith('/app/') || pathname.startsWith('/admin/')
+  const isProtectedArea = pathname === '/customer' || pathname.startsWith('/customer/')
   const canUseThemePreference = Boolean(user && isProtectedArea)
   const resolvedTheme: ResolvedTheme = canUseThemePreference && (
     preferredTheme === 'DARK' || (preferredTheme === 'SYSTEM' && systemDark)

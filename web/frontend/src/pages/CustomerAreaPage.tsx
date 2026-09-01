@@ -1,7 +1,12 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
-const navigation = ['Visão Geral', 'Minha Conta', 'Meu Plano', 'Licença', 'Dispositivos', 'Downloads', 'Suporte']
+const groups = [
+  { label: 'CONTA', items: ['Minha conta', 'Segurança'] },
+  { label: 'PRODUTO', items: ['Meu plano', 'Licença', 'Dispositivos', 'Downloads'] },
+  { label: 'FINANCEIRO', items: ['Cobrança'] },
+  { label: 'AJUDA', items: ['Suporte', 'Minhas solicitações', 'Documentação'] },
+]
 
 export function CustomerAreaPage() {
   const { user, logout } = useAuth()
@@ -16,21 +21,30 @@ export function CustomerAreaPage() {
     <aside className="customer-sidebar">
       <div><span className="customer-mark">FH</span><strong>ForensiHash</strong><small>Área do Cliente</small></div>
       <nav aria-label="Área do Cliente">
-        {navigation.map((label, index) => index === 0
-          ? <NavLink key={label} to="/customer" end>{label}</NavLink>
-          : <span key={label} aria-disabled="true">{label}<small>Em breve</small></span>)}
+        <NavLink to="/customer" end>Visão Geral</NavLink>
+        {groups.map((group) => <section key={group.label} className="customer-nav-group">
+          <h2>{group.label}</h2>
+          {group.items.map((label) => <span key={label} aria-disabled="true">{label}<small>Em breve</small></span>)}
+        </section>)}
       </nav>
       <button type="button" className="customer-logout" onClick={signOut}>Sair</button>
     </aside>
     <section className="customer-content">
-      <p className="eyebrow">ÁREA DO CLIENTE</p>
+      <p className="eyebrow">FORENSIHASH · ÁREA DO CLIENTE</p>
       <h1>Visão Geral</h1>
       <article className="customer-card">
         <small>CONTA AUTENTICADA</small>
         <strong>{user?.email}</strong>
-        <span className="customer-status">{user?.status === 'ACTIVE' ? 'Ativa' : user?.status}</span>
+        <dl className="customer-auth-facts">
+          <div><dt>Status</dt><dd>{user?.status === 'ACTIVE' ? 'Ativa' : user?.status}</dd></div>
+          <div><dt>E-mail</dt><dd>{user?.email_verified ? 'Verificado' : 'Ainda não verificado'}</dd></div>
+        </dl>
       </article>
-      <p className="customer-boundary">Seus arquivos e análises periciais permanecem no ForensiHash Desktop. Esta área não recebe evidências automaticamente.</p>
+      <section className="customer-next-actions" aria-labelledby="available-soon">
+        <h2 id="available-soon">Recursos da conta</h2>
+        <p>Perfil, plano, licença, dispositivos, downloads, cobrança e suporte serão disponibilizados em etapas futuras.</p>
+      </section>
+      <p className="customer-boundary">Arquivos, casos e análises periciais permanecem locais no ForensiHash Desktop. Esta área não recebe evidências automaticamente.</p>
     </section>
   </main>
 }

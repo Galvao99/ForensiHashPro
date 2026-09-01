@@ -67,4 +67,5 @@ info.txt
 *.md
 !docs/architecture/CUSTOMER_AREA_AUTH_V1.md
 !docs/architecture/CUSTOMER_AREA_AUTH_V1_AUDIT.md
+!docs/architecture/CUSTOMER_AREA_WEB_TRANSITION_V1_AUDIT.md
 !/README.md

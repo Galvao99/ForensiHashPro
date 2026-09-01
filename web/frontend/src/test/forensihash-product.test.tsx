@@ -34,7 +34,7 @@ describe('página institucional ForensiHash', () => {
     expect(screen.getByRole('heading', { name: /o que o ForensiHash não decide/i })).toBeInTheDocument()
     expect(screen.getByText(/a interpretação permanece dependente/i)).toBeInTheDocument()
     expect(screen.getByRole('img', { name: /DDNA preserva o estado/i })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Acessar plataforma' })).toHaveAttribute('href', '/app/analysis')
+    expect(screen.getByRole('link', { name: 'Área do Cliente' })).toHaveAttribute('href', '/customer')
   })
 
   it('não publica conclusões automáticas proibidas', () => {

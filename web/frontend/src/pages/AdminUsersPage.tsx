@@ -1,5 +1,0 @@
-import { useEffect, useState } from 'react'
-import { authApi } from '../lib/api'
-import { useAuth } from '../context/AuthContext'
-import type { WebUser } from '../types/api'
-export function AdminUsersPage() { const [users, setUsers] = useState<WebUser[]>([]); const { csrfToken } = useAuth(); useEffect(() => { authApi.users().then(setUsers) }, []); async function toggle(user: WebUser) { const updated = await authApi.updateUser(user.id, { is_active: !user.is_active }, csrfToken); setUsers((current) => current.map((item) => item.id === updated.id ? updated : item)) } return <div className="app-page"><p className="eyebrow">ADMINISTRAÇÃO</p><h1>Usuários</h1><div className="app-panel table-scroll"><table className="technical-table"><thead><tr><th>Nome</th><th>E-mail</th><th>Role</th><th>Status</th><th>Ação</th></tr></thead><tbody>{users.map((user) => <tr key={user.id}><td>{user.name}</td><td>{user.email}</td><td>{user.role}</td><td>{user.is_active ? 'ATIVO' : 'INATIVO'}</td><td><button className="text-button" onClick={() => toggle(user)}>{user.is_active ? 'Desativar' : 'Ativar'}</button></td></tr>)}</tbody></table></div></div> }

@@ -1,6 +1,6 @@
 import { createContext, ReactNode, useContext, useEffect, useRef, useState } from 'react'
 import { authApi } from '../lib/api'
-import type { AuthResponse, PrivacyPreferences, WebUser } from '../types/api'
+import type { AuthResponse, WebUser } from '../types/api'
 
 export interface RegisterPayload {
   email: string
@@ -12,14 +12,12 @@ type AuthStage = 'IDLE' | 'SUBMITTING' | 'VALIDATING'
 
 interface AuthValue {
   user: WebUser | null
-  privacy: PrivacyPreferences | null
   csrfToken: string
   loading: boolean
   authStage: AuthStage
   login(email: string, password: string): Promise<void>
   register(payload: RegisterPayload): Promise<void>
   logout(): Promise<void>
-  updatePrivacy(payload: object): Promise<void>
 }
 
 const AuthContext = createContext<AuthValue | null>(null)
@@ -66,7 +64,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   return (
     <AuthContext.Provider value={{
       user: auth?.user ?? null,
-      privacy: auth?.privacy ?? null,
       csrfToken: auth?.csrf_token ?? '',
       loading,
       authStage,
@@ -78,11 +75,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setAuth(null)
         setLoading(false)
         setAuthStage('IDLE')
-      },
-      async updatePrivacy(payload) {
-        if (!auth) return
-        const privacy = await authApi.updatePrivacy(payload, auth.csrf_token)
-        setAuth({ ...auth, privacy })
       },
     }}>
       {children}

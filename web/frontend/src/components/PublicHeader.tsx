@@ -30,7 +30,7 @@ export function PublicHeader() {
         </button>
         <nav id="public-navigation" className={open ? 'public-nav open' : 'public-nav'} aria-label="Navegação principal">
           {links.map(([to, label]) => to.includes('#') ? <Link key={to} to={to} onClick={() => setOpen(false)}>{label}</Link> : <NavLink key={to} to={to} onClick={() => setOpen(false)}>{label}</NavLink>)}
-          <Link className="header-cta" to="/app/analysis" onClick={() => setOpen(false)}>Acessar plataforma</Link>
+          <Link className="header-cta" to="/customer" onClick={() => setOpen(false)}>Área do Cliente</Link>
         </nav>
       </Container>
     </header>

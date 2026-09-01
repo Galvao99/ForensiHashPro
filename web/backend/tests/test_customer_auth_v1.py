@@ -123,3 +123,39 @@ def test_expired_recovery_token_is_rejected(auth_platform) -> None:
         record.expires_at = utcnow() - timedelta(seconds=1) 
         database.commit()
     assert client.post("/api/v1/auth/reset-password", json={"token": token, "password": "new-secure-password-42", "password_confirmation": "new-secure-password-42"}).status_code == 400
+
+
+def test_duplicate_email_is_rejected_and_hash_is_never_serialized(auth_platform) -> None:
+    client, _, _ = auth_platform
+    assert register(client).status_code == 201
+    duplicate = register(client)
+    assert duplicate.status_code == 409
+    assert "password_hash" not in duplicate.text
+
+
+def test_session_cookie_is_httponly(auth_platform) -> None:
+    client, _, _ = auth_platform
+    response = register(client)
+    session_cookie = next(value for value in response.headers.get_list("set-cookie") if value.startswith("forensihash_session="))
+    assert "HttpOnly" in session_cookie
+    assert "SameSite=" in session_cookie
+
+
+@pytest.mark.parametrize("path", [
+    "/api/v1/capabilities",
+    "/api/v1/analyses/history",
+    "/api/v1/analysis-jobs",
+    "/api/v1/analysis-sets/example",
+    "/api/v1/analyses/example/ddna-snapshot",
+    "/api/v1/admin/users",
+])
+def test_legacy_web_forensic_and_admin_routes_are_not_exposed(auth_platform, path: str) -> None:
+    client, _, _ = auth_platform
+    assert client.get(path).status_code in {404, 405}
+
+
+def test_health_remains_available(auth_platform) -> None:
+    client, _, _ = auth_platform
+    response = client.get("/health")
+    assert response.status_code == 200
+    assert response.json()["status"] == "ok"
