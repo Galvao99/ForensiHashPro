@@ -4,6 +4,7 @@ import { Button, Input } from '../components/ui'
 import { useAuth } from '../context/AuthContext'
 import { authApi } from '../lib/api'
 import { DocumentMetadata } from '../components/DocumentMetadata'
+import { AuthLayout } from '../components/AuthLayout'
 
 export function publicRegistrationEnabled() {
   return import.meta.env.VITE_REGISTRATION_ENABLED?.toLowerCase() !== 'false'
@@ -12,12 +13,12 @@ export function publicRegistrationEnabled() {
 function AuthFrame({ title, children }: { title: string; children: ReactNode }) {
   const { user, loading } = useAuth()
   if (!loading && user) return <Navigate to="/customer" replace />
-  return <div className="customer-auth-page"><div className="customer-auth-brand"><span>FH</span><strong>ForensiHash</strong><small>Área do Cliente · ARQEN</small></div><div className="customer-auth-panel auth-panel"><p className="eyebrow">ACESSO SEGURO</p><h1>{title}</h1>{children}</div></div>
+  return <AuthLayout title={title}>{children}</AuthLayout>
 }
 
 function PasswordField({ name, label, autoComplete }: { name: string; label: string; autoComplete: string }) {
   const [visible, setVisible] = useState(false)
-  return <label>{label}<span className="password-field"><Input name={name} type={visible ? 'text' : 'password'} autoComplete={autoComplete} minLength={12} required /><button type="button" onClick={() => setVisible(!visible)} aria-label={`${visible ? 'Ocultar' : 'Mostrar'} ${label.toLowerCase()}`}>{visible ? 'Ocultar' : 'Mostrar'}</button></span></label>
+  return <label>{label}<span className="password-field"><Input name={name} type={visible ? 'text' : 'password'} autoComplete={autoComplete} minLength={12} required /><button type="button" onClick={() => setVisible(!visible)} aria-label={`${visible ? 'Ocultar' : 'Mostrar'} ${label.toLowerCase()}`} aria-pressed={visible}>{visible ? 'Ocultar' : 'Mostrar'}</button></span></label>
 }
 
 export function LoginPage() {

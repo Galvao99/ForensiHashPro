@@ -1,5 +1,6 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { ForensiHashLogo } from '../components/AuthLayout'
 
 const groups = [
   { label: 'CONTA', items: ['Minha conta', 'Segurança'] },
@@ -19,7 +20,7 @@ export function CustomerAreaPage() {
 
   return <main className="customer-area">
     <aside className="customer-sidebar">
-      <div><span className="customer-mark">FH</span><strong>ForensiHash</strong><small>Área do Cliente</small></div>
+      <div className="customer-product-brand"><ForensiHashLogo /><span>Área do Cliente</span><small>Um produto ARQEN</small></div>
       <nav aria-label="Área do Cliente">
         <NavLink to="/customer" end>Visão Geral</NavLink>
         {groups.map((group) => <section key={group.label} className="customer-nav-group">
@@ -27,7 +28,11 @@ export function CustomerAreaPage() {
           {group.items.map((label) => <span key={label} aria-disabled="true">{label}<small>Em breve</small></span>)}
         </section>)}
       </nav>
-      <button type="button" className="customer-logout" onClick={signOut}>Sair</button>
+      <footer className="customer-account">
+        <span>Conta autenticada</span>
+        <strong>{user?.email}</strong>
+        <button type="button" className="customer-logout" onClick={signOut}>Sair</button>
+      </footer>
     </aside>
     <section className="customer-content">
       <p className="eyebrow">FORENSIHASH · ÁREA DO CLIENTE</p>

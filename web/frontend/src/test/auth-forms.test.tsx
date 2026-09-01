@@ -14,6 +14,30 @@ function renderAt(path: string) {
 }
 
 describe('formulários reais de autenticação', () => {
+  it.each(['/login', '/register', '/forgot-password', '/reset-password?token=example'])(
+    'usa o logo real e a fundação visual compartilhada em %s',
+    async (path) => {
+      vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(response({}, 401))))
+      const { container } = renderAt(path)
+
+      const logo = await screen.findByRole('img', { name: 'ForensiHash' })
+      expect(logo).toHaveAttribute('src', '/assets/forensihash_logo_branco.png')
+      expect(container.querySelector('.customer-auth-page')).toBeInTheDocument()
+      expect(container.querySelector('.customer-auth-surface')).toBeInTheDocument()
+      expect(screen.queryByText('FH', { exact: true })).not.toBeInTheDocument()
+    },
+  )
+
+  it('oferece cadastro e recuperação a partir do login público', async () => {
+    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(response({}, 401))))
+    renderAt('/login')
+
+    expect(await screen.findByRole('link', { name: 'Criar conta' })).toHaveAttribute('href', '/register')
+    expect(screen.getByRole('link', { name: 'Esqueci minha senha' })).toHaveAttribute('href', '/forgot-password')
+    expect(screen.getByLabelText('E-mail')).toHaveAttribute('autocomplete', 'email')
+    expect(screen.getByLabelText('Senha')).toHaveAttribute('autocomplete', 'current-password')
+  })
+
   it('submete cadastro com o schema exato, confirma a sessão e navega', async () => {
     let meCalls = 0
     const fetchMock = vi.fn((input: string | URL | Request, _init?: RequestInit) => {
