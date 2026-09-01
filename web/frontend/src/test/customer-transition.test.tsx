@@ -24,7 +24,9 @@ describe('transição para Área do Cliente', () => {
   it('mostra somente conta real e placeholders honestos', async () => {
     renderAt('/customer', true)
     expect(await screen.findByRole('heading', { name: 'Visão Geral' })).toBeInTheDocument()
-    expect(screen.getByText('person@example.test')).toBeInTheDocument()
+    expect(screen.getByRole('img', { name: 'ForensiHash' })).toHaveAttribute('src', '/assets/forensihash_logo_branco.png')
+    expect(screen.queryByText('FH', { exact: true })).not.toBeInTheDocument()
+    expect(screen.getAllByText('person@example.test')).toHaveLength(2)
     expect(screen.getByText('Ainda não verificado')).toBeInTheDocument()
     expect(screen.queryByText(/Nova análise|Analisar evidências|Histórico de análises|ForensiHash Free/i)).not.toBeInTheDocument()
     expect(document.querySelector('input[type="file"]')).not.toBeInTheDocument()

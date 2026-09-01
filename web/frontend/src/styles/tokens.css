@@ -65,6 +65,20 @@
   --radius: 2px;
   --max-width: 1240px;
   --header-height: 72px;
+  --customer-background-primary: #07090c;
+  --customer-background-secondary: #0b0e12;
+  --customer-surface: #0f1318;
+  --customer-surface-elevated: #131820;
+  --customer-border-subtle: #1c232c;
+  --customer-border-default: #2b3541;
+  --customer-text-primary: #f4f5f6;
+  --customer-text-secondary: #aab2bc;
+  --customer-text-muted: #707b88;
+  --customer-accent: #6ba9dc;
+  --customer-accent-hover: #8bc0e8;
+  --customer-success: #73c69a;
+  --customer-warning: #d1a553;
+  --customer-error: #e1767a;
 }
 
 :root[data-theme='dark'] {
