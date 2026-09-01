@@ -69,13 +69,16 @@ def test_registration_login_me_logout_and_public_dto(auth_platform) -> None:
 
 def test_login_failure_is_equivalent_and_disabled_user_is_rejected(auth_platform) -> None:
     client, factory, _ = auth_platform
-    register(client); client.cookies.clear()
+    register(client) 
+    client.cookies.clear()
     wrong = client.post("/api/v1/auth/login", json={"email": "person@example.test", "password": "wrong-password-42"})
     unknown = client.post("/api/v1/auth/login", json={"email": "unknown@example.test", "password": "wrong-password-42"})
     assert (wrong.status_code, wrong.json()["error"]["code"]) == (unknown.status_code, unknown.json()["error"]["code"])
     with factory() as database:
-        user = database.scalar(select(User)); assert user
-        user.status = UserStatus.DISABLED.value; database.commit()
+        user = database.scalar(select(User)) 
+        assert user
+        user.status = UserStatus.DISABLED.value 
+        database.commit()
     assert client.post("/api/v1/auth/login", json={"email": "person@example.test", "password": "correct-horse-42"}).status_code == 401
 
 
@@ -83,8 +86,10 @@ def test_expired_session_is_rejected(auth_platform) -> None:
     client, factory, _ = auth_platform
     register(client)
     with factory() as database:
-        session = database.scalar(select(AuthSession)); assert session
-        session.expires_at = utcnow() - timedelta(seconds=1); database.commit()
+        session = database.scalar(select(AuthSession)) 
+        assert session
+        session.expires_at = utcnow() - timedelta(seconds=1) 
+        database.commit()
     assert client.get("/api/v1/auth/me").status_code == 401
 
 
@@ -103,14 +108,18 @@ def test_recovery_is_generic_one_time_and_revokes_sessions(auth_platform) -> Non
     assert client.post("/api/v1/auth/login", json={"email": "person@example.test", "password": "correct-horse-42"}).status_code == 401
     assert client.post("/api/v1/auth/login", json={"email": "person@example.test", "password": "new-secure-password-42"}).status_code == 200
     with factory() as database:
-        record = database.scalar(select(PasswordResetToken)); assert record and record.used_at
+        record = database.scalar(select(PasswordResetToken)) 
+        assert record and record.used_at
 
 
 def test_expired_recovery_token_is_rejected(auth_platform) -> None:
     client, factory, delivery = auth_platform
-    register(client); client.post("/api/v1/auth/forgot-password", json={"email": "person@example.test"})
+    register(client) 
+    client.post("/api/v1/auth/forgot-password", json={"email": "person@example.test"})
     token = delivery.reset_url.rsplit("token=", 1)[1]
     with factory() as database:
-        record = database.scalar(select(PasswordResetToken)); assert record
-        record.expires_at = utcnow() - timedelta(seconds=1); database.commit()
+        record = database.scalar(select(PasswordResetToken)) 
+        assert record
+        record.expires_at = utcnow() - timedelta(seconds=1) 
+        database.commit()
     assert client.post("/api/v1/auth/reset-password", json={"token": token, "password": "new-secure-password-42", "password_confirmation": "new-secure-password-42"}).status_code == 400
