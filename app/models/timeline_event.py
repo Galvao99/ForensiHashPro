@@ -61,6 +61,13 @@ class TimelineEvent:
         value = self.date
         return value.strftime("%d/%m/%Y %H:%M:%S") if value else "Data nao determinada"
 
+    @property
+    def temporal_order_key(self) -> tuple | None:
+        # Local import avoids app.models -> app.services package initialization.
+        from app.services.temporal_parser import TemporalParser
+
+        return TemporalParser().order_key(self.timestamp)
+
 
 @dataclass(frozen=True, slots=True)
 class TimelineWarning:

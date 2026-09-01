@@ -1,5 +1,6 @@
 from datetime import datetime
 from pathlib import Path
+from time import perf_counter
 
 from PySide6.QtCore import (
     QEasingCurve,
@@ -445,6 +446,7 @@ class MainWindow(QWidget):
 
         folder_path = Path(folder)
 
+        discovery_started = perf_counter()
         files = sorted(
             (
                 path
@@ -453,6 +455,7 @@ class MainWindow(QWidget):
             ),
             key=lambda path: str(path).lower(),
         )
+        self._last_ingestion_ms = (perf_counter() - discovery_started) * 1000
 
         self.current_folder_path = (
             folder_path
@@ -497,6 +500,7 @@ class MainWindow(QWidget):
         file_path = Path(filename)
 
         self.current_folder_path = None
+        self._last_ingestion_ms = 0.0
 
         self.sidebar.file_list.add_files(
             [file_path]
@@ -581,6 +585,17 @@ class MainWindow(QWidget):
         }
         self._refresh_case_overview()
 
+        observability = getattr(self.analysis_service, "observability", None)
+        case_identity = case_id or str(files[0].resolve())
+        case_ref = (
+            observability.begin_case(
+                case_identity,
+                [(str(path), path.stat().st_size) for path in files],
+                getattr(self, "_last_ingestion_ms", 0.0),
+            )
+            if observability is not None else None
+        )
+
         # Limpa IPs e dados investigativos da análise anterior.
         self.workspace.update_investigation_context(
             None
@@ -604,7 +619,9 @@ class MainWindow(QWidget):
             files=files,
             case_id=case_id or None,
             cached_results=cached_results,
+            observability=observability,
         )
+        self.analysis_worker.case_ref = case_ref
 
         self.analysis_worker.moveToThread(
             self.analysis_thread

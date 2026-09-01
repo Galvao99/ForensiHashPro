@@ -13,6 +13,53 @@ QWidget {
     font-size: 13px;
 }
 
+/* Diagnostics / Observability V2 */
+QWidget#DiagnosticsPage QGroupBox {
+    background: #111922;
+    border: 1px solid #263442;
+    border-radius: 8px;
+    margin-top: 10px;
+    padding-top: 10px;
+    font-weight: 600;
+}
+QFrame#DiagnosticsMetricCard, QFrame#DiagnosticsFact, QFrame#DiagnosticsChart {
+    background: #111922;
+    border: 1px solid #263442;
+    border-radius: 8px;
+}
+QFrame#DiagnosticsMetricCard[statusKind="ok"] { border-left: 3px solid #36b877; }
+QFrame#DiagnosticsMetricCard[statusKind="degraded"] { border-left: 3px solid #e0ac38; }
+QFrame#DiagnosticsMetricCard[statusKind="unavailable"] { border-left: 3px solid #7690aa; }
+QFrame#DiagnosticsMetricCard[statusKind="error"] { border-left: 3px solid #e05a5a; }
+QLabel#DiagnosticsCardTitle, QLabel#DiagnosticsFactTitle {
+    color: #98a7b7;
+    font-size: 11px;
+}
+QLabel#DiagnosticsCardValue { color: #f1f5f9; font-size: 20px; font-weight: 700; }
+QLabel#DiagnosticsCardDetail { color: #a9b5c2; font-size: 11px; }
+QLabel#DiagnosticsFactValue { color: #e7edf4; font-size: 14px; font-weight: 600; }
+QLabel#DiagnosticsStatusBadge {
+    border-radius: 5px;
+    padding: 5px 9px;
+    font-weight: 700;
+}
+QLabel#DiagnosticsStatusBadge[statusKind="ok"] { color: #75e3a9; background: #123427; }
+QLabel#DiagnosticsStatusBadge[statusKind="degraded"] { color: #f4c95d; background: #392f18; }
+QLabel#DiagnosticsStatusBadge[statusKind="unavailable"] { color: #afc0d1; background: #243140; }
+QLabel#DiagnosticsStatusBadge[statusKind="error"] { color: #ff8585; background: #3d2024; }
+QLabel#DiagnosticsCoverageLabel { color: #f4c95d; font-size: 11px; }
+QLabel#DiagnosticsEmptyState { color: #8997a6; padding: 7px; font-style: italic; }
+QLabel#DiagnosticsDetails { color: #b8c4d0; background: #0c131b; border: 1px solid #263442; border-radius: 5px; padding: 9px; }
+QProgressBar#DiagnosticsTimeBar, QProgressBar#DiagnosticsStatusBar {
+    min-height: 8px; max-height: 8px; border: 0; border-radius: 4px; background: #25313e;
+}
+QProgressBar#DiagnosticsTimeBar::chunk { background: #4f9bd9; border-radius: 4px; }
+QProgressBar#DiagnosticsStatusBar[statusKind="ok"]::chunk { background: #36b877; }
+QProgressBar#DiagnosticsStatusBar[statusKind="degraded"]::chunk { background: #e0ac38; }
+QProgressBar#DiagnosticsStatusBar[statusKind="error"]::chunk { background: #e05a5a; }
+QProgressBar#DiagnosticsStatusBar[statusKind="running"]::chunk { background: #4f9bd9; }
+QProgressBar#DiagnosticsStatusBar[statusKind="unavailable"]::chunk { background: #7690aa; }
+
 QLabel {
     background: transparent;
 }

@@ -337,7 +337,8 @@ class TimelineService:
         return str(uuid5(NAMESPACE_URL, ":".join(("forensihash", "timeline", evidence_ref, *parts))))
 
     @staticmethod
-    def _sort_key(event: TimelineEvent) -> tuple[int, str, int]:
-        if event.timestamp is not None:
-            return 0, event.timestamp, event.structural_sequence or 0
-        return 1, "", event.structural_sequence or 0
+    def _sort_key(event: TimelineEvent) -> tuple[int, object, int, str]:
+        temporal_key = event.temporal_order_key
+        if temporal_key is not None:
+            return 0, temporal_key, event.structural_sequence or 0, event.event_id
+        return 1, (2, (), ""), event.structural_sequence or 0, event.event_id

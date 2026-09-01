@@ -455,7 +455,7 @@ class DeepFileExplorerPage(QWidget):
         self.file_label.setText(f"{result.file_info.name} · {result.file_info.size_bytes:,} bytes · SHA-256: {sha}")
         structure_format = self._structure_format(result, path)
         if structure_format not in {"pdf", "jpeg"}:
-            self.status_label.setText("Estrutura profunda indisponível para este formato.")
+            self.status_label.setText("Formato ainda não suportado pelo Deep File Explorer.")
             self.document_viewer.clear("Visualização estrutural disponível para PDF e JPEG.")
             self._set_model(StructureTreeModel())
             self.inspector.set_session(None)

@@ -62,6 +62,41 @@ def test_temporal_parser_rejects_unsupported_values(raw):
     assert TemporalParser().parse(raw) is None
 
 
+def test_temporal_order_key_compares_aware_values_by_utc_instant():
+    parser = TemporalParser()
+    earlier = parser.order_key("2023-01-26T15:00:00-03:00")
+    later = parser.order_key("2023-01-26T19:00:00Z")
+    same_instant = parser.order_key("2023-01-26T18:00:00Z")
+    assert earlier is not None and later is not None and same_instant is not None
+    assert earlier < later
+    assert earlier[:2] == same_instant[:2]
+
+
+def test_temporal_order_key_keeps_naive_in_separate_domain_without_inventing_zone():
+    parser = TemporalParser()
+    naive = parser.parse("2023-01-26 15:50:00")
+    aware = parser.parse("2023-01-26T15:50:00Z")
+    assert naive is not None and aware is not None
+    assert naive.raw == "2023-01-26 15:50:00"
+    assert naive.timezone_status == "unknown"
+    assert naive.utc_normalized is None
+    assert parser.order_key(aware)[0] == 0
+    assert parser.order_key(naive)[0] == 1
+
+
+def test_mixed_timezone_timeline_order_is_deterministic_and_preserves_raw():
+    result = _result(metadata=SimpleNamespace(raw={
+        "PDF:CreationDate": "2023-01-26 15:50:00",
+        "PDF:ModifyDate": "2023-01-26T17:00:00-03:00",
+        "XMP:MetadataDate": "2023-01-26T19:00:00Z",
+    }))
+    first = TimelineService().build(result).events
+    second = TimelineService().build(result).events
+    assert [item.event_id for item in first] == [item.event_id for item in second]
+    assert any(item.raw_timestamp == "2023-01-26 15:50:00" for item in first)
+    assert TimelineService().build(result).warnings == []
+
+
 def test_metadata_creation_modification_and_objective_warning():
     result = _result(metadata=SimpleNamespace(raw={
         "PDF:CreationDate": "2024-01-10T10:00:00-03:00",

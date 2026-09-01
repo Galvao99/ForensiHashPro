@@ -1,4 +1,3 @@
-from datetime import datetime, timezone
 from pathlib import Path
 
 from app.engines.digital_signature_engine import DigitalSignatureEngine
@@ -34,6 +33,7 @@ from app.analysis_profiles import (
     AnalysisProfile,
     FORENSIHASH_PRO,
 )
+from app.services.filesystem_timestamps import read_filesystem_timestamp
 
 
 class UnacquiredEvidenceError(RuntimeError):
@@ -121,20 +121,20 @@ class FileAnalyzer:
         file_path = Path(file_path)
         stat = file_path.stat()
 
+        timestamp_results = (
+            read_filesystem_timestamp("st_ctime", stat.st_ctime),
+            read_filesystem_timestamp("st_mtime", stat.st_mtime),
+            read_filesystem_timestamp("st_atime", stat.st_atime),
+        )
+
         file_info = FileInfo(
             name=file_path.name,
             path=file_path,
             extension=file_path.suffix.lower(),
             size_bytes=stat.st_size,
-            created_at=datetime.fromtimestamp(
-                stat.st_ctime, tz=timezone.utc
-            ),
-            modified_at=datetime.fromtimestamp(
-                stat.st_mtime, tz=timezone.utc
-            ),
-            accessed_at=datetime.fromtimestamp(
-                stat.st_atime, tz=timezone.utc
-            ),
+            created_at=timestamp_results[0].value,
+            modified_at=timestamp_results[1].value,
+            accessed_at=timestamp_results[2].value,
         )
 
         hashes = self.hash_engine.calculate_all(
@@ -142,6 +142,37 @@ class FileAnalyzer:
         )
 
         processing_steps = []
+        timestamp_issues = [
+            ProcessingIssue(
+                code="filesystem_timestamp_invalid",
+                status=ProcessingStatus.PARTIAL,
+                technical_message=(
+                    f"Timestamp de filesystem indisponível: {item.operation}."
+                ),
+                user_message="Um timestamp do filesystem não pôde ser representado.",
+                component="filesystem_metadata",
+                details={
+                    "field": item.field,
+                    "operation": item.operation,
+                    "error_type": type(item.error).__name__,
+                    "errno": getattr(item.error, "errno", None),
+                },
+                impact=ProcessingImpact.ANALYSIS_PARTIAL,
+                original_exception=item.error,
+            )
+            for item in timestamp_results
+            if item.error is not None
+        ]
+        processing_steps.append(self._processing_step(
+            "filesystem_timestamps",
+            "filesystem_metadata",
+            ProcessingStatus.PARTIAL if timestamp_issues else ProcessingStatus.SUCCESS,
+            (
+                "Um ou mais timestamps do filesystem estão indisponíveis."
+                if timestamp_issues else "Timestamps do filesystem adquiridos."
+            ),
+            issues=timestamp_issues,
+        ))
         extract_step = getattr(self.metadata_engine, "extract_step", None)
         if callable(extract_step):
             try:
