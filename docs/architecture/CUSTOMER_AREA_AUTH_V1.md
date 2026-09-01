@@ -65,7 +65,7 @@ Opaque sessions need no signing secret: token entropy comes from the operating s
 
 ## Known limitations
 
-There is no email verification flow or production email provider. Rate limiting is process-local and documented as non-production. Session cleanup is evaluated on access; a scheduled purge is not included. Legacy Web analysis routes/tables remain and require a separate decommissioning patch.
+There is no email verification flow or production email provider. Rate limiting is process-local and documented as non-production. Session cleanup is evaluated on access; a scheduled purge is not included. Legacy Web forensic routers are no longer registered; their implementation and database tables remain temporarily for a later, observed cleanup migration.
 
 ## Future integration points
 

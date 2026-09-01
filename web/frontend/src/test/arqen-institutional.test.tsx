@@ -42,7 +42,7 @@ describe('homepage institucional ARQEN', () => {
     expect(screen.getByRole('link', { name: /entender uma análise/i })).toHaveAttribute('href', '/forensihash')
     const navigation = screen.getByRole('navigation', { name: /navegação principal/i })
     const localRoutes = within(navigation).getAllByRole('link').map(link => link.getAttribute('href'))
-    expect(localRoutes).toEqual(['/#solutions', '/ddna', '/forensihash', '/references', '/app/analysis'])
+    expect(localRoutes).toEqual(['/#solutions', '/ddna', '/forensihash', '/references', '/customer'])
     expect(within(navigation).queryByRole('link', { name: 'Tecnologia' })).not.toBeInTheDocument()
     expect(screen.getByRole('contentinfo')).not.toHaveTextContent('Tecnologia')
   })

@@ -19,11 +19,11 @@ describe('navegação pública', () => {
     expect(screen.getByRole('heading', { name: /proveniência.*integridade.*rastreabilidade/i })).toBeInTheDocument()
   })
 
-  it('a navbar expõe as áreas institucionais e a análise', () => {
+  it('a navbar expõe as áreas institucionais e a Área do Cliente', () => {
     renderAt('/')
     expect(screen.getAllByRole('link', { name: 'ForensiHash' })[0]).toHaveAttribute('href', '/forensihash')
     expect(screen.getAllByRole('link', { name: 'DDNA' })[0]).toHaveAttribute('href', '/ddna')
-    expect(screen.getByRole('link', { name: 'Acessar plataforma' })).toHaveAttribute('href', '/app/analysis')
+    expect(screen.getByRole('link', { name: 'Área do Cliente' })).toHaveAttribute('href', '/customer')
     expect(screen.queryByRole('link', { name: 'Tecnologia' })).not.toBeInTheDocument()
     expect(document.querySelector('a[href="/technology"]')).not.toBeInTheDocument()
   })

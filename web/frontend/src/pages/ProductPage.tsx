@@ -96,7 +96,7 @@ export function ProductPage() {
       </Section>
 
       <Section className="arqen-section forensi-final-cta" eyebrow="FORENSIHASH" title="Analise artefatos digitais com mais contexto.">
-        <div className="hero-actions"><Link className="button-link button-light" to="/app/analysis">Acessar plataforma</Link><Link className="text-link text-link--light" to="/ddna">Conhecer DDNA <span aria-hidden="true">↗</span></Link></div>
+        <div className="hero-actions"><Link className="button-link button-light" to="/customer">Área do Cliente</Link><Link className="text-link text-link--light" to="/ddna">Conhecer DDNA <span aria-hidden="true">↗</span></Link></div>
       </Section>
     </article>
   )

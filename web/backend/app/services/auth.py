@@ -7,7 +7,7 @@ from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from web.backend.app.models import AuthSession, PasswordResetToken, User, UserPrivacyPreferences, UserStatus
+from web.backend.app.models import AuthSession, PasswordResetToken, User, UserStatus
 from web.backend.app.runtime_config import reset_token_lifetime_seconds, session_lifetime_seconds
 from web.backend.app.security import hash_password, new_opaque_token, normalize_email, token_digest, validate_password, verify_password
 
@@ -33,8 +33,6 @@ class AuthService:
         if confirmation is not None and password != confirmation:
             raise ValueError("As senhas não coincidem.")
         user = User(email=normalized, password_hash=hash_password(password), status=UserStatus.ACTIVE.value)
-        # Required only while legacy analysis routes remain available.
-        user.privacy = UserPrivacyPreferences()
         self.database.add(user)
         try:
             self.database.commit()
