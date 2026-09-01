@@ -79,7 +79,7 @@ def test_staging_configuration_is_valid_and_registration_defaults_disabled(
 ) -> None:
     monkeypatch.setenv("FORENSIHASH_ENV", "staging")
     monkeypatch.setenv("FORENSIHASH_ALLOWED_ORIGINS", "https://frontend.onrender.com")
-    monkeypatch.setenv("FORENSIHASH_SESSION_SECRET", "s" * 32)
+    monkeypatch.setenv("FORENSIHASH_APPLICATION_BASE_URL", "https://frontend.onrender.com")
     monkeypatch.setenv("FORENSIHASH_COOKIE_SECURE", "true")
     monkeypatch.setenv("FORENSIHASH_DATABASE_URL", "postgresql+psycopg://db/test")
     monkeypatch.delenv("FORENSIHASH_REGISTRATION_ENABLED", raising=False)

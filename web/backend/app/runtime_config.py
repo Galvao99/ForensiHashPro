@@ -10,6 +10,8 @@ DEFAULT_DEVELOPMENT_ORIGINS = ("http://localhost:5173", "http://127.0.0.1:5173")
 DEFAULT_ANALYSIS_CONCURRENCY = 1
 DEFAULT_ANALYSIS_QUEUE_CAPACITY = 20
 DEFAULT_ANALYSIS_TIMEOUT_SECONDS = 300
+DEFAULT_SESSION_LIFETIME_SECONDS = 8 * 60 * 60
+DEFAULT_RESET_TOKEN_LIFETIME_SECONDS = 30 * 60
 
 
 def environment() -> str:
@@ -91,6 +93,24 @@ def cookie_samesite() -> str:
     return value
 
 
+def session_lifetime_seconds() -> int:
+    return _bounded_integer("FORENSIHASH_SESSION_LIFETIME_SECONDS", DEFAULT_SESSION_LIFETIME_SECONDS, minimum=300, maximum=2_592_000)
+
+
+def reset_token_lifetime_seconds() -> int:
+    return _bounded_integer("FORENSIHASH_RESET_TOKEN_LIFETIME_SECONDS", DEFAULT_RESET_TOKEN_LIFETIME_SECONDS, minimum=300, maximum=86_400)
+
+
+def application_base_url() -> str:
+    value = os.environ.get("FORENSIHASH_APPLICATION_BASE_URL", "http://localhost:5173").strip().rstrip("/")
+    parsed = urlsplit(value)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc or parsed.query or parsed.fragment:
+        raise RuntimeError("FORENSIHASH_APPLICATION_BASE_URL deve ser uma URL HTTP(S) válida.")
+    if deployed_environment() and parsed.scheme != "https":
+        raise RuntimeError("FORENSIHASH_APPLICATION_BASE_URL deve usar HTTPS em staging/production.")
+    return value
+
+
 def allowed_origins() -> tuple[str, ...]:
     configured = os.environ.get("FORENSIHASH_ALLOWED_ORIGINS", "")
     if not configured.strip():
@@ -116,13 +136,11 @@ def validate_runtime_configuration() -> None:
     current_environment = environment()
     allowed_origins()
     cookie_samesite()
+    session_lifetime_seconds()
+    reset_token_lifetime_seconds()
+    application_base_url()
     archive_limits()
     if current_environment in DEPLOYED_ENVIRONMENTS:
-        secret = os.environ.get("FORENSIHASH_SESSION_SECRET", "")
-        if len(secret) < 32:
-            raise RuntimeError(
-                "FORENSIHASH_SESSION_SECRET deve possuir ao menos 32 caracteres."
-            )
         if not cookie_secure():
             raise RuntimeError(
                 "FORENSIHASH_COOKIE_SECURE deve ser true em staging/production."

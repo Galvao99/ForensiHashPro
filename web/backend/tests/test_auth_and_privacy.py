@@ -60,16 +60,16 @@ def register(client: TestClient, email: str = "person@example.test"):
     return client.post("/api/v1/auth/register", json={"name": "Pessoa Teste", "email": email, "password": "correct-horse-42", "accept_terms": True, "accept_privacy": True})
 
 
-def test_registration_normalizes_email_hashes_password_and_records_consents(platform) -> None:
+def test_registration_normalizes_email_and_keeps_legacy_consents_outside_auth(platform) -> None:
     client, factory, _ = platform
     response = register(client, " Person@Example.Test ")
     assert response.status_code == 201
     assert response.json()["user"]["email"] == "person@example.test"
-    assert response.json()["privacy"]["retention_mode"] == "PRIVATE"
+    assert "privacy" not in response.json()
     with factory() as db:
         user = db.scalar(select(User))
         assert user and user.password_hash != "correct-horse-42"
-        assert len(list(db.scalars(select(Consent)))) == 2
+        assert len(list(db.scalars(select(Consent)))) == 0
 
 
 def test_public_registration_can_be_disabled_safely(
@@ -142,14 +142,12 @@ def test_inactive_user_cannot_login(platform) -> None:
     assert client.post("/api/v1/auth/login", json={"email": "person@example.test", "password": "correct-horse-42"}).status_code == 401
 
 
-def test_privacy_preferences_reject_file_retention(platform) -> None:
+def test_legacy_forensic_privacy_is_not_part_of_customer_auth(platform) -> None:
     client, _, _ = platform
     auth = register(client).json()
     csrf = auth["csrf_token"]
-    updated = client.patch("/api/v1/auth/privacy", json={"retention_mode": "RESULT_ONLY", "allow_external_services": False}, headers={"X-CSRF-Token": csrf})
-    assert updated.status_code == 200 and updated.json()["retain_analysis_results"] is True
-    unavailable = client.patch("/api/v1/auth/privacy", json={"retention_mode": "FILE_AND_RESULT"}, headers={"X-CSRF-Token": csrf})
-    assert unavailable.status_code == 422
+    response = client.patch("/api/v1/auth/privacy", json={"retention_mode": "RESULT_ONLY"}, headers={"X-CSRF-Token": csrf})
+    assert response.status_code == 404
 
 
 def test_admin_can_manage_users_but_regular_user_cannot(platform) -> None:
@@ -166,7 +164,9 @@ def test_admin_can_manage_users_but_regular_user_cannot(platform) -> None:
     users = client.get("/api/v1/admin/users")
     assert users.status_code == 200 and len(users.json()) == 2
     changed = client.patch(f"/api/v1/admin/users/{user_id}", json={"is_active": False}, headers={"X-CSRF-Token": admin_auth["csrf_token"]})
-    assert changed.status_code == 200 and changed.json()["is_active"] is False
+    assert changed.status_code == 200
+    with factory() as db:
+        assert db.get(User, user_id).is_active is False
 
 
 def test_history_is_scoped_to_current_user(platform) -> None:

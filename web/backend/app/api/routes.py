@@ -20,7 +20,7 @@ from app.evidence import (
     EvidenceSizeLimitError,
 )
 from web.backend.app.errors import WebApiError
-from web.backend.app.api.dependencies import current_user, optional_user, require_csrf
+from web.backend.app.api.dependencies import current_user, optional_auth, optional_user, require_csrf
 from web.backend.app.database import SessionFactory, get_db
 from web.backend.app.models import AnalysisJob, AnalysisJobStatus, AnalysisSetRecord, RetentionMode, StoredAnalysis, User
 from web.backend.app.presentation import AnalysisPresenter
@@ -136,7 +136,7 @@ async def create_analysis_job(
     db: Session = Depends(get_db),
 ) -> dict[str, object]:
     request_id = str(uuid4())
-    require_csrf(request)
+    require_csrf(request, optional_auth(request, db))
     try:
         if job_worker_enabled():
             start_executor = getattr(executor, "start", None)
@@ -247,7 +247,7 @@ def create_ddna_snapshot(
     service: DdnaSnapshotService = Depends(get_ddna_snapshot_service),
 ) -> Response:
     """Exporta somente um resultado individual pertencente ao usuário autenticado."""
-    require_csrf(request)
+    require_csrf(request, optional_auth(request, db))
     request_id = str(uuid4())
     stored = db.scalar(
         select(StoredAnalysis).where(
@@ -312,7 +312,7 @@ def create_analysis_set(
     db: Session = Depends(get_db),
     service: AnalysisSetService = Depends(get_analysis_set_service),
 ) -> dict[str, object]:
-    require_csrf(request)
+    require_csrf(request, optional_auth(request, db))
     if not AnalysisEntitlementService.resolve(user).allows(
         AnalysisCapability.CROSS_ARTIFACT_CORRELATION
     ):
@@ -368,7 +368,7 @@ async def create_analysis(
     size_bytes = 0
     try:
         if user is not None:
-            require_csrf(request)
+            require_csrf(request, optional_auth(request, db))
         selected_retention = RetentionMode.PRIVATE
         if user is not None and not private_session:
             try:

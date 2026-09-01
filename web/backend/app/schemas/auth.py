@@ -6,11 +6,9 @@ from pydantic import BaseModel, Field
 
 
 class RegisterRequest(BaseModel):
-    name: str = Field(min_length=2, max_length=160)
     email: str
     password: str
-    accept_terms: bool
-    accept_privacy: bool
+    password_confirmation: str | None = None
 
 
 class LoginRequest(BaseModel):
@@ -20,11 +18,9 @@ class LoginRequest(BaseModel):
 
 class UserResponse(BaseModel):
     id: str
-    name: str
     email: str
-    role: str
-    analysis_profile: str
-    is_active: bool
+    status: str
+    email_verified: bool
     created_at: datetime
     last_login_at: datetime | None
 
@@ -55,5 +51,18 @@ class PrivacyPatchRequest(BaseModel):
 
 class AuthResponse(BaseModel):
     user: UserResponse
-    privacy: PrivacyResponse
     csrf_token: str
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: str
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str = Field(min_length=32, max_length=256)
+    password: str
+    password_confirmation: str
+
+
+class MessageResponse(BaseModel):
+    message: str
