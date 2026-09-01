@@ -28,27 +28,22 @@ describe('formulários reais de autenticação', () => {
     vi.stubGlobal('fetch', fetchMock)
     renderAt('/register')
 
-    await userEvent.type(screen.getByLabelText('Nome'), 'Pessoa Teste')
     await userEvent.type(screen.getByLabelText('E-mail'), 'person@example.test')
     await userEvent.type(screen.getByLabelText('Senha'), 'correct-horse-42')
     await userEvent.type(screen.getByLabelText('Confirmar senha'), 'correct-horse-42')
-    await userEvent.click(screen.getByRole('checkbox', { name: /termos/i }))
-    await userEvent.click(screen.getByRole('checkbox', { name: /política/i }))
     await userEvent.click(screen.getByRole('button', { name: 'Criar conta' }))
 
-    await screen.findByText('Pessoa Teste')
+    await screen.findByRole('heading', { name: 'Visão Geral' })
     const call = fetchMock.mock.calls.find(([input]) => String(input).includes('/auth/register'))
     expect(call).toBeDefined()
     expect(call?.[1]).toMatchObject({ method: 'POST', credentials: 'include' })
     expect(JSON.parse(String(call?.[1]?.body))).toEqual({
-      name: 'Pessoa Teste',
       email: 'person@example.test',
       password: 'correct-horse-42',
-      accept_terms: true,
-      accept_privacy: true,
+      password_confirmation: 'correct-horse-42',
     })
     expect(meCalls).toBe(2)
-    expect(window.location.pathname).toBe('/app')
+    expect(window.location.pathname).toBe('/customer')
   })
 
   it('informa acesso restrito quando cadastro público está desabilitado', async () => {
@@ -89,12 +84,12 @@ describe('formulários reais de autenticação', () => {
     await userEvent.type(screen.getByLabelText('E-mail'), 'person@example.test')
     await userEvent.type(screen.getByLabelText('Senha'), 'not-persisted-42{Enter}')
 
-    await screen.findByText('Pessoa Teste')
+    await screen.findByRole('heading', { name: 'Visão Geral' })
     const call = fetchMock.mock.calls.find(([input]) => String(input).includes('/auth/login'))
     expect(call?.[1]).toMatchObject({ method: 'POST', credentials: 'include' })
     expect(JSON.parse(String(call?.[1]?.body))).toEqual({ email: 'person@example.test', password: 'not-persisted-42' })
     expect(meCalls).toBe(2)
-    expect(window.location.pathname).toBe('/app')
+    expect(window.location.pathname).toBe('/customer')
     expect(JSON.stringify(localStorage)).not.toContain('not-persisted-42')
     expect(JSON.stringify(sessionStorage)).not.toContain('not-persisted-42')
     expect([...Array(localStorage.length)].map((_, index) => localStorage.key(index))).toEqual(['forensihash-theme'])
@@ -177,11 +172,11 @@ describe('formulários reais de autenticação', () => {
 
     await userEvent.type(screen.getByLabelText('E-mail'), 'person@example.test')
     await userEvent.type(screen.getByLabelText('Senha'), 'correct-horse-42{Enter}')
-    await screen.findByText('Pessoa Teste')
+    await screen.findByRole('heading', { name: 'Visão Geral' })
     expect(meCalls).toBe(2)
 
     resolveInitial?.(response({}, 401))
-    await waitFor(() => expect(screen.getByText('Pessoa Teste')).toBeInTheDocument())
-    expect(window.location.pathname).toBe('/app')
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Visão Geral' })).toBeInTheDocument())
+    expect(window.location.pathname).toBe('/customer')
   })
 })

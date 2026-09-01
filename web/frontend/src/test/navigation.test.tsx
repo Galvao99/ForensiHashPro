@@ -46,7 +46,7 @@ describe('navegação pública', () => {
     await userEvent.type(screen.getByLabelText('E-mail'), 'person@example.test')
     await userEvent.type(screen.getByLabelText('Senha'), 'not-persisted')
     await userEvent.click(screen.getByRole('button', { name: 'Entrar' }))
-    await screen.findByText('Pessoa Teste')
+    await screen.findByRole('heading', { name: 'Visão Geral' })
     expect([...Array(localStorage.length)].map((_, index) => localStorage.key(index))).toEqual(['forensihash-theme'])
     expect(JSON.stringify(localStorage)).not.toContain('person@example.test')
     expect(JSON.stringify(localStorage)).not.toContain('not-persisted')

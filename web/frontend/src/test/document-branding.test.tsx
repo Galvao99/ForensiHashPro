@@ -9,7 +9,7 @@ const routeTitles: Array<[string, string]> = [
   ['/forensihash', 'ForensiHash | Análise de Artefatos Digitais — ARQEN'],
   ['/references', 'Referências Técnicas e Jurídicas | ARQEN'],
   ['/login', 'Acessar plataforma | ARQEN'],
-  ['/register', 'Criar conta | ARQEN'],
+  ['/register', 'Criar conta | ForensiHash'],
 ]
 
 describe('branding do documento público', () => {

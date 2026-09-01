@@ -3,7 +3,8 @@ import { AppShell } from './components/AppShell'
 import { AnalysisSessionProvider } from './context/AnalysisSessionContext'
 import { PublicLayout } from './components/PublicLayout'
 import { AnalysisPage } from './pages/AnalysisPage'
-import { LoginPage, RegisterPage } from './pages/AuthPages'
+import { ForgotPasswordPage, LoginPage, RegisterPage, ResetPasswordPage } from './pages/AuthPages'
+import { CustomerAreaPage } from './pages/CustomerAreaPage'
 import { DashboardPage } from './pages/DashboardPage'
 import { DdnaPage } from './pages/DdnaPage'
 import { HomePage } from './pages/HomePage'
@@ -31,9 +32,12 @@ export function App() {
           <Route path="/references" element={<ReferencesPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/terms" element={<TermsPage />} />
           <Route path="/privacy" element={<PrivacyPage />} />
         </Route>
+        <Route element={<ProtectedRoute />}><Route path="/customer" element={<CustomerAreaPage />} /></Route>
         <Route element={<ProtectedRoute />}><Route path="/app" element={<AuthorizedWorkspace />}>
           <Route index element={<DashboardPage />} />
           <Route path="analysis" element={<AnalysisPage />} />

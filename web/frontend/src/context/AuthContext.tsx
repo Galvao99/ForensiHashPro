@@ -3,11 +3,9 @@ import { authApi } from '../lib/api'
 import type { AuthResponse, PrivacyPreferences, WebUser } from '../types/api'
 
 export interface RegisterPayload {
-  name: string
   email: string
   password: string
-  accept_terms: boolean
-  accept_privacy: boolean
+  password_confirmation: string
 }
 
 type AuthStage = 'IDLE' | 'SUBMITTING' | 'VALIDATING'

@@ -74,9 +74,9 @@ export interface ApiErrorEnvelope {
 }
 
 export type AnalysisProfileName = 'FREE' | 'PRO'
-export interface WebUser { id: string; name: string; email: string; role: 'USER' | 'ADMIN'; analysis_profile: AnalysisProfileName; is_active: boolean; created_at: string; last_login_at: string | null }
+export interface WebUser { id: string; email: string; status?: 'ACTIVE' | 'DISABLED' | 'PENDING_VERIFICATION'; email_verified?: boolean; created_at: string; last_login_at: string | null; name?: string; role?: 'USER' | 'ADMIN'; analysis_profile?: AnalysisProfileName; is_active?: boolean }
 export interface PrivacyPreferences { retention_mode: 'PRIVATE' | 'RESULT_ONLY' | 'FILE_AND_RESULT'; retain_analysis_results: boolean; retain_original_files: boolean; allow_external_services: boolean; updated_at: string }
-export interface AuthResponse { user: WebUser; privacy: PrivacyPreferences; csrf_token: string }
+export interface AuthResponse { user: WebUser; privacy?: PrivacyPreferences; csrf_token: string }
 
 export type AnalysisJobStatus = 'QUEUED' | 'PROCESSING' | 'SUCCESS' | 'PARTIAL' | 'FAILED' | 'LIMIT_EXCEEDED' | 'CANCELLED'
 export type AnalysisJobPublicState = 'queued' | 'running' | 'completed' | 'partial' | 'failed'
