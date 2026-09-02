@@ -66,6 +66,7 @@ class SettingsService:
                 f"limits.{name}",
             )
         settings = AppSettings(
+            theme_mode=str(data.get("theme_mode", "light")).strip().lower(),
             ip_provider=str(data.get("ip_provider", "ip2location")),
             ip_api_key=api_key,
             ip_lookup_enabled=self._boolean(

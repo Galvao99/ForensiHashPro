@@ -24,6 +24,7 @@ from app.pages.ocr_page import OcrPage
 from app.pages.timeline_page import TimelinePage
 from app.services.analysis_service import AnalysisService
 from app.pages.diagnostics_page import DiagnosticsPage
+from app.pages.settings_page import SettingsPage
 from app.observability import HealthCheckService, ObservabilityService
 
 
@@ -49,11 +50,14 @@ class AnalysisWorkspace(QStackedWidget):
         "ocr": "OCR e busca",
         "ip": "Contexto de IP",
         "diagnostics": "Configurações > Diagnóstico",
+        "settings": "Configurações",
     }
 
     def __init__(
         self,
         analysis_service: AnalysisService,
+        *,
+        theme_mode: str = "light",
     ) -> None:
         super().__init__()
 
@@ -80,6 +84,7 @@ class AnalysisWorkspace(QStackedWidget):
         observability = getattr(analysis_service, "observability", None) or ObservabilityService()
         health_checks = getattr(analysis_service, "health_checks", None) or HealthCheckService()
         self.diagnostics_page = DiagnosticsPage(observability, health_checks)
+        self.settings_page = SettingsPage(theme_mode)
 
         self.pages = {
             "home": self.home_page,
@@ -96,6 +101,7 @@ class AnalysisWorkspace(QStackedWidget):
             "ocr": self.ocr_page,
             "ip": self.ip_page,
             "diagnostics": self.diagnostics_page,
+            "settings": self.settings_page,
             # "binary_structure": self.binary_structure_page,
         }
 
@@ -122,7 +128,7 @@ class AnalysisWorkspace(QStackedWidget):
             return False
 
         self._requested_page_key = page_key
-        if page_key not in {"home", "diagnostics"} and self._selection_message is not None:
+        if page_key not in {"home", "diagnostics", "settings"} and self._selection_message is not None:
             self.setCurrentWidget(self.selection_placeholder)
         else:
             self.setCurrentWidget(page)

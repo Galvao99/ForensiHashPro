@@ -109,7 +109,7 @@ def test_file_type_markers_cover_common_artifacts(qt_app) -> None:
 def test_theme_tokens_and_official_logos_are_available() -> None:
     assert DARK_THEME.background == "#0B0D0F"
     assert DARK_THEME.surface != DARK_THEME.background
-    assert LIGHT_THEME.background == "#FFFFFF"
+    assert LIGHT_THEME.background == "#F5F6F8"
     assert brand_logo_path(DARK_THEME) is not None
     assert brand_logo_path(LIGHT_THEME) is not None
     stylesheet = load_desktop_stylesheet(ApplicationPaths.discover())

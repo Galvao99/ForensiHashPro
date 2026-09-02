@@ -1,270 +1,187 @@
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtWidgets import (
-    QFrame,
-    QHBoxLayout,
-    QLabel,
-    QPushButton,
-    QVBoxLayout,
-    QWidget,
-)
+from __future__ import annotations
 
-from app.presentation.file_display import folder_display_origin
+from datetime import datetime
+from pathlib import Path
+
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QPixmap
+from PySide6.QtWidgets import QFrame, QLabel, QPushButton, QScrollArea, QVBoxLayout, QWidget
+
+from app.ui.case_catalog import RecentCase
+from app.ui.line_icons import HomeIllustration
+from app.settings import ApplicationPaths
 
 
 class HomePage(QWidget):
-    """
-    Área inicial do ForensiHash.
+    """Product entry point, independent from a currently opened case."""
 
-    É exibida enquanto nenhuma página de análise foi escolhida
-    no menu lateral.
-    """
-
-    open_file_requested = Signal()
-    open_folder_requested = Signal()
+    new_case_requested = Signal()
+    open_case_requested = Signal()
+    dropped_paths = Signal(list)
+    recent_case_requested = Signal(object)
+    navigation_requested = Signal(str)
+    open_file_requested = Signal()  # compatibility
+    open_folder_requested = Signal()  # compatibility
 
     def __init__(self) -> None:
         super().__init__()
-
         self.setObjectName("HomePage")
-
-        self._build_ui()
-
-    def _build_ui(self) -> None:
-        root_layout = QVBoxLayout(self)
-        root_layout.setContentsMargins(28, 28, 28, 28)
-        root_layout.setSpacing(22)
-
-        root_layout.addWidget(
-            self._build_welcome_card()
-        )
-
-        content_layout = QHBoxLayout()
-        content_layout.setSpacing(18)
-
-        content_layout.addWidget(
-            self._build_quick_actions(),
-            stretch=1,
-        )
-
-        content_layout.addWidget(
-            self._build_workspace_summary(),
-            stretch=1,
-        )
-
-        root_layout.addLayout(content_layout)
-        root_layout.addStretch()
-
-    def _build_welcome_card(self) -> QWidget:
-        card = QFrame()
-        card.setObjectName("HomeHeroCard")
-
-        layout = QVBoxLayout(card)
-        layout.setContentsMargins(28, 28, 28, 28)
-        layout.setSpacing(12)
-
-        badge = QLabel("FORENSIHASH PRO")
-        badge.setObjectName("HomeHeroBadge")
-
-        title = QLabel(
-            "Investigação técnica de arquivos"
-        )
-        title.setObjectName("HomeHeroTitle")
-
-        subtitle = QLabel(
-            "Abra um arquivo ou uma pasta para iniciar a análise. "
-            "Os resultados serão organizados em hashes, metadados, "
-            "vestígios, OCR, timeline, assinatura digital e contexto de rede."
-        )
-        subtitle.setObjectName("HomeHeroSubtitle")
-        subtitle.setWordWrap(True)
-        subtitle.setMaximumWidth(760)
-
-        actions_layout = QHBoxLayout()
-        actions_layout.setSpacing(10)
-
-        open_file_button = QPushButton(
-            "Abrir arquivo"
-        )
-        open_file_button.setObjectName(
-            "HomePrimaryButton"
-        )
-        open_file_button.clicked.connect(
-            self.open_file_requested.emit
-        )
-
-        open_folder_button = QPushButton(
-            "Abrir pasta"
-        )
-        open_folder_button.setObjectName(
-            "HomeSecondaryButton"
-        )
-        open_folder_button.clicked.connect(
-            self.open_folder_requested.emit
-        )
-
-        actions_layout.addWidget(open_file_button)
-        actions_layout.addWidget(open_folder_button)
-        actions_layout.addStretch()
-
-        layout.addWidget(badge)
-        layout.addWidget(title)
+        self.setAcceptDrops(True)
+        root = QVBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 0)
+        scroll = QScrollArea()
+        scroll.setObjectName("HomeScroll")
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        content = QWidget()
+        content.setObjectName("HomeContent")
+        layout = QVBoxLayout(content)
+        layout.setContentsMargins(34, 30, 34, 36)
+        layout.setSpacing(24)
+        self.home_logo = QLabel()
+        self.home_logo.setObjectName("HomeLogo")
+        self.home_logo.setAccessibleName("ForensiHash")
+        self.home_logo.setFixedSize(230, 42)
+        self.set_theme_mode("light")
+        subtitle = QLabel("Inicie uma nova análise ou continue de onde parou.")
+        subtitle.setObjectName("HomeSubtitle")
+        layout.addWidget(self.home_logo)
         layout.addWidget(subtitle)
-        layout.addSpacing(8)
-        layout.addLayout(actions_layout)
 
-        return card
+        self.drop_area = QFrame()
+        self.drop_area.setObjectName("HomeDropArea")
+        drop_layout = QVBoxLayout(self.drop_area)
+        drop_layout.setContentsMargins(28, 28, 28, 28)
+        drop_layout.setSpacing(8)
+        self.illustration = HomeIllustration()
+        self.new_case_button = QPushButton("+  Criar novo Caso")
+        self.new_case_button.setObjectName("HomeNewCaseButton")
+        self.new_case_button.setAccessibleName("Criar novo Caso")
+        self.new_case_button.clicked.connect(self.new_case_requested.emit)
+        hint = QLabel("Selecione uma pasta ou arraste arquivos para começar uma nova análise.")
+        hint.setObjectName("HomeDropHint")
+        hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        hint.setWordWrap(True)
+        self.open_case_button = QPushButton("Abrir Caso existente")
+        self.open_case_button.setObjectName("HomeOpenCaseButton")
+        self.open_case_button.clicked.connect(self.open_case_requested.emit)
+        drop_layout.addWidget(self.illustration, alignment=Qt.AlignmentFlag.AlignCenter)
+        drop_layout.addWidget(self.new_case_button, alignment=Qt.AlignmentFlag.AlignCenter)
+        drop_layout.addWidget(hint)
+        drop_layout.addWidget(self.open_case_button, alignment=Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self.drop_area)
 
-    def _build_quick_actions(self) -> QWidget:
-        card = QFrame()
-        card.setObjectName("HomeInfoCard")
+        section = QLabel("CASOS RECENTES")
+        section.setObjectName("SectionLabel")
+        layout.addWidget(section)
+        self.recent_container = QWidget()
+        self.recent_layout = QVBoxLayout(self.recent_container)
+        self.recent_layout.setContentsMargins(0, 0, 0, 0)
+        self.recent_layout.setSpacing(0)
+        layout.addWidget(self.recent_container)
+        self.set_recent_cases([])
 
-        layout = QVBoxLayout(card)
-        layout.setContentsMargins(20, 20, 20, 20)
-        layout.setSpacing(14)
+        section = QLabel("EXPLORE O FORENSIHASH")
+        section.setObjectName("SectionLabel")
+        layout.addWidget(section)
+        self.explore_container = QWidget()
+        explore = QVBoxLayout(self.explore_container)
+        explore.setContentsMargins(0, 0, 0, 0)
+        explore.setSpacing(0)
+        for key, name, detail, requires_case in (
+            ("comparison", "Correlações", "Explore relações técnicas observadas entre artefatos.", True),
+            ("timeline", "Timeline", "Examine eventos e informações temporais do Caso.", True),
+            ("deep_file_explorer", "Deep File Explorer", "Inspecione profundamente a estrutura interna de arquivos.", False),
+        ):
+            button = QPushButton(f"{name}\n{detail}" + (" · requer Caso aberto" if requires_case else ""))
+            button.setObjectName("HomeExploreRow")
+            button.setProperty("requiresCase", requires_case)
+            button.clicked.connect(lambda checked=False, page=key: self.navigation_requested.emit(page))
+            explore.addWidget(button)
+        layout.addWidget(self.explore_container)
 
-        title = QLabel("Como começar")
-        title.setObjectName("HomeCardTitle")
-
-        file_item = self._create_instruction(
-            "1",
-            "Arquivo individual",
-            "Analise um PDF, imagem, JSON ou outro arquivo isoladamente.",
-        )
-
-        folder_item = self._create_instruction(
-            "2",
-            "Conjunto de evidências",
-            "Abra uma pasta para correlacionar hashes, datas e informações entre arquivos.",
-        )
-
-        investigation_item = self._create_instruction(
-            "3",
-            "Navegação técnica",
-            "Use o menu lateral para acessar cada camada da análise.",
-        )
-
-        layout.addWidget(title)
-        layout.addWidget(file_item)
-        layout.addWidget(folder_item)
-        layout.addWidget(investigation_item)
+        tips_title = QLabel("DICAS RÁPIDAS")
+        tips_title.setObjectName("SectionLabel")
+        layout.addWidget(tips_title)
+        self.tips_container = QFrame()
+        self.tips_container.setObjectName("HomeTips")
+        tips = QVBoxLayout(self.tips_container)
+        tips.setContentsMargins(16, 8, 16, 8)
+        tips.setSpacing(0)
+        for title_text, detail in (
+            ("Organize seus Casos", "Use nomes claros para localizar análises depois."),
+            ("Explore correlações", "Veja relações técnicas observadas entre artefatos."),
+            ("Use o Deep File Explorer", "Inspecione estruturas internas de arquivos."),
+        ):
+            tip = QLabel(f"<b>{title_text}</b><br><span>{detail}</span>")
+            tip.setObjectName("HomeTip")
+            tip.setWordWrap(True)
+            tips.addWidget(tip)
+        layout.addWidget(self.tips_container)
         layout.addStretch()
+        scroll.setWidget(content)
+        root.addWidget(scroll)
 
-        return card
-
-    def _build_workspace_summary(self) -> QWidget:
-        card = QFrame()
-        card.setObjectName("HomeInfoCard")
-
-        layout = QVBoxLayout(card)
-        layout.setContentsMargins(20, 20, 20, 20)
-        layout.setSpacing(12)
-
-        title = QLabel("Área de trabalho")
-        title.setObjectName("HomeCardTitle")
-
-        self.workspace_status = QLabel(
-            "Nenhum arquivo ou pasta foi aberto."
-        )
-        self.workspace_status.setObjectName(
-            "HomeWorkspaceStatus"
-        )
-        self.workspace_status.setWordWrap(True)
-
-        self.workspace_details = QLabel(
-            "Os arquivos analisados aparecerão no explorador lateral."
-        )
-        self.workspace_details.setObjectName(
-            "HomeWorkspaceDetails"
-        )
-        self.workspace_details.setWordWrap(True)
-
-        layout.addWidget(title)
-        layout.addWidget(self.workspace_status)
-        layout.addWidget(self.workspace_details)
-        layout.addStretch()
-
-        return card
-
-    def _create_instruction(
-        self,
-        number: str,
-        title: str,
-        description: str,
-    ) -> QWidget:
-        container = QWidget()
-        container.setObjectName("HomeInstructionItem")
-
-        layout = QHBoxLayout(container)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(12)
-
-        number_label = QLabel(number)
-        number_label.setObjectName(
-            "HomeInstructionNumber"
-        )
-        number_label.setAlignment(Qt.AlignCenter)
-        number_label.setFixedSize(30, 30)
-
-        text_layout = QVBoxLayout()
-        text_layout.setContentsMargins(0, 0, 0, 0)
-        text_layout.setSpacing(3)
-
-        title_label = QLabel(title)
-        title_label.setObjectName(
-            "HomeInstructionTitle"
-        )
-
-        description_label = QLabel(description)
-        description_label.setObjectName(
-            "HomeInstructionDescription"
-        )
-        description_label.setWordWrap(True)
-
-        text_layout.addWidget(title_label)
-        text_layout.addWidget(description_label)
-
-        layout.addWidget(
-            number_label,
-            alignment=Qt.AlignTop,
-        )
-        layout.addLayout(text_layout, stretch=1)
-
-        return container
-
-    def update_workspace(
-        self,
-        *,
-        file_name: str | None = None,
-        file_count: int = 0,
-        folder_path: str | None = None,
-    ) -> None:
-        if file_name:
-            self.workspace_status.setText(
-                f"Arquivo selecionado: {file_name}"
+    def set_theme_mode(self, mode: str) -> None:
+        filename = "forensihash_logo_branco.png" if mode == "dark" else "forensihash_logo_preto.png"
+        path = ApplicationPaths.discover().resource(f"app/ui/assets/{filename}")
+        if path.is_file():
+            self.home_logo.setPixmap(
+                QPixmap(str(path)).scaled(
+                    224, 40, Qt.AspectRatioMode.KeepAspectRatio,
+                    Qt.TransformationMode.SmoothTransformation,
+                )
             )
+            self.home_logo.setText("")
+        else:
+            self.home_logo.setPixmap(QPixmap())
+            self.home_logo.setText("ForensiHash")
 
-            self.workspace_details.setText(
-                "Selecione uma página no menu lateral "
-                "para visualizar os resultados da análise."
-            )
+    def set_case_open(self, is_open: bool) -> None:
+        for button in self.explore_container.findChildren(QPushButton):
+            button.setEnabled(is_open or not bool(button.property("requiresCase")))
 
+    def set_recent_cases(self, cases: list[RecentCase]) -> None:
+        while self.recent_layout.count():
+            item = self.recent_layout.takeAt(0)
+            if item.widget() is not None:
+                item.widget().deleteLater()
+        if not cases:
+            empty = QLabel("Nenhum Caso recente.\nCrie um novo Caso para começar.")
+            empty.setObjectName("HomeRecentEmpty")
+            self.recent_layout.addWidget(empty)
             return
+        for recent in cases:
+            try:
+                accessed = datetime.fromisoformat(recent.last_opened).astimezone().strftime("%d/%m/%Y %H:%M")
+            except ValueError:
+                accessed = recent.last_opened
+            button = QPushButton(f"{recent.name}\n{recent.file_count} arquivo(s) · {accessed}")
+            button.setObjectName("HomeRecentCase")
+            button.setAccessibleName(f"Abrir Caso {recent.name}")
+            button.clicked.connect(lambda checked=False, item=recent: self.recent_case_requested.emit(item))
+            self.recent_layout.addWidget(button)
 
-        if folder_path:
-            self.workspace_status.setText(
-                f"Pasta aberta com {file_count} arquivo(s)."
-            )
+    def dragEnterEvent(self, event) -> None:
+        if event.mimeData().hasUrls() and any(url.isLocalFile() for url in event.mimeData().urls()):
+            self._drop_state(True)
+            event.acceptProposedAction()
 
-            self.workspace_details.setText(
-                folder_display_origin(folder_path)
-            )
+    def dragLeaveEvent(self, event) -> None:
+        self._drop_state(False)
+        super().dragLeaveEvent(event)
 
-            return
+    def dropEvent(self, event) -> None:
+        paths = [Path(url.toLocalFile()) for url in event.mimeData().urls() if url.isLocalFile()]
+        self._drop_state(False)
+        if paths:
+            self.dropped_paths.emit(paths)
+            event.acceptProposedAction()
 
-        self.workspace_status.setText(
-            "Nenhum arquivo ou pasta foi aberto."
-        )
+    def _drop_state(self, active: bool) -> None:
+        self.drop_area.setProperty("dropActive", active)
+        self.style().unpolish(self.drop_area)
+        self.style().polish(self.drop_area)
 
-        self.workspace_details.setText(
-            "Os arquivos analisados aparecerão no explorador lateral."
-        )
+    def update_workspace(self, **_: object) -> None:
+        """Compatibility hook; state now belongs to the stable shell."""

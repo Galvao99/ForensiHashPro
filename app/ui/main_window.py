@@ -9,11 +9,16 @@ from PySide6.QtCore import (
     QTimer,
     Qt,
 )
+from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
+    QApplication,
+    QDialog,
     QFileDialog,
     QFrame,
     QHBoxLayout,
     QLabel,
+    QMessageBox,
+    QPushButton,
     QProgressBar,
     QSplitter,
     QVBoxLayout,
@@ -23,8 +28,14 @@ from PySide6.QtWidgets import (
 from app.models import AnalysisResult
 from app.services.analysis_service import AnalysisService
 from app.ui.sidebar import Sidebar
+from app.ui.case_catalog import CaseCatalog, RecentCase
 from app.ui.current_case_selection import CurrentCaseSelection
+from app.ui.new_case_dialog import NewCaseDialog
+from app.ui.line_icons import LineIcon
+from app.ui.theme import load_desktop_stylesheet, theme_tokens
+from app.settings import ApplicationPaths, SettingsService
 from app.widgets.analysis_workspace import AnalysisWorkspace
+from app.widgets.file_strip import FileStrip
 from app.workers.analysis_worker import AnalysisWorker
 
 
@@ -32,10 +43,18 @@ class MainWindow(QWidget):
     def __init__(
         self,
         analysis_service: AnalysisService,
+        *,
+        paths: ApplicationPaths | None = None,
+        settings_service: SettingsService | None = None,
     ) -> None:
         super().__init__()
 
         self.analysis_service = analysis_service
+        self.paths = paths or ApplicationPaths.discover()
+        self.settings_service = settings_service or SettingsService(paths=self.paths)
+        self.settings = self.settings_service.load()
+        self.case_catalog = CaseCatalog(self.paths.recent_cases_file)
+        self.current_case_name: str | None = None
 
         self.current_result: AnalysisResult | None = None
         self.current_selection: CurrentCaseSelection | None = None
@@ -70,11 +89,13 @@ class MainWindow(QWidget):
             640,
         )
 
-        self.sidebar = Sidebar()
+        self.sidebar = Sidebar(self.paths, self.settings.theme_mode)
 
         self.workspace = AnalysisWorkspace(
-            self.analysis_service
+            self.analysis_service,
+            theme_mode=self.settings.theme_mode,
         )
+        self.file_strip = FileStrip(self.paths)
 
         self.clock_label = QLabel()
         self.clock_label.setObjectName(
@@ -137,8 +158,13 @@ class MainWindow(QWidget):
         )
 
         self.sidebar.set_active_page(
-            None
+            "home"
         )
+        self.workspace.home_page.set_recent_cases(self.case_catalog.list())
+        self.workspace.home_page.set_case_open(False)
+        self.case_icon.setVisible(False)
+        self.page_title.setVisible(False)
+        self.context_label.setVisible(False)
 
     # ==========================================================
     # CONSTRUÇÃO DA INTERFACE
@@ -152,7 +178,7 @@ class MainWindow(QWidget):
         e da área principal.
         """
 
-        main_layout = QHBoxLayout(self)
+        main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(
             0,
             0,
@@ -161,6 +187,7 @@ class MainWindow(QWidget):
         )
         main_layout.setSpacing(0)
 
+        main_layout.addWidget(self._build_topbar())
         self.main_splitter = QSplitter(
             Qt.Orientation.Horizontal
         )
@@ -199,12 +226,101 @@ class MainWindow(QWidget):
 
         # Larguras iniciais.
         self.main_splitter.setSizes(
-            [320, 1120]
+            [230, 1210]
         )
 
         main_layout.addWidget(
-            self.main_splitter
+            self.main_splitter,
+            stretch=1,
         )
+        self.status_bar = self._build_statusbar()
+        main_layout.addWidget(self.status_bar)
+
+    def _build_topbar(self) -> QWidget:
+        bar = QFrame()
+        bar.setObjectName("TopBar")
+        bar.setFixedHeight(60)
+        layout = QHBoxLayout(bar)
+        layout.setContentsMargins(18, 0, 14, 0)
+        left = QWidget()
+        left.setFixedWidth(260)
+        left_layout = QHBoxLayout(left)
+        left_layout.setContentsMargins(0, 0, 0, 0)
+        self.topbar_logo = QLabel()
+        self.topbar_logo.setObjectName("TopBarLogo")
+        self.topbar_logo.setAccessibleName("ForensiHash")
+        self.topbar_logo.setFixedSize(220, 42)
+        left_layout.addWidget(self.topbar_logo)
+        left_layout.addStretch()
+        center = QWidget()
+        center_layout = QHBoxLayout(center)
+        center_layout.setContentsMargins(0, 0, 0, 0)
+        center_layout.setSpacing(7)
+        self.case_icon = LineIcon("briefcase", center, 17, paths=self.paths)
+        self.case_icon.setObjectName("TopBarCaseIcon")
+        self.topbar_context = QLabel("Nenhum Caso aberto")
+        self.topbar_context.setObjectName("TopBarContext")
+        center_layout.addStretch()
+        center_layout.addWidget(self.case_icon)
+        center_layout.addWidget(self.topbar_context)
+        center_layout.addStretch()
+        right = QWidget()
+        right.setFixedWidth(260)
+        right_layout = QHBoxLayout(right)
+        right_layout.setContentsMargins(0, 0, 0, 0)
+        right_layout.addStretch()
+        self.help_button = QPushButton("?")
+        self.help_button.setToolTip("Ajuda")
+        self.help_button.setAccessibleName("Ajuda")
+        self.settings_button = QPushButton("Configurações")
+        self.settings_button.setAccessibleName("Configurações")
+        self.settings_button.clicked.connect(lambda: self.show_workspace_page("settings"))
+        right_layout.addWidget(self.help_button)
+        right_layout.addWidget(self.settings_button)
+        layout.addWidget(left)
+        layout.addWidget(center, stretch=1)
+        layout.addWidget(right)
+        self._update_brand_assets(self.settings.theme_mode)
+        return bar
+
+    def _build_statusbar(self) -> QWidget:
+        bar = QFrame()
+        bar.setObjectName("StatusBar")
+        bar.setFixedHeight(30)
+        layout = QHBoxLayout(bar)
+        layout.setContentsMargins(14, 0, 14, 0)
+        self.operational_status_label = QLabel("Pronto")
+        self.operational_status_label.setObjectName("StatusBarText")
+        self.task_status_label = QLabel("0 tarefas em execução")
+        self.task_status_label.setObjectName("StatusBarText")
+        self.version_label = QLabel("v0.1.0")
+        self.version_label.setObjectName("StatusBarVersion")
+        self.current_analysis_file_label = QLabel()
+        self.current_analysis_file_label.setObjectName("StatusCurrentFile")
+        self.current_analysis_file_label.setMaximumWidth(360)
+        self.current_analysis_file_label.setVisible(False)
+        layout.addWidget(self.operational_status_label)
+        layout.addWidget(self.task_status_label)
+        layout.addStretch()
+        layout.addWidget(self.current_analysis_file_label)
+        layout.addWidget(self.progress_bar)
+        layout.addWidget(self.version_label)
+        return bar
+
+    def _update_brand_assets(self, mode: str) -> None:
+        dark = theme_tokens(mode).name == "dark"
+        filename = "forensihash_logo_branco.png" if dark else "forensihash_logo_preto.png"
+        path = self.paths.resource(f"app/ui/assets/{filename}")
+        if path.is_file():
+            pixmap = QPixmap(str(path)).scaled(
+                214, 40, Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation,
+            )
+            self.topbar_logo.setPixmap(pixmap)
+            self.topbar_logo.setText("")
+        else:
+            self.topbar_logo.setPixmap(QPixmap())
+            self.topbar_logo.setText("ForensiHash")
 
     def _build_content(self) -> QWidget:
         """
@@ -217,12 +333,7 @@ class MainWindow(QWidget):
         )
 
         layout = QVBoxLayout(content)
-        layout.setContentsMargins(
-            26,
-            20,
-            26,
-            20,
-        )
+        layout.setContentsMargins(24, 18, 24, 18)
         layout.setSpacing(12)
 
         header = QHBoxLayout()
@@ -257,13 +368,10 @@ class MainWindow(QWidget):
         )
 
         layout.addWidget(
-            self.progress_container
-        )
-
-        layout.addWidget(
             self.workspace,
             stretch=1,
         )
+        layout.addWidget(self.file_strip)
 
         return content
 
@@ -317,10 +425,14 @@ class MainWindow(QWidget):
         self.sidebar.file_list.itemClicked.connect(
             self.analyze_selected_file
         )
+        self.file_strip.selection_requested.connect(self.select_file_from_strip)
 
         self.sidebar.navigation_requested.connect(
             self.show_workspace_page
         )
+
+        self.sidebar.new_case_requested.connect(self.create_new_case)
+        self.sidebar.open_case_requested.connect(self.open_existing_case)
 
         self.workspace.home_page.open_file_requested.connect(
             self.select_file
@@ -329,6 +441,12 @@ class MainWindow(QWidget):
         self.workspace.home_page.open_folder_requested.connect(
             self.select_folder
         )
+        self.workspace.home_page.new_case_requested.connect(self.create_new_case)
+        self.workspace.home_page.open_case_requested.connect(self.open_existing_case)
+        self.workspace.home_page.dropped_paths.connect(self.create_new_case)
+        self.workspace.home_page.recent_case_requested.connect(self.open_recent_case)
+        self.workspace.home_page.navigation_requested.connect(self.show_workspace_page)
+        self.workspace.settings_page.theme_requested.connect(self.set_theme_mode)
         self.workspace.comparison_page.focus_mode_requested.connect(
             self.set_comparison_focus_mode
         )
@@ -365,6 +483,9 @@ class MainWindow(QWidget):
         Exibe uma página do workspace.
         """
 
+        if page_key in self.sidebar.CASE_ONLY_KEYS and self.current_case_name is None:
+            self.context_label.setVisible(page_key != "general")
+            return
         if not self.workspace.show_page(
             page_key
         ):
@@ -374,6 +495,8 @@ class MainWindow(QWidget):
             self.workspace.comparison_page.set_focus_mode(False)
 
         self.current_page_key = page_key
+
+        self.page_title.setVisible(True)
 
         self.page_title.setText(
             self.workspace.page_title(
@@ -408,9 +531,75 @@ class MainWindow(QWidget):
 
         self.context_label.setVisible(True)
 
-        self.sidebar.set_active_page(
-            None
-        )
+        self.page_title.setVisible(False)
+        self.context_label.setVisible(False)
+
+        self.sidebar.set_active_page("home")
+
+    def set_theme_mode(self, mode: str) -> None:
+        self.settings.theme_mode = mode
+        try:
+            self.settings_service.save(self.settings)
+        except OSError as error:
+            QMessageBox.warning(self, "Configurações", f"Não foi possível salvar a preferência: {error}")
+            return
+        app = QApplication.instance()
+        if app is not None:
+            app.setStyleSheet(load_desktop_stylesheet(self.paths, theme_tokens(mode)))
+        self._update_brand_assets(mode)
+        self.sidebar.set_theme_mode(theme_tokens(mode).name)
+        self.workspace.home_page.set_theme_mode(theme_tokens(mode).name)
+        self.workspace.settings_page.set_theme_mode(mode)
+
+    def create_new_case(self, dropped_paths: list[Path] | None = None) -> None:
+        dialog = NewCaseDialog(self, list(dropped_paths or []))
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        self._open_case_inputs(dialog.case_name, dialog.selected_paths)
+
+    def open_existing_case(self) -> None:
+        folder = QFileDialog.getExistingDirectory(self, "Abrir Caso")
+        if folder:
+            self.create_new_case([Path(folder)])
+
+    def open_recent_case(self, recent: RecentCase) -> None:
+        path = Path(recent.source_path)
+        if not path.exists():
+            QMessageBox.warning(self, "Abrir Caso", "A localização registrada não está disponível.")
+            self.workspace.home_page.set_recent_cases(self.case_catalog.list())
+            return
+        self._open_case_inputs(recent.name, [path])
+
+    def _open_case_inputs(self, name: str, inputs: list[Path]) -> None:
+        discovery_started = perf_counter()
+        files: list[Path] = []
+        for item in inputs:
+            if item.is_dir():
+                files.extend(path for path in item.rglob("*") if path.is_file())
+            elif item.is_file():
+                files.append(item)
+        files = sorted(dict.fromkeys(files), key=lambda path: str(path).lower())
+        if not files:
+            QMessageBox.warning(self, "Novo Caso", "Nenhum arquivo disponível foi selecionado.")
+            return
+        self._last_ingestion_ms = (perf_counter() - discovery_started) * 1000
+        self.current_case_name = name.strip()
+        directory_inputs = [item for item in inputs if item.is_dir()]
+        self.current_folder_path = directory_inputs[0] if len(inputs) == 1 and directory_inputs else None
+        case_source = self.current_folder_path or files[0]
+        self.sidebar.file_list.add_files(files)
+        self.file_strip.set_files(files)
+        self.sidebar.set_case(self.current_case_name, len(files), "Pronto")
+        self.topbar_context.setText(self.current_case_name)
+        self.case_icon.setVisible(True)
+        self.workspace.home_page.set_case_open(True)
+        try:
+            self.case_catalog.touch(self.current_case_name, case_source, len(files))
+        except OSError as error:
+            QMessageBox.warning(self, "Casos recentes", f"Não foi possível atualizar a lista: {error}")
+        self.workspace.home_page.set_recent_cases(self.case_catalog.list())
+        self.show_workspace_page("general")
+        self._start_analysis(files=files)
 
     # ==========================================================
     # RELÓGIO
@@ -464,6 +653,7 @@ class MainWindow(QWidget):
         self.sidebar.file_list.add_files(
             files
         )
+        self.file_strip.set_files(files)
 
         self.context_label.setText(
             folder_path.name
@@ -505,6 +695,7 @@ class MainWindow(QWidget):
         self.sidebar.file_list.add_files(
             [file_path]
         )
+        self.file_strip.set_files([file_path])
 
         self._start_analysis(
             files=[file_path]
@@ -572,8 +763,9 @@ class MainWindow(QWidget):
         )
         for path, status in self._case_file_states.items():
             self.sidebar.file_list.set_file_status(path, status)
+            self.file_strip.set_status(path, status)
         self._case_progress = {
-            "case_name": self.current_folder_path.name if self.current_folder_path else files[0].name,
+            "case_name": self.current_case_name or (self.current_folder_path.name if self.current_folder_path else files[0].name),
             "is_case": self.current_folder_path is not None,
             "total": len(files),
             "analyzed": len(cached_results),
@@ -894,6 +1086,7 @@ class MainWindow(QWidget):
         file_path = Path(
             str(raw_file_path)
         )
+        self.file_strip.set_selected_path(file_path)
 
         key = str(file_path.resolve())
         status = self._case_file_states.get(key, "pending")
@@ -916,10 +1109,23 @@ class MainWindow(QWidget):
         label = "FALHA" if status == "failed" else ("EM ANÁLISE" if status == "analyzing" else "PENDENTE")
         self.context_label.setText(f"{file_path.name} • {label}")
 
+    def select_file_from_strip(self, file_path: Path) -> None:
+        """Routes strip interaction through the existing canonical selection handler."""
+        key = str(file_path.resolve())
+        for index in range(self.sidebar.file_list.count()):
+            item = self.sidebar.file_list.item(index)
+            raw = item.data(Qt.ItemDataRole.UserRole)
+            if raw is None or str(Path(str(raw)).resolve()) != key:
+                continue
+            self.sidebar.file_list.setCurrentItem(item)
+            self.analyze_selected_file(item)
+            return
+
     def _on_file_state_changed(self, file_path: str, status: str) -> None:
         key = str(Path(file_path).resolve())
         self._case_file_states[key] = status
         self.sidebar.file_list.set_file_status(file_path, status)
+        self.file_strip.set_status(file_path, status)
         if self.current_selection is not None and self.current_selection.key == key:
             self.current_selection.status = status
             if status != "analyzed":
@@ -966,10 +1172,23 @@ class MainWindow(QWidget):
         if not isinstance(progress, dict):
             return
         self._case_progress.update(progress)
+        if self.current_case_name:
+            self._case_progress["case_name"] = self.current_case_name
         self._case_progress["analyzing"] = sum(
             status == "analyzing" for status in self._case_file_states.values()
         )
+        self._set_current_analysis_file(str(self._case_progress.get("current_file", "")))
         self._refresh_case_overview()
+
+    def _set_current_analysis_file(self, filename: str) -> None:
+        self.current_analysis_file_label.setToolTip(filename)
+        if not filename:
+            self.current_analysis_file_label.clear()
+            self.current_analysis_file_label.setVisible(False)
+            return
+        display = filename if len(filename) <= 48 else f"{filename[:45]}…"
+        self.current_analysis_file_label.setText(f"Analisando: {display}")
+        self.current_analysis_file_label.setVisible(True)
 
     def _refresh_case_overview(self) -> None:
         if not self._case_progress:
@@ -979,6 +1198,20 @@ class MainWindow(QWidget):
             list(self.analysis_results),
             self.correlation_result,
         )
+        if self.current_case_name:
+            analyzed = int(self._case_progress.get("analyzed", 0))
+            total = int(self._case_progress.get("total", 0))
+            running = self.analysis_thread is not None and self.analysis_thread.isRunning()
+            state = "Analisando" if running else "Pronto"
+            self.sidebar.set_case(self.current_case_name, total, state)
+            self.task_status_label.setText(
+                self._progress_count_text(analyzed, total) if running else "0 tarefas em execução"
+            )
+
+    def _progress_count_text(self, analyzed: int, total: int) -> str:
+        failed = int(self._case_progress.get("failed", 0))
+        base = f"{analyzed} / {total} arquivos"
+        return f"{base} · {failed} falha(s)" if failed else base
 
     @staticmethod
     def _is_cached_result_valid(result: AnalysisResult) -> bool:
@@ -1010,14 +1243,15 @@ class MainWindow(QWidget):
         self.status_label.setText(
             message
         )
-
-        self.progress_container.setVisible(
-            True
-        )
+        self.operational_status_label.setText("Analisando")
 
         self.progress_bar.setVisible(
             True
         )
+        self.progress_bar.setTextVisible(True)
+        self.progress_bar.setFormat("%p%")
+        self.progress_bar.setFixedWidth(190)
+        self.status_bar.setFixedHeight(38)
 
         self.progress_animation.stop()
 
@@ -1062,10 +1296,6 @@ class MainWindow(QWidget):
         Exibe o painel de progresso.
         """
 
-        self.progress_container.setVisible(
-            True
-        )
-
         self._update_progress(
             progress,
             message,
@@ -1087,6 +1317,10 @@ class MainWindow(QWidget):
         self.status_label.setText(
             "Pronto"
         )
+        self.operational_status_label.setText("Pronto")
+        self.task_status_label.setText("0 tarefas em execução")
+        self._set_current_analysis_file("")
+        self.status_bar.setFixedHeight(30)
 
     def _set_interface_busy(
         self,
@@ -1108,6 +1342,14 @@ class MainWindow(QWidget):
 
         self.sidebar.file_list.setEnabled(True)
         self.sidebar.file_search.setEnabled(True)
+        self.operational_status_label.setText("Analisando" if busy else "Pronto")
+        if busy:
+            total = int(self._case_progress.get("total", 0))
+            analyzed = int(self._case_progress.get("analyzed", 0))
+            self.task_status_label.setText(self._progress_count_text(analyzed, total))
+        else:
+            self.task_status_label.setText("0 tarefas em execução")
+            self._set_current_analysis_file("")
 
     # ==========================================================
     # ENCERRAMENTO
