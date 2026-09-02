@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 from pathlib import Path
+from PySide6.QtGui import QGuiApplication, QPalette
 
 from app.settings import ApplicationPaths
 
@@ -56,19 +57,19 @@ DARK_THEME = ThemeTokens(
 
 LIGHT_THEME = ThemeTokens(
     name="light",
-    background="#FFFFFF",
-    surface="#F7F7F7",
+    background="#F5F6F8",
+    surface="#FFFFFF",
     surface_raised="#FFFFFF",
-    border="#D2D2D2",
-    border_strong="#8D8D8D",
-    text_primary="#111111",
-    text_secondary="#595959",
-    text_muted="#6B6B6B",
+    border="#DDE1E6",
+    border_strong="#CBD1D8",
+    text_primary="#171A1F",
+    text_secondary="#4F5965",
+    text_muted="#737D8A",
     accent="#155AA8",
     success="#14733C",
     warning="#8A5A00",
     error="#A4262C",
-    surface_secondary="#F7F7F7",
+    surface_secondary="#F7F8FA",
     surface_elevated="#FFFFFF",
     border_subtle="#E4E4E4",
     difference="#155AA8",
@@ -88,9 +89,20 @@ def brand_logo_path(
         else "forensihash_logo_preto.png"
     )
     candidate = (paths or ApplicationPaths.discover()).resource(
-        f"web/frontend/public/assets/{filename}"
+        f"app/ui/assets/{filename}"
     )
     return candidate if candidate.is_file() else None
+
+
+def theme_tokens(mode: str) -> ThemeTokens:
+    if mode == "dark":
+        return DARK_THEME
+    if mode == "system":
+        app = QGuiApplication.instance()
+        if app is not None:
+            color = app.palette().color(QPalette.ColorRole.Window)
+            return DARK_THEME if color.lightness() < 128 else LIGHT_THEME
+    return LIGHT_THEME
 
 
 def load_desktop_stylesheet(
@@ -136,6 +148,33 @@ def _normalize_legacy_surfaces(base: str, tokens: ThemeTokens) -> str:
         "#2A3D5D": tokens.border_strong,
         "#2a3a59": tokens.border_strong,
         "#334155": tokens.border_strong,
+        "#F8FAFC": tokens.text_primary,
+        "#f8fafc": tokens.text_primary,
+        "#F1F5F9": tokens.text_primary,
+        "#f1f5f9": tokens.text_primary,
+        "#E5E7EB": tokens.text_primary,
+        "#e5e7eb": tokens.text_primary,
+        "#E2E8F0": tokens.text_primary,
+        "#e2e8f0": tokens.text_primary,
+        "#D7E2F5": tokens.text_primary,
+        "#d8e3f6": tokens.text_primary,
+        "#CBD5E1": tokens.text_secondary,
+        "#cbd5e1": tokens.text_secondary,
+        "#C4D0E4": tokens.text_secondary,
+        "#A7B4C9": tokens.text_secondary,
+        "#a9b5c2": tokens.text_secondary,
+        "#94A3B8": tokens.text_muted,
+        "#94a3b8": tokens.text_muted,
+        "#91a0b8": tokens.text_muted,
+        "#8495b3": tokens.text_muted,
+        "#71839F": tokens.text_muted,
+        "#71819c": tokens.text_muted,
+        "#64748B": tokens.text_muted,
+        "#64748b": tokens.text_muted,
+        "#60A5FA": tokens.accent,
+        "#60a5fa": tokens.accent,
+        "#3B82F6": tokens.accent,
+        "#3b82f6": tokens.accent,
     }
     for legacy, replacement in replacements.items():
         base = base.replace(legacy, replacement)
@@ -146,10 +185,99 @@ def _phase_one_stylesheet(tokens: ThemeTokens) -> str:
     values = asdict(tokens)
     template = r"""
 /* Phase 1: shared ForensiHash result language. */
+QWidget { background-color: {background}; color: {text_primary}; }
+QLabel { color: {text_primary}; }
 QWidget#Content, QWidget#DashboardContent, QScrollArea#DashboardScroll,
 QScrollArea#DashboardScroll > QWidget > QWidget {
     background: {background};
 }
+QWidget#MainArea, QWidget#WorkspaceContainer, QWidget#HomeContent, QScrollArea#HomeScroll { background: {background}; }
+QStackedWidget#AnalysisWorkspace, QStackedWidget#AnalysisWorkspace > QWidget,
+QScrollArea#DashboardScroll > QWidget > QWidget { background: {surface_elevated}; }
+QFrame#TopBar, QFrame#StatusBar { background: {surface_elevated}; border: 0; }
+QFrame#TopBar { border-bottom: 1px solid {border_subtle}; }
+QFrame#StatusBar { border-top: 1px solid {border_subtle}; }
+QLabel#TopBarBrand { color: {text_primary}; font-size: 13px; font-weight: 700; letter-spacing: 1px; }
+QLabel#TopBarContext, QLabel#StatusBarText, QLabel#StatusBarVersion { color: {text_secondary}; }
+QLabel#StatusCurrentFile { color: {text_primary}; font-size: 11px; }
+QProgressBar#AnalysisProgressBar { background: {surface_secondary}; color: {text_primary}; border: 1px solid {border}; border-radius: 3px; height: 16px; text-align: center; font-size: 10px; }
+QProgressBar#AnalysisProgressBar::chunk { background: {accent}; border-radius: 2px; }
+QLabel#HomeTitle { color: {text_primary}; font-size: 26px; font-weight: 650; }
+QLabel#HomeSubtitle, QLabel#HomeDropHint, QLabel#HomeRecentEmpty, QLabel#SettingsDescription { color: {text_secondary}; }
+QLabel#SectionLabel, QLabel#SidebarSectionTitle { color: {text_muted}; font-size: 10px; font-weight: 700; letter-spacing: 1px; }
+QFrame#HomeDropArea { background: {surface_elevated}; border: 1px solid {border}; border-radius: 6px; min-height: 150px; }
+QFrame#HomeDropArea[dropActive="true"] { background: {selected}; border: 2px solid {accent}; }
+QPushButton#HomeNewCaseButton { color: white; background: {accent}; border: 0; border-radius: 4px; min-height: 38px; padding: 0 18px; font-weight: 650; }
+QPushButton#HomeOpenCaseButton { color: {accent}; background: transparent; border: 0; min-height: 30px; }
+QPushButton#HomeRecentCase, QPushButton#HomeExploreRow { color: {text_primary}; background: {surface_elevated}; border: 0; border-bottom: 1px solid {border_subtle}; padding: 12px; text-align: left; }
+QPushButton#HomeRecentCase:hover, QPushButton#HomeExploreRow:hover { background: {hover}; }
+QPushButton#HomeExploreRow:disabled { color: {text_muted}; }
+QFrame#HomeTips { background: {surface_elevated}; border: 1px solid {border_subtle}; border-radius: 5px; }
+QLabel#HomeTip { color: {text_secondary}; border-bottom: 1px solid {border_subtle}; padding: 10px 2px; }
+QLabel#SidebarCaseName { color: {text_primary}; font-weight: 650; }
+QLabel#SidebarCaseDetails { color: {text_muted}; font-size: 11px; }
+QPushButton#SidebarNavigationButton { text-align: left; min-height: 34px; padding: 0 8px; }
+QPushButton#SidebarNavigationButton:checked { border-left: 3px solid {accent}; }
+QLabel#SidebarNavigationText { color: {text_secondary}; background: transparent; }
+QLabel#SidebarNavigationText { font-weight: 400; }
+QPushButton#SidebarNavigationButton:checked QLabel#SidebarNavigationText { color: {text_primary}; }
+QWidget#LineIcon, QWidget#HomeIllustration { background: transparent; }
+QPushButton#SidebarCollapseButton { background: transparent; color: {text_secondary}; border: 1px solid transparent; border-radius: 3px; }
+QPushButton#SidebarCollapseButton:hover, QPushButton#SidebarCollapseButton:focus { background: {hover}; border-color: {border}; color: {text_primary}; }
+QFrame#SidebarSeparator { color: {border_subtle}; }
+QDialog#NewCaseDialog { background: {background}; color: {text_primary}; }
+QLabel#DialogTitle, QLabel#SettingsSectionTitle { color: {text_primary}; font-size: 18px; font-weight: 650; }
+QLabel#CaseDropHint { color: {text_secondary}; background: {surface_secondary}; border: 1px dashed {border}; padding: 18px; }
+QLineEdit, QListWidget { background: {surface_elevated}; color: {text_primary}; border: 1px solid {border}; selection-background-color: {selected}; selection-color: {text_primary}; }
+QPushButton:disabled { color: {text_muted}; background: {surface_secondary}; }
+QPushButton:focus, QLineEdit:focus, QListWidget:focus { border: 1px solid {accent}; }
+QFrame#FileStrip { background: {surface_elevated}; border-top: 1px solid {border}; }
+QListView#FileStripView { background: {surface_elevated}; color: {text_primary}; border: 0; outline: 0; }
+QListView#FileStripView::item { border: 0; border-radius: 0; }
+QPushButton#FileStripScrollButton { background: {surface_secondary}; border: 0; border-radius: 0; color: {text_secondary}; }
+QPushButton#FileStripScrollButton:hover { background: {hover}; color: {text_primary}; }
+QScrollBar:horizontal { background: transparent; height: 5px; margin: 0; }
+QScrollBar::handle:horizontal { background: {border_strong}; min-width: 28px; border-radius: 2px; }
+QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal { width: 0; }
+
+/* V3: instrument-like internal page language. */
+QFrame#BaseCard, QFrame#CardContent, QFrame#InfoCard, QFrame#metadataCard,
+QFrame#summaryCard, QFrame#CaseOverview, QFrame#ResultHeader,
+QFrame#SummarySection, QFrame#AnalyzedFileCard, QFrame#BinaryCard,
+QFrame#DetectedIpCard, QFrame#TimelineEventCard, QFrame#TimelineInfoCard,
+QFrame#ProportionalTimelineCard, QFrame#ContractDateConfirmationCard {
+    background: {surface_elevated}; border: 1px solid {border}; border-radius: {radius_panel}px;
+}
+QLabel#CardTitle, QLabel#SectionTitle, QLabel#StructureSectionTitle,
+QLabel#TimelinePageTitle, QLabel#DashboardTitle { color: {text_primary}; }
+QLabel#MutedText, QLabel#SectionSubtitle, QLabel#StructureMutedText,
+QLabel#TimelinePageSubtitle, QLabel#ForensicSummaryDescription,
+QLabel#AnalyzedFileFieldTitle, QLabel#metadataInsightText,
+QLabel#findingItemMuted, QLabel#findingsPreviewMuted { color: {text_secondary}; }
+QTableView, QTreeView, QTreeWidget, QListWidget, QTextEdit, QPlainTextEdit {
+    background: {surface_elevated}; color: {text_primary}; alternate-background-color: {surface_secondary};
+    border: 1px solid {border}; gridline-color: {border}; selection-background-color: {selected};
+    selection-color: {text_primary};
+}
+QHeaderView::section { background: {surface_secondary}; color: {text_secondary}; border: 0; border-bottom: 1px solid {border}; padding: 6px; }
+QGroupBox { background: {surface_elevated}; color: {text_primary}; border: 1px solid {border}; border-radius: {radius_small}px; margin-top: 10px; }
+QLabel#TechnicalMetricBadge, QLabel#StatusBadge, QLabel#EvidenceBadge,
+QLabel#ConfidenceBadge, QLabel#TimelineBadge, QLabel#TimelineHourBadge,
+QLabel#DiagnosticsStatusBadge { border-radius: {radius_small}px; background: {surface_secondary}; color: {text_secondary}; }
+QFrame#DiagnosticsMetricCard, QFrame#DiagnosticsFact, QFrame#DiagnosticsChart {
+    background: {surface_elevated}; border: 1px solid {border}; border-radius: {radius_panel}px;
+}
+QLabel#DiagnosticsCardTitle, QLabel#DiagnosticsFactTitle { color: {text_secondary}; }
+QLabel#DiagnosticsCardValue, QLabel#DiagnosticsFactValue { color: {text_primary}; }
+QLabel#DiagnosticsDetails { color: {text_secondary}; background: {surface_secondary}; border: 1px solid {border}; border-radius: {radius_small}px; }
+QFrame#MagicCompactHeader, QFrame#SelectionBar, QFrame#BinaryStatusBar {
+    background: {surface_elevated}; border: 0; border-bottom: 1px solid {border};
+}
+QLabel#CurrentFileName, QLabel#MagicDetectedType, QLabel#InspectorValue { color: {text_primary}; }
+QLabel#CurrentFileMeta, QLabel#TechnicalCaption, QLabel#InspectorCaption,
+QLabel#MagicFeedback { color: {text_secondary}; }
+QPushButton#ThemeOptionButton { text-align: left; max-width: 360px; min-height: 34px; }
+QPushButton#ThemeOptionButton:checked { border: 1px solid {accent}; background: {selected}; }
 QLabel#PageTitle { color: {text_primary}; font-size: 22px; font-weight: 650; }
 QLabel#SectionSubtitle, QLabel#ClockLabel { color: {text_muted}; }
 QFrame#Sidebar { background: {surface_secondary}; border-right: 1px solid {border}; }

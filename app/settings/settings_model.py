@@ -7,6 +7,7 @@ class InvalidConfigurationError(ValueError):
 
 @dataclass
 class AppSettings:
+    theme_mode: str = "light"
     ip_provider: str = "ip2location"
     ip_api_key: str = field(default="", repr=False)
     ip_lookup_enabled: bool = False
@@ -17,6 +18,8 @@ class AppSettings:
     limits: ProcessingLimits = field(default_factory=ProcessingLimits)
 
     def validate(self) -> None:
+        if self.theme_mode not in {"light", "dark", "system"}:
+            raise InvalidConfigurationError("theme_mode deve ser light, dark ou system.")
         if not 1 <= self.request_timeout <= 120:
             raise InvalidConfigurationError(
                 "request_timeout deve estar entre 1 e 120 segundos."
@@ -34,6 +37,7 @@ class AppSettings:
     def safe_dict(self) -> dict[str, object]:
         """Serializa somente configuração não secreta."""
         return {
+            "theme_mode": self.theme_mode,
             "ip_provider": self.ip_provider,
             "ip_lookup_enabled": self.ip_lookup_enabled,
             "request_timeout": self.request_timeout,

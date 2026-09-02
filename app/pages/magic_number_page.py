@@ -501,26 +501,10 @@ class MagicNumberPage(QWidget):
 
     def _apply_local_style(self) -> None:
         self.setStyleSheet("""
-            MagicNumberPage { background: #080d13; color: #d8e2ec; }
-            QFrame#MagicCompactHeader { border: 0; border-bottom: 1px solid #263442; background: #0b1119; }
             QFrame#HexWorkspace { border: 1px solid #263442; background: #0b1119; }
             QAbstractScrollArea#HexGrid { border: 0; background: #0b1119; }
             QFrame#ByteInspector { border: 0; border-left: 1px solid #263442; background: #0d141d; }
-            QFrame#SelectionBar { border: 0; border-top: 1px solid #263442; border-bottom: 1px solid #263442; background: #0b1119; }
-            QFrame#BinaryStatusBar { border: 0; border-top: 1px solid #263442; background: #080d13; }
-            QLabel { color: #d8e2ec; }
-            QLabel#CurrentFileName { font-size: 16px; font-weight: 650; color: #f1f5f9; }
-            QLabel#CurrentFileMeta, QLabel#MagicDetectedType { font-size: 11px; color: #aab6c3; }
-            QLabel#TechnicalCaption, QLabel#TechnicalBadge { font-size: 9px; letter-spacing: 1px; color: #8996a5; }
-            QLabel#InspectorCaption { font-size: 9px; color: #8593a2; margin-top: 3px; }
-            QLabel#InspectorValue { color: #eef4fa; font-size: 11px; font-weight: 600; }
-            QLabel#TechnicalBadge { border: 1px solid #31404f; border-radius: 3px; padding: 3px 6px; }
-            QLabel#SectionSubtitle, QLabel#MagicFeedback { color: #9aa7b5; }
-            QLabel#MagicFeedback { padding: 0 3px; }
-            QLineEdit { min-height: 24px; background: #0d151e; color: #e2e8f0; border: 1px solid #31404f; border-radius: 3px; padding: 0 6px; }
-            QPushButton { min-height: 24px; padding: 0 8px; color: #dce5ee; background: #17212c; border: 1px solid #31404f; border-radius: 3px; }
-            QPushButton:hover { background: #1d2a36; border-color: #415568; }
-            QPushButton:disabled { color: #667382; background: #111821; border-color: #222e3a; }
-            QPushButton#PrimaryButton { background: #1d5278; border-color: #2a6b98; color: #f3f7fa; }
-            QCheckBox { color: #aab6c3; spacing: 5px; }
+            QFrame#HexWorkspace QLabel { color: #d8e2ec; }
+            QFrame#HexWorkspace QLabel#InspectorCaption { color: #8593a2; }
+            QFrame#HexWorkspace QLabel#InspectorValue { color: #eef4fa; }
         """)

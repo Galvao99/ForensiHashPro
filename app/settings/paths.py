@@ -74,6 +74,10 @@ class ApplicationPaths:
     def settings_file(self) -> Path:
         return self.config_dir / "settings.json"
 
+    @property
+    def recent_cases_file(self) -> Path:
+        return self.config_dir / "recent_cases.json"
+
 
 def configured_path(
     environment_name: str,

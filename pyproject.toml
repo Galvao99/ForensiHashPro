@@ -16,6 +16,9 @@ dependencies = {file = ["requirements.txt"]}
 [tool.setuptools.packages.find]
 include = ["app*"]
 
+[tool.setuptools.package-data]
+"app.ui" = ["assets/*.png", "assets/icons/tabler/*.svg", "assets/icons/tabler/*.txt", "assets/icons/tabler/*.md"]
+
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]
