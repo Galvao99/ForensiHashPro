@@ -67,25 +67,23 @@ def test_selection_signal_and_status_are_model_backed(qt_app, tmp_path: Path) ->
     assert index.data(FileStripModel.StatusRole) == "analyzing"
 
 
-def test_strip_routes_through_canonical_sidebar_selection(qt_app, tmp_path: Path) -> None:
+def test_strip_routes_through_canonical_selection(qt_app, tmp_path: Path) -> None:
     paths_config = _paths(tmp_path)
     window = MainWindow(object(), paths=paths_config, settings_service=SettingsService(paths=paths_config))
     paths = [tmp_path / "a.pdf", tmp_path / "b.pdf"]
-    window.sidebar.file_list.add_files(paths)
     window.file_strip.set_files(paths)
     window._case_file_states = {str(path.resolve()): "pending" for path in paths}
     window.select_file_from_strip(paths[1])
     assert window.current_selection is not None
     assert window.current_selection.file_path == paths[1]
-    assert window.sidebar.file_list.selected_file_path() == paths[1]
     assert window.file_strip.selected_path() == paths[1]
+    assert not hasattr(window.sidebar, "file_list")
 
 
 def test_navigation_and_worker_update_do_not_steal_strip_selection(qt_app, tmp_path: Path) -> None:
     paths_config = _paths(tmp_path)
     window = MainWindow(object(), paths=paths_config, settings_service=SettingsService(paths=paths_config))
     paths = [tmp_path / "a.pdf", tmp_path / "b.pdf"]
-    window.sidebar.file_list.add_files(paths)
     window.file_strip.set_files(paths)
     window._case_file_states = {str(path.resolve()): "pending" for path in paths}
     window.select_file_from_strip(paths[1])

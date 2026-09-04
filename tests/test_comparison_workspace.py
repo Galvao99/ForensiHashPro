@@ -136,7 +136,7 @@ def test_sidebar_collapses_expands_and_keeps_navigation(qt_app) -> None:
     assert requested == ["comparison"]
     sidebar.set_collapsed(False)
     assert not sidebar.is_collapsed
-    assert sidebar.minimumWidth() == 260
+    assert sidebar.minimumWidth() == 280
 
 
 def test_presentation_controls_do_not_execute_engine_again(qt_app) -> None:

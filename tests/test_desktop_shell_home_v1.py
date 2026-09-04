@@ -63,10 +63,29 @@ def test_recent_cases_use_only_persisted_real_locations(tmp_path: Path) -> None:
     ]
 
 
+def test_inaccessible_recent_case_does_not_block_desktop(tmp_path: Path, monkeypatch) -> None:
+    path = tmp_path / "recent.json"
+    path.write_text(json.dumps([{
+        "name": "Caso em rede", "source_path": r"\\server\restrito",
+        "file_count": 1, "last_opened": "2026-09-04T00:00:00+00:00",
+    }]), encoding="utf-8")
+    original_exists = Path.exists
+
+    def controlled_exists(candidate: Path) -> bool:
+        if str(candidate) == r"\\server\restrito":
+            raise PermissionError("sem acesso")
+        return original_exists(candidate)
+
+    monkeypatch.setattr(Path, "exists", controlled_exists)
+    assert CaseCatalog(path).list() == []
+
+
 def test_sidebar_structurally_changes_with_case(qt_app) -> None:
     sidebar = Sidebar()
     assert sidebar.home_button.isVisible() is False  # not mounted in a shown window
-    assert sidebar.case_section.isHidden()
+    assert sidebar.case_name_label.isHidden()
+    assert sidebar.case_details_label.isHidden()
+    assert not sidebar.group_buttons["tools"].isHidden()
     assert sidebar.navigation_buttons["general"].isHidden()
     assert not sidebar.navigation_buttons["deep_file_explorer"].isHidden()
     sidebar.set_case("Caso definido", 3, "Pronto")
@@ -113,8 +132,10 @@ def test_shell_keeps_global_pages_accessible(qt_app, tmp_path: Path) -> None:
         assert key in window.workspace.pages
     assert window.topbar_context.text() == "Nenhum Caso aberto"
     assert window.task_status_label.text() == "0 tarefas em execução"
-    assert not window.topbar_logo.pixmap().isNull()
-    assert window.topbar_logo.accessibleName() == "ForensiHash"
+    assert not window.sidebar.brand_logo.pixmap().isNull()
+    assert window.sidebar.brand_logo.accessibleName() == "ForensiHash"
+    assert not hasattr(window, "topbar_logo")
+    assert not hasattr(window.workspace.home_page, "home_logo")
     assert window.case_icon.isHidden()
 
 

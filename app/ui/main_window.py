@@ -9,7 +9,6 @@ from PySide6.QtCore import (
     QTimer,
     Qt,
 )
-from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
     QApplication,
     QDialog,
@@ -89,7 +88,9 @@ class MainWindow(QWidget):
             640,
         )
 
-        self.sidebar = Sidebar(self.paths, self.settings.theme_mode)
+        self.sidebar = Sidebar(
+            self.paths, self.settings.theme_mode, self.settings.sidebar_groups
+        )
 
         self.workspace = AnalysisWorkspace(
             self.analysis_service,
@@ -246,11 +247,6 @@ class MainWindow(QWidget):
         left.setFixedWidth(260)
         left_layout = QHBoxLayout(left)
         left_layout.setContentsMargins(0, 0, 0, 0)
-        self.topbar_logo = QLabel()
-        self.topbar_logo.setObjectName("TopBarLogo")
-        self.topbar_logo.setAccessibleName("ForensiHash")
-        self.topbar_logo.setFixedSize(220, 42)
-        left_layout.addWidget(self.topbar_logo)
         left_layout.addStretch()
         center = QWidget()
         center_layout = QHBoxLayout(center)
@@ -308,19 +304,7 @@ class MainWindow(QWidget):
         return bar
 
     def _update_brand_assets(self, mode: str) -> None:
-        dark = theme_tokens(mode).name == "dark"
-        filename = "forensihash_logo_branco.png" if dark else "forensihash_logo_preto.png"
-        path = self.paths.resource(f"app/ui/assets/{filename}")
-        if path.is_file():
-            pixmap = QPixmap(str(path)).scaled(
-                214, 40, Qt.AspectRatioMode.KeepAspectRatio,
-                Qt.TransformationMode.SmoothTransformation,
-            )
-            self.topbar_logo.setPixmap(pixmap)
-            self.topbar_logo.setText("")
-        else:
-            self.topbar_logo.setPixmap(QPixmap())
-            self.topbar_logo.setText("ForensiHash")
+        self.sidebar.set_theme_mode(theme_tokens(mode).name)
 
     def _build_content(self) -> QWidget:
         """
@@ -422,9 +406,6 @@ class MainWindow(QWidget):
             self.select_folder
         )
 
-        self.sidebar.file_list.itemClicked.connect(
-            self.analyze_selected_file
-        )
         self.file_strip.selection_requested.connect(self.select_file_from_strip)
 
         self.sidebar.navigation_requested.connect(
@@ -447,16 +428,34 @@ class MainWindow(QWidget):
         self.workspace.home_page.recent_case_requested.connect(self.open_recent_case)
         self.workspace.home_page.navigation_requested.connect(self.show_workspace_page)
         self.workspace.settings_page.theme_requested.connect(self.set_theme_mode)
+        self.workspace.timeline_page.source_requested.connect(
+            self._navigate_timeline_source
+        )
         self.workspace.comparison_page.focus_mode_requested.connect(
             self.set_comparison_focus_mode
+        )
+        self.workspace.correlation_explorer_page.artifact_requested.connect(
+            self._select_correlation_artifact
+        )
+        self.workspace.correlation_explorer_page.source_requested.connect(
+            self._open_correlation_source
         )
         self.sidebar.collapsed_changed.connect(
             self._resize_for_sidebar_state
         )
+        self.sidebar.group_state_changed.connect(self._save_sidebar_group_state)
+
+    def _save_sidebar_group_state(self, group: str, expanded: bool) -> None:
+        self.settings.sidebar_groups[group] = expanded
+        try:
+            self.settings_service.save(self.settings)
+        except OSError:
+            # A preferência visual não deve interromper navegação nem análise.
+            return
 
     def _resize_for_sidebar_state(self, collapsed: bool) -> None:
         available = max(1, self.main_splitter.width())
-        sidebar_width = 64 if collapsed else min(300, max(260, available // 4))
+        sidebar_width = 64 if collapsed else min(300, max(280, available // 4))
         self.main_splitter.setSizes([sidebar_width, max(1, available - sidebar_width)])
 
     def set_comparison_focus_mode(self, enabled: bool) -> None:
@@ -536,6 +535,30 @@ class MainWindow(QWidget):
 
         self.sidebar.set_active_page("home")
 
+    def _navigate_timeline_source(self, event_id: str) -> None:
+        """Route to the closest real source page; no unsupported deep-link is implied."""
+        if self.current_result is None:
+            return
+        event = next(
+            (item for item in self.current_result.timeline_events if item.event_id == event_id),
+            None,
+        )
+        if event is None:
+            return
+        target = {
+            "metadata": "metadata",
+            "filesystem_metadata": "metadata",
+            "digital_signature": "digital_signature",
+            "text": "ocr",
+            "native": "ocr",
+            "native_partial": "ocr",
+            "ocr": "ocr",
+            "filesystem": "general",
+            "processing": "general",
+        }.get(event.source_type)
+        if target is not None:
+            self.show_workspace_page(target)
+
     def set_theme_mode(self, mode: str) -> None:
         self.settings.theme_mode = mode
         try:
@@ -587,7 +610,6 @@ class MainWindow(QWidget):
         directory_inputs = [item for item in inputs if item.is_dir()]
         self.current_folder_path = directory_inputs[0] if len(inputs) == 1 and directory_inputs else None
         case_source = self.current_folder_path or files[0]
-        self.sidebar.file_list.add_files(files)
         self.file_strip.set_files(files)
         self.sidebar.set_case(self.current_case_name, len(files), "Pronto")
         self.topbar_context.setText(self.current_case_name)
@@ -650,9 +672,6 @@ class MainWindow(QWidget):
             folder_path
         )
 
-        self.sidebar.file_list.add_files(
-            files
-        )
         self.file_strip.set_files(files)
 
         self.context_label.setText(
@@ -692,9 +711,6 @@ class MainWindow(QWidget):
         self.current_folder_path = None
         self._last_ingestion_ms = 0.0
 
-        self.sidebar.file_list.add_files(
-            [file_path]
-        )
         self.file_strip.set_files([file_path])
 
         self._start_analysis(
@@ -751,7 +767,7 @@ class MainWindow(QWidget):
             )
             for path in files
         }
-        selected_path = self.sidebar.file_list.selected_file_path()
+        selected_path = self.file_strip.selected_path()
         self.current_selection = (
             CurrentCaseSelection(
                 case_id=case_id,
@@ -762,7 +778,6 @@ class MainWindow(QWidget):
             if selected_path is not None else None
         )
         for path, status in self._case_file_states.items():
-            self.sidebar.file_list.set_file_status(path, status)
             self.file_strip.set_status(path, status)
         self._case_progress = {
             "case_name": self.current_case_name or (self.current_folder_path.name if self.current_folder_path else files[0].name),
@@ -1076,16 +1091,13 @@ class MainWindow(QWidget):
         Exibe o resultado correspondente ao arquivo selecionado.
         """
 
-        raw_file_path = item.data(
-            Qt.ItemDataRole.UserRole
-        )
-
-        if raw_file_path is None:
-            return
-
-        file_path = Path(
-            str(raw_file_path)
-        )
+        if isinstance(item, Path):
+            file_path = item
+        else:
+            raw_file_path = item.data(Qt.ItemDataRole.UserRole)
+            if raw_file_path is None:
+                return
+            file_path = Path(str(raw_file_path))
         self.file_strip.set_selected_path(file_path)
 
         key = str(file_path.resolve())
@@ -1110,21 +1122,22 @@ class MainWindow(QWidget):
         self.context_label.setText(f"{file_path.name} • {label}")
 
     def select_file_from_strip(self, file_path: Path) -> None:
-        """Routes strip interaction through the existing canonical selection handler."""
-        key = str(file_path.resolve())
-        for index in range(self.sidebar.file_list.count()):
-            item = self.sidebar.file_list.item(index)
-            raw = item.data(Qt.ItemDataRole.UserRole)
-            if raw is None or str(Path(str(raw)).resolve()) != key:
-                continue
-            self.sidebar.file_list.setCurrentItem(item)
-            self.analyze_selected_file(item)
-            return
+        """Update canonical selection from the sole visual artifact navigator."""
+        self.analyze_selected_file(file_path)
+
+    def _select_correlation_artifact(self, file_path: str) -> None:
+        """Use the canonical File Strip selection without leaving the Explorer."""
+        self.analyze_selected_file(Path(file_path))
+
+    def _open_correlation_source(self, file_path: str, occurrence_id: str) -> None:
+        """Select the canonical artifact and open the available technical detail."""
+        self.analyze_selected_file(Path(file_path))
+        self.workspace.finding_page.set_navigation_context(file_path, occurrence_id)
+        self.show_workspace_page("findings")
 
     def _on_file_state_changed(self, file_path: str, status: str) -> None:
         key = str(Path(file_path).resolve())
         self._case_file_states[key] = status
-        self.sidebar.file_list.set_file_status(file_path, status)
         self.file_strip.set_status(file_path, status)
         if self.current_selection is not None and self.current_selection.key == key:
             self.current_selection.status = status
@@ -1340,8 +1353,6 @@ class MainWindow(QWidget):
             enabled
         )
 
-        self.sidebar.file_list.setEnabled(True)
-        self.sidebar.file_search.setEnabled(True)
         self.operational_status_label.setText("Analisando" if busy else "Pronto")
         if busy:
             total = int(self._case_progress.get("total", 0))

@@ -10,6 +10,7 @@ from app.investigation.investigation_context import (
 
 from app.models import AnalysisResult
 from app.pages.comparison_workspace import ComparisonWorkspace
+from app.pages.correlation_explorer_page import CorrelationExplorerPage
 from app.pages.digital_signature_pages import DigitalSignaturePage
 from app.pages.deep_file_explorer_page import DeepFileExplorerPage
 from app.pages.finding_page import FindingPage
@@ -47,10 +48,15 @@ class AnalysisWorkspace(QStackedWidget):
         "deep_file_explorer": "Deep File Explorer",
         "integrity": "Integridade",
         "comparison": "Comparação",
+        "correlations": "Correlações",
         "ocr": "OCR e busca",
         "ip": "Contexto de IP",
         "diagnostics": "Configurações > Diagnóstico",
         "settings": "Configurações",
+    }
+    FILE_SCOPED_PAGES = {
+        "hashes", "metadata", "findings", "timeline", "magic_number",
+        "digital_signature", "deep_file_explorer", "integrity", "ocr", "ip",
     }
 
     def __init__(
@@ -78,6 +84,7 @@ class AnalysisWorkspace(QStackedWidget):
         self.comparison_page = ComparisonWorkspace(
             analysis_service
         )
+        self.correlation_explorer_page = CorrelationExplorerPage()
 
         self.ocr_page = OcrPage()
         self.ip_page = IpPage()
@@ -98,6 +105,7 @@ class AnalysisWorkspace(QStackedWidget):
             "deep_file_explorer": self.deep_file_explorer_page,
             "integrity": self.integrity_page,
             "comparison": self.comparison_page,
+            "correlations": self.correlation_explorer_page,
             "ocr": self.ocr_page,
             "ip": self.ip_page,
             "diagnostics": self.diagnostics_page,
@@ -128,7 +136,7 @@ class AnalysisWorkspace(QStackedWidget):
             return False
 
         self._requested_page_key = page_key
-        if page_key not in {"home", "diagnostics", "settings"} and self._selection_message is not None:
+        if page_key in self.FILE_SCOPED_PAGES and self._selection_message is not None:
             self.setCurrentWidget(self.selection_placeholder)
         else:
             self.setCurrentWidget(page)
@@ -214,7 +222,7 @@ class AnalysisWorkspace(QStackedWidget):
             f"{file_path.name}\n\n{labels.get(status, status.title())}{detail}"
         )
         self.selection_placeholder.setText(self._selection_message)
-        if self._requested_page_key != "home":
+        if self._requested_page_key in self.FILE_SCOPED_PAGES:
             self.setCurrentWidget(self.selection_placeholder)
 
     def update_investigation(
@@ -271,3 +279,6 @@ class AnalysisWorkspace(QStackedWidget):
         correlation_result: CorrelationResult | None,
     ) -> None:
         self.general_page.update_case(state, results, correlation_result)
+        self.correlation_explorer_page.update_case(
+            results, correlation_result=correlation_result,
+        )

@@ -88,7 +88,7 @@ def test_sidebar_keeps_navigation_keys_and_uses_uniform_markers(qt_app) -> None:
     assert set(sidebar.navigation_buttons) == {
         "general", "hashes", "metadata", "findings", "timeline",
         "magic_number", "digital_signature", "integrity", "ocr", "ip",
-        "comparison", "deep_file_explorer",
+        "correlations", "comparison", "deep_file_explorer",
     }
     sidebar.set_active_page("metadata")
     assert sidebar.navigation_buttons["metadata"].isChecked()
@@ -177,17 +177,11 @@ def test_case_overview_precedes_selected_file_summary(qt_app, analysis_result) -
     assert dashboard.summary_eyebrow.text() == "ARQUIVO SELECIONADO"
 
 
-def test_sidebar_file_states_are_explicit(qt_app, tmp_path: Path) -> None:
-    path = tmp_path / "evidence.pdf"
-    path.write_bytes(b"pdf")
+def test_sidebar_does_not_render_artifact_browser(qt_app) -> None:
     sidebar = Sidebar()
-    sidebar.file_list.add_files([path])
-    widget = sidebar.file_list.itemWidget(sidebar.file_list.item(0))
-    assert widget.status_label.text() == "PENDENTE"
-    sidebar.file_list.set_file_status(path, "analyzing")
-    assert widget.status_label.text() == "ANALISANDO"
-    sidebar.file_list.set_file_status(path, "analyzed")
-    assert widget.status_label.text() == "ANALISADO"
+    assert not hasattr(sidebar, "file_list")
+    assert not hasattr(sidebar, "file_search")
+    assert sidebar.findChildren(FileListItemWidget) == []
 
 
 def test_selecting_unavailable_result_never_starts_analysis(qt_app, tmp_path: Path) -> None:
