@@ -3,13 +3,12 @@ from __future__ import annotations
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
-    QButtonGroup, QFrame, QHBoxLayout, QLabel, QLineEdit, QPushButton, QSizePolicy,
-    QVBoxLayout, QWidget,
+    QButtonGroup, QFrame, QHBoxLayout, QLabel, QPushButton, QScrollArea,
+    QSizePolicy, QVBoxLayout, QWidget,
 )
 
 from app.settings import ApplicationPaths
 from app.ui.line_icons import LineIcon
-from app.widgets.file_list import FileList
 
 
 class Sidebar(QFrame):
@@ -17,30 +16,42 @@ class Sidebar(QFrame):
     new_case_requested = Signal()
     open_case_requested = Signal()
     collapsed_changed = Signal(bool)
+    group_state_changed = Signal(str, bool)
 
     CASE_ONLY_KEYS = {
         "general", "hashes", "metadata", "findings", "timeline", "magic_number",
-        "digital_signature", "integrity", "ocr", "ip", "comparison",
+        "digital_signature", "integrity", "ocr", "ip", "correlations", "comparison",
     }
-    ITEMS = (
-        ("general", "layout-dashboard", "Visão Geral"),
+    GROUPS = (
+        ("case", "CASO", (
+            ("general", "layout-dashboard", "Visão geral"),
+            ("timeline", "clock", "Timeline"),
+            ("correlations", "topology-star", "Correlações"),
+            ("comparison", "file-search", "Comparação"),
+        )),
+        ("file", "ARQUIVO", (
         ("hashes", "hash", "Hashes"),
         ("metadata", "file-info", "Metadados"),
         ("findings", "microscope", "Vestígios técnicos"),
-        ("timeline", "clock", "Timeline"),
         ("magic_number", "binary", "Magic Number"),
         ("digital_signature", "signature", "Assinaturas"),
         ("integrity", "shield-check", "Integridade"),
         ("ocr", "text-recognition", "OCR e busca"),
         ("ip", "network", "Contexto de IP"),
-        ("comparison", "topology-star", "Correlações"),
+        )),
+        ("tools", "FERRAMENTAS", (
+            ("deep_file_explorer", "file-search", "Deep File Explorer"),
+        )),
     )
 
-    def __init__(self, paths: ApplicationPaths | None = None, theme_mode: str = "light") -> None:
+    def __init__(
+        self, paths: ApplicationPaths | None = None, theme_mode: str = "light",
+        group_states: dict[str, bool] | None = None,
+    ) -> None:
         super().__init__()
         self.paths = paths or ApplicationPaths.discover()
         self.setObjectName("Sidebar")
-        self.setFixedWidth(260)
+        self.setFixedWidth(280)
         self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Expanding)
         self.navigation_buttons: dict[str, QPushButton] = {}
         self.navigation_labels: dict[str, QLabel] = {}
@@ -48,6 +59,10 @@ class Sidebar(QFrame):
         self._all_labels: dict[str, QLabel] = {}
         self._collapsed = False
         self._case_open = False
+        self.group_buttons: dict[str, QPushButton] = {}
+        self.group_containers: dict[str, QWidget] = {}
+        self._group_states = {"case": True, "file": True, "tools": True}
+        self._group_states.update(group_states or {})
         self._build_ui()
         self.set_theme_mode(theme_mode)
         self.set_case(None, 0, None)
@@ -60,7 +75,7 @@ class Sidebar(QFrame):
         self.brand_logo = QLabel()
         self.brand_logo.setObjectName("SidebarBrandLogo")
         self.brand_logo.setAccessibleName("ForensiHash")
-        self.brand_logo.setFixedHeight(30)
+        self.brand_logo.setFixedHeight(56)
         self.brand_logo.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         self.collapse_button = QPushButton()
         self.collapse_button.setObjectName("SidebarCollapseButton")
@@ -82,7 +97,7 @@ class Sidebar(QFrame):
         brand_row.addWidget(self.brand_logo, stretch=1)
         brand_row.addWidget(self.collapse_button)
         root.addLayout(brand_row)
-        root.addSpacing(10)
+        root.addSpacing(14)
 
         self.navigation_group = QButtonGroup(self)
         self.navigation_group.setExclusive(True)
@@ -106,21 +121,30 @@ class Sidebar(QFrame):
         self.case_name_label = QLabel()
         self.case_name_label.setObjectName("SidebarCaseName")
         self.case_name_label.setWordWrap(True)
+        self.case_name_label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
         self.case_details_label = QLabel()
         self.case_details_label.setObjectName("SidebarCaseDetails")
+        self.case_details_label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
         case_layout.addWidget(self.case_name_label)
         case_layout.addWidget(self.case_details_label)
-        self.file_panel = self._file_panel()
-        case_layout.addWidget(self.file_panel)
-        for key, icon, label in self.ITEMS:
-            case_layout.addWidget(self._nav(key, icon, label))
-        root.addWidget(self.case_section, stretch=1)
+        for group_key, title, items in self.GROUPS[:2]:
+            case_layout.addSpacing(7)
+            header, container = self._navigation_group(group_key, title, items)
+            case_layout.addWidget(header)
+            case_layout.addWidget(container)
+        case_layout.addSpacing(7)
+        self.tools_label, tools = self._navigation_group(*self.GROUPS[2])
+        case_layout.addWidget(self.tools_label)
+        case_layout.addWidget(tools)
+        case_layout.addStretch()
+        self.case_scroll = QScrollArea()
+        self.case_scroll.setObjectName("SidebarCaseScroll")
+        self.case_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self.case_scroll.setWidgetResizable(True)
+        self.case_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.case_scroll.setWidget(self.case_section)
+        root.addWidget(self.case_scroll, stretch=1)
 
-        self.no_case_spacer = QWidget()
-        root.addWidget(self.no_case_spacer, stretch=1)
-        self.tools_label = self._section("FERRAMENTAS")
-        root.addWidget(self.tools_label)
-        root.addWidget(self._nav("deep_file_explorer", "file-search", "Deep File Explorer"))
         root.addWidget(self._separator())
         self.diagnostics_button = self._nav("diagnostics", "activity", "Diagnóstico", tracked=False)
         self.settings_button = self._nav("settings", "settings", "Configurações", tracked=False)
@@ -132,22 +156,44 @@ class Sidebar(QFrame):
         self.legacy_overview_label = QLabel("Visão geral", self)
         self.legacy_overview_label.setVisible(False)
 
-    def _file_panel(self) -> QWidget:
-        panel = QWidget()
-        layout = QVBoxLayout(panel)
-        layout.setContentsMargins(0, 4, 0, 5)
-        layout.setSpacing(4)
-        self.file_search = QLineEdit()
-        self.file_search.setPlaceholderText("Pesquisar arquivo…")
-        self.file_list = FileList()
-        self.file_list.setMinimumHeight(80)
-        self.file_list.setMaximumHeight(110)
-        self.file_search.textChanged.connect(self.file_list.filter_files)
-        self.file_count_label = QLabel("0")
-        self.file_list.file_count_changed.connect(self._update_file_count)
-        layout.addWidget(self.file_search)
-        layout.addWidget(self.file_list)
-        return panel
+    def _navigation_group(self, key: str, title: str, items: tuple) -> tuple[QPushButton, QWidget]:
+        header = QPushButton()
+        header.setObjectName("SidebarGroupButton")
+        header.setAccessibleName(f"{title}: expandir ou recolher")
+        header.setToolTip(title.title())
+        row = QHBoxLayout(header)
+        row.setContentsMargins(8, 0, 7, 0)
+        label = QLabel(title)
+        label.setObjectName("SidebarSectionTitle")
+        indicator = QLabel("▾" if self._group_states[key] else "▸")
+        indicator.setObjectName("SidebarGroupIndicator")
+        row.addWidget(label, stretch=1)
+        row.addWidget(indicator)
+        container = QWidget()
+        layout = QVBoxLayout(container)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(3)
+        for page_key, icon, text in items:
+            layout.addWidget(self._nav(page_key, icon, text))
+        container.setVisible(self._group_states[key])
+        header.clicked.connect(lambda _=False, group=key: self.set_group_expanded(group, not self._group_states[group]))
+        header.setProperty("indicator", indicator)
+        self.group_buttons[key] = header
+        self.group_containers[key] = container
+        return header, container
+
+    def set_group_expanded(self, group: str, expanded: bool) -> None:
+        if group not in self.group_containers or self._group_states[group] == expanded:
+            return
+        self._group_states[group] = expanded
+        self.group_containers[group].setVisible(expanded and not self._collapsed)
+        indicator = self.group_buttons[group].property("indicator")
+        if isinstance(indicator, QLabel):
+            indicator.setText("▾" if expanded else "▸")
+        self.group_state_changed.emit(group, expanded)
+
+    def group_expanded(self, group: str) -> bool:
+        return self._group_states[group]
 
     def _nav(
         self, key: str, icon_name: str, text: str, *, tracked: bool = True,
@@ -202,18 +248,12 @@ class Sidebar(QFrame):
         if path.is_file():
             pixmap = QPixmap(str(path))
             self.brand_logo.setPixmap(
-                pixmap.scaled(172, 28, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+                pixmap.scaled(225, 54, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
             )
             self.brand_logo.setText("")
         else:
             self.brand_logo.setPixmap(QPixmap())
             self.brand_logo.setText("ForensiHash")
-
-    def _update_file_count(self, count: int) -> None:
-        self.file_count_label.setText(str(count))
-        self.file_search.clear()
-        if self._case_open:
-            self.case_details_label.setText(f"{count} arquivo(s)")
 
     def set_case(self, name: str | None, file_count: int, state: str | None) -> None:
         self._case_open = bool(name)
@@ -234,7 +274,7 @@ class Sidebar(QFrame):
         if self._collapsed == collapsed:
             return
         self._collapsed = collapsed
-        self.setFixedWidth(64 if collapsed else 260)
+        self.setFixedWidth(64 if collapsed else 280)
         self.collapse_icon.setVisible(not collapsed)
         self.expand_icon.setVisible(collapsed)
         self.collapse_button.setToolTip("Expandir Sidebar" if collapsed else "Recolher Sidebar")
@@ -250,12 +290,17 @@ class Sidebar(QFrame):
         self.case_group_label.setVisible(self._case_open and not compact)
         self.case_name_label.setVisible(self._case_open and not compact)
         self.case_details_label.setVisible(self._case_open and not compact)
-        self.file_panel.setVisible(self._case_open and not compact)
-        self.case_section.setVisible(self._case_open or compact)
-        self.no_case_spacer.setVisible(not self._case_open and not compact)
+        self.case_section.setVisible(True)
+        self.case_scroll.setVisible(True)
         self.new_case_button.setVisible(not self._case_open)
         self.open_case_button.setVisible(not self._case_open)
         self.tools_label.setVisible(not compact)
+        for group, header in self.group_buttons.items():
+            header.setVisible(not compact and (group == "tools" or self._case_open))
+            self.group_containers[group].setVisible(
+                (self._case_open or group == "tools" or compact)
+                and (compact or self._group_states[group])
+            )
         for key in self.CASE_ONLY_KEYS:
             self.navigation_buttons[key].setVisible(self._case_open or compact)
 

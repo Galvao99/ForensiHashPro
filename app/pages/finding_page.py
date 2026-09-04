@@ -63,6 +63,7 @@ class FindingPage(QWidget):
 
         self.findings: list[object] = []
         self.current_filter = self.FILTER_ALL
+        self.navigation_context: tuple[str, str] | None = None
 
         self.summary_buttons: dict[
             str,
@@ -70,6 +71,10 @@ class FindingPage(QWidget):
         ] = {}
 
         self._build_ui()
+
+    def set_navigation_context(self, artifact_path: str, occurrence_id: str) -> None:
+        """Retain a safe deep-link boundary until occurrence focus is supported."""
+        self.navigation_context = (artifact_path, occurrence_id)
 
     def _build_ui(self) -> None:
         root = QVBoxLayout(self)

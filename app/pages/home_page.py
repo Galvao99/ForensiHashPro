@@ -4,12 +4,10 @@ from datetime import datetime
 from pathlib import Path
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import QFrame, QLabel, QPushButton, QScrollArea, QVBoxLayout, QWidget
 
 from app.ui.case_catalog import RecentCase
 from app.ui.line_icons import HomeIllustration
-from app.settings import ApplicationPaths
 
 
 class HomePage(QWidget):
@@ -38,14 +36,8 @@ class HomePage(QWidget):
         layout = QVBoxLayout(content)
         layout.setContentsMargins(34, 30, 34, 36)
         layout.setSpacing(24)
-        self.home_logo = QLabel()
-        self.home_logo.setObjectName("HomeLogo")
-        self.home_logo.setAccessibleName("ForensiHash")
-        self.home_logo.setFixedSize(230, 42)
-        self.set_theme_mode("light")
         subtitle = QLabel("Inicie uma nova análise ou continue de onde parou.")
         subtitle.setObjectName("HomeSubtitle")
-        layout.addWidget(self.home_logo)
         layout.addWidget(subtitle)
 
         self.drop_area = QFrame()
@@ -89,7 +81,7 @@ class HomePage(QWidget):
         explore.setContentsMargins(0, 0, 0, 0)
         explore.setSpacing(0)
         for key, name, detail, requires_case in (
-            ("comparison", "Correlações", "Explore relações técnicas observadas entre artefatos.", True),
+            ("correlations", "Correlações", "Explore relações técnicas observadas entre artefatos.", True),
             ("timeline", "Timeline", "Examine eventos e informações temporais do Caso.", True),
             ("deep_file_explorer", "Deep File Explorer", "Inspecione profundamente a estrutura interna de arquivos.", False),
         ):
@@ -123,19 +115,7 @@ class HomePage(QWidget):
         root.addWidget(scroll)
 
     def set_theme_mode(self, mode: str) -> None:
-        filename = "forensihash_logo_branco.png" if mode == "dark" else "forensihash_logo_preto.png"
-        path = ApplicationPaths.discover().resource(f"app/ui/assets/{filename}")
-        if path.is_file():
-            self.home_logo.setPixmap(
-                QPixmap(str(path)).scaled(
-                    224, 40, Qt.AspectRatioMode.KeepAspectRatio,
-                    Qt.TransformationMode.SmoothTransformation,
-                )
-            )
-            self.home_logo.setText("")
-        else:
-            self.home_logo.setPixmap(QPixmap())
-            self.home_logo.setText("ForensiHash")
+        """Compatibility hook; the shell owns the single primary brand mark."""
 
     def set_case_open(self, is_open: bool) -> None:
         for button in self.explore_container.findChildren(QPushButton):

@@ -45,7 +45,11 @@ class CaseCatalog:
                 )
             except (KeyError, TypeError, ValueError):
                 continue
-            if case.name.strip() and Path(case.source_path).exists():
+            try:
+                source_is_available = Path(case.source_path).exists()
+            except OSError:
+                source_is_available = False
+            if case.name.strip() and source_is_available:
                 cases.append(case)
         return cases[:12]
 

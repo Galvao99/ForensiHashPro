@@ -15,6 +15,9 @@ class AppSettings:
     ocr_enabled: bool = True
     metadata_enabled: bool = True
     rust_json_enabled: bool = True
+    sidebar_groups: dict[str, bool] = field(
+        default_factory=lambda: {"case": True, "file": True, "tools": True}
+    )
     limits: ProcessingLimits = field(default_factory=ProcessingLimits)
 
     def validate(self) -> None:
@@ -44,6 +47,7 @@ class AppSettings:
             "ocr_enabled": self.ocr_enabled,
             "metadata_enabled": self.metadata_enabled,
             "rust_json_enabled": self.rust_json_enabled,
+            "sidebar_groups": dict(self.sidebar_groups),
             "limits": {
                 name: getattr(self.limits, name)
                 for name in self.limits.__dataclass_fields__

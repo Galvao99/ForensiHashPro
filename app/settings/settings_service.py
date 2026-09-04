@@ -92,10 +92,21 @@ class SettingsService:
                 default=local_rust_enabled,
                 name="FORENSIHASH_RUST_JSON_ENABLED",
             ),
+            sidebar_groups=self._sidebar_groups(data.get("sidebar_groups")),
             limits=ProcessingLimits(**limit_values),
         )
         settings.validate()
         return settings
+
+    @staticmethod
+    def _sidebar_groups(value: object) -> dict[str, bool]:
+        defaults = {"case": True, "file": True, "tools": True}
+        if not isinstance(value, dict):
+            return defaults
+        return {
+            key: raw if isinstance(raw, bool) else defaults[key]
+            for key, raw in ((key, value.get(key, default)) for key, default in defaults.items())
+        }
 
     def save(self, settings: AppSettings) -> None:
         self.settings_path.parent.mkdir(parents=True, exist_ok=True)

@@ -28,6 +28,9 @@ class ThemeTokens:
     difference: str
     hover: str
     selected: str
+    scrollbar_thumb: str
+    scrollbar_thumb_hover: str
+    scrollbar_thumb_pressed: str
     radius_small: int = 2
     radius_panel: int = 2
     spacing: int = 8
@@ -53,6 +56,9 @@ DARK_THEME = ThemeTokens(
     difference="#65A4E8",
     hover="#20262B",
     selected="#172534",
+    scrollbar_thumb="#68737E",
+    scrollbar_thumb_hover="#85909B",
+    scrollbar_thumb_pressed="#A2ABB4",
 )
 
 LIGHT_THEME = ThemeTokens(
@@ -75,6 +81,9 @@ LIGHT_THEME = ThemeTokens(
     difference="#155AA8",
     hover="#EFEFEF",
     selected="#EAF2FA",
+    scrollbar_thumb="#8A949F",
+    scrollbar_thumb_hover="#6F7984",
+    scrollbar_thumb_pressed="#59636E",
 )
 
 
@@ -221,6 +230,10 @@ QPushButton#SidebarNavigationButton:checked { border-left: 3px solid {accent}; }
 QLabel#SidebarNavigationText { color: {text_secondary}; background: transparent; }
 QLabel#SidebarNavigationText { font-weight: 400; }
 QPushButton#SidebarNavigationButton:checked QLabel#SidebarNavigationText { color: {text_primary}; }
+QPushButton#SidebarGroupButton { min-height: 22px; background: transparent; border: 0; border-radius: 0; text-align: left; }
+QPushButton#SidebarGroupButton:hover { background: {hover}; border: 0; }
+QPushButton#SidebarGroupButton:focus { background: transparent; border: 0; border-bottom: 1px solid {accent}; }
+QLabel#SidebarGroupIndicator { color: {text_muted}; background: transparent; }
 QWidget#LineIcon, QWidget#HomeIllustration { background: transparent; }
 QPushButton#SidebarCollapseButton { background: transparent; color: {text_secondary}; border: 1px solid transparent; border-radius: 3px; }
 QPushButton#SidebarCollapseButton:hover, QPushButton#SidebarCollapseButton:focus { background: {hover}; border-color: {border}; color: {text_primary}; }
@@ -239,6 +252,18 @@ QPushButton#FileStripScrollButton:hover { background: {hover}; color: {text_prim
 QScrollBar:horizontal { background: transparent; height: 5px; margin: 0; }
 QScrollBar::handle:horizontal { background: {border_strong}; min-width: 28px; border-radius: 2px; }
 QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal { width: 0; }
+QPushButton#TimelineModeButton { min-width: 82px; min-height: 30px; background: transparent; color: {text_secondary}; border: 1px solid {border}; border-radius: {radius_small}px; }
+QPushButton#TimelineModeButton:checked { color: {text_primary}; background: {selected}; border-color: {accent}; font-weight: 600; }
+QPushButton#TimelineModeButton:focus, QPushButton#TimelineSourceButton:focus, QPushButton#TimelineReferencesButton:focus { border: 1px solid {accent}; }
+QFrame#TimelineV2EventRow { background: {surface_elevated}; border: 0; border-bottom: 1px solid {border_subtle}; }
+QFrame#TimelineV2EventRow:focus { border-left: 2px solid {accent}; }
+QLabel#TimelineV2Marker { color: {text_primary}; font-size: 12px; }
+QLabel#TimelineV2EventTitle { color: {text_primary}; font-weight: 600; }
+QLabel#TimelineV2EventTime { color: {text_primary}; }
+QLabel#TimelineV2Secondary, QLabel#TimelineV2Description, QLabel#TimelineV2Empty { color: {text_secondary}; }
+QPushButton#TimelineSourceButton, QPushButton#TimelineReferencesButton { color: {text_secondary}; background: transparent; border: 1px solid {border}; border-radius: {radius_small}px; min-height: 27px; padding: 0 9px; }
+QPushButton#TimelineSourceButton:hover, QPushButton#TimelineReferencesButton:hover { background: {hover}; color: {text_primary}; }
+QWidget#VisualTimeline { background: {surface_elevated}; border: 1px solid {border}; }
 
 /* V3: instrument-like internal page language. */
 QFrame#BaseCard, QFrame#CardContent, QFrame#InfoCard, QFrame#metadataCard,
@@ -279,8 +304,96 @@ QLabel#MagicFeedback { color: {text_secondary}; }
 QPushButton#ThemeOptionButton { text-align: left; max-width: 360px; min-height: 34px; }
 QPushButton#ThemeOptionButton:checked { border: 1px solid {accent}; background: {selected}; }
 QLabel#PageTitle { color: {text_primary}; font-size: 22px; font-weight: 650; }
+QLabel#PageSubtitle, QLabel#CorrelationDisclaimer, QLabel#CorrelationElementCounts,
+QLabel#CorrelationRelationLabel, QLabel#CorrelationProvenance,
+QLabel#CorrelationFileExtension, QLabel#CorrelationRawValue { color: {text_secondary}; }
+QLabel#CorrelationDetailValue { color: {text_primary}; font-size: 18px; font-weight: 600; }
+QLabel#CorrelationElementTitle { color: {text_primary}; font-weight: 400; font-size: 14px; }
+QLabel#CorrelationElementCategory {
+    color: {text_muted}; font-size: 10px; font-weight: 500; letter-spacing: 0.7px;
+}
+QFrame#CorrelationSummaryMetrics {
+    background: transparent; border: 0; border-top: 1px solid {border_subtle};
+    border-bottom: 1px solid {border_subtle};
+}
+QLabel#CorrelationMetricValue { color: {text_primary}; font-size: 22px; font-weight: 600; }
+QLabel#CorrelationMetricLabel, QLabel#CorrelationCoverageNote { color: {text_secondary}; }
+QPushButton#CorrelationMetricButton {
+    background: transparent; color: {text_primary}; border: 0;
+    border-right: 1px solid {border_subtle}; border-radius: 0; text-align: left;
+    padding: 0 14px; font-size: 13px;
+}
+QPushButton#CorrelationMetricButton:hover { background: {hover}; }
+QPushButton#CorrelationSummaryRow, QPushButton#CorrelationVerificationRow {
+    background: transparent; color: {text_primary}; border: 0;
+    border-bottom: 1px solid {border_subtle}; border-radius: 0;
+    text-align: left; padding: 9px 8px;
+}
+QPushButton#CorrelationSummaryRow:hover, QPushButton#CorrelationVerificationRow:hover {
+    background: {hover};
+}
+QPushButton#CorrelationBackButton {
+    background: transparent; color: {text_secondary}; border: 0;
+    border-radius: 0; padding: 3px 2px; text-align: left;
+}
+QPushButton#CorrelationBackButton:hover { color: {text_primary}; text-decoration: underline; }
+QLabel#CorrelationVerificationTitle { color: {text_primary}; font-size: 16px; font-weight: 600; }
+QLabel#CorrelationVerificationState { color: {text_primary}; font-weight: 600; }
+QFrame#CorrelationVerificationBlock {
+    background: transparent; border: 0; border-bottom: 1px solid {border_subtle};
+}
+QLabel#CorrelationDeterministicState { color: {text_primary}; font-weight: 600; }
+QPushButton#CorrelationElementRow {
+    background: transparent; color: {text_primary}; text-align: left;
+    border: 0; border-bottom: 1px solid {border_subtle}; border-radius: 0;
+}
+QPushButton#CorrelationElementRow:hover { background: {hover}; }
+QPushButton#CorrelationElementRow:checked {
+    background: {selected}; border-left: 2px solid {accent};
+}
+QFrame#CorrelationArtifactBlock {
+    background: transparent; border: 0; border-top: 1px solid {border_subtle};
+}
+QPushButton#CorrelationArtifactLink, QPushButton#InlineActionButton {
+    background: transparent; color: {text_primary}; border: 0; text-align: left;
+    padding: 2px 0; font-weight: 500;
+}
+QPushButton#CorrelationArtifactLink:hover, QPushButton#InlineActionButton:hover {
+    color: {accent}; text-decoration: underline;
+}
+QPushButton#CorrelationArtifactLink:focus, QPushButton#InlineActionButton:focus {
+    border-bottom: 1px solid {accent};
+}
 QLabel#SectionSubtitle, QLabel#ClockLabel { color: {text_muted}; }
-QFrame#Sidebar { background: {surface_secondary}; border-right: 1px solid {border}; }
+QFrame#Sidebar { background: {surface_secondary}; border: 0; }
+QScrollArea#SidebarCaseScroll, QScrollArea#SidebarCaseScroll > QWidget > QWidget {
+    background: {surface_secondary}; border: 0;
+}
+QScrollBar:vertical {
+    background: transparent; border: 0; width: 9px; margin: 0;
+}
+QScrollBar:horizontal {
+    background: transparent; border: 0; height: 9px; margin: 0;
+}
+QScrollBar::handle:vertical, QScrollBar::handle:horizontal {
+    background: {scrollbar_thumb}; border: 0; border-radius: 3px;
+}
+QScrollBar::handle:vertical { min-height: 28px; }
+QScrollBar::handle:horizontal { min-width: 28px; }
+QScrollBar::handle:vertical:hover, QScrollBar::handle:horizontal:hover {
+    background: {scrollbar_thumb_hover};
+}
+QScrollBar::handle:vertical:pressed, QScrollBar::handle:horizontal:pressed {
+    background: {scrollbar_thumb_pressed};
+}
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical,
+QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
+    background: transparent; border: 0; width: 0; height: 0;
+}
+QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical,
+QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {
+    background: transparent; border: 0;
+}
 QLabel#SidebarLogoFallback { color: {text_primary}; font-size: 18px; font-weight: 700; }
 QLabel#SidebarProductKind, QLabel#ResultEyebrow, QLabel#SummaryEyebrow,
 QLabel#TechnicalFieldLabel, QLabel#SummarySectionTitle {
@@ -290,12 +403,34 @@ QPushButton#SidebarActionButton, QPushButton#SidebarNavigationButton {
     background: transparent; border: 1px solid transparent; border-radius: {radius_small}px;
     color: {text_secondary};
 }
+QPushButton#SidebarNavigationButton {
+    border: 0; border-left: 2px solid transparent; border-radius: 0; font-weight: 400;
+}
+QPushButton#SidebarNavigationButton:checked {
+    background: {selected}; border: 0; border-left: 2px solid {accent};
+    color: {text_primary}; font-weight: 500;
+}
+QPushButton#SidebarNavigationButton:checked QLabel#SidebarNavigationText { font-weight: 500; }
 QPushButton#SidebarActionButton { border-color: {border}; }
 QPushButton#SidebarActionButton:hover, QPushButton#SidebarNavigationButton:hover {
     background: {hover}; border-color: {border_subtle}; color: {text_primary};
 }
 QPushButton#SidebarNavigationButton:checked {
     background: {selected}; border-color: {border}; color: {text_primary};
+}
+QPushButton#SidebarNavigationButton:hover {
+    background: {hover}; border: 0; border-left: 2px solid transparent;
+}
+QPushButton#SidebarNavigationButton:checked,
+QPushButton#SidebarNavigationButton:checked:hover {
+    background: {selected}; border: 0; border-left: 2px solid {accent};
+}
+QPushButton#SidebarGroupButton {
+    min-height: 22px; background: transparent; border: 0; border-radius: 0;
+}
+QPushButton#SidebarGroupButton:hover { background: {hover}; border: 0; }
+QPushButton#SidebarGroupButton:focus {
+    background: transparent; border: 0; border-bottom: 1px solid {accent};
 }
 QLabel#SidebarNavigationIcon, QLabel#SidebarFileTypeIcon {
     color: {accent}; font-family: "Consolas", monospace; font-size: 9px; font-weight: 700;

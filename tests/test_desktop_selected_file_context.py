@@ -70,7 +70,7 @@ def _window(tmp_path: Path, names: tuple[str, ...] = ("a.pdf", "b.pdf", "c.pdf")
         path.write_bytes(name.encode())
         paths.append(path)
     window.current_folder_path = tmp_path
-    window.sidebar.file_list.add_files(paths)
+    window.file_strip.set_files(paths)
     window._case_file_states = {str(path.resolve()): "pending" for path in paths}
     window._case_progress = {
         "case_name": tmp_path.name, "is_case": True, "total": len(paths),
@@ -81,9 +81,8 @@ def _window(tmp_path: Path, names: tuple[str, ...] = ("a.pdf", "b.pdf", "c.pdf")
 
 
 def _select(window: MainWindow, index: int) -> None:
-    item = window.sidebar.file_list.item(index)
-    window.sidebar.file_list.setCurrentItem(item)
-    window.analyze_selected_file(item)
+    raw = window.file_strip.model.index(index).data(window.file_strip.model.PathRole)
+    window.select_file_from_strip(Path(str(raw)))
 
 
 def _seed(window: MainWindow, results: list[AnalysisResult]) -> None:
