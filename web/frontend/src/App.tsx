@@ -11,6 +11,9 @@ import { AuthProvider } from './context/AuthContext'
 import { ThemeProvider } from './context/ThemeContext'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { PrivacyPage, TermsPage } from './pages/LegalPages'
+import { ObservatoryPage } from './pages/ObservatoryPage'
+import { ObservatoryMethodologyPage } from './pages/ObservatoryMethodologyPage'
+import { ObservatoryStatePage } from './pages/ObservatoryStatePage'
 
 export function App() {
   return (
@@ -21,6 +24,9 @@ export function App() {
           <Route path="/forensihash" element={<ProductPage />} />
           <Route path="/ddna" element={<DdnaPage />} />
           <Route path="/references" element={<ReferencesPage />} />
+          <Route path="/observatorio" element={<ObservatoryPage />} />
+          <Route path="/observatorio/metodologia" element={<ObservatoryMethodologyPage />} />
+          <Route path="/observatorio/estado/:uf" element={<ObservatoryStatePage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />

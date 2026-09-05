@@ -23,6 +23,7 @@ describe('navegação pública', () => {
     renderAt('/')
     expect(screen.getAllByRole('link', { name: 'ForensiHash' })[0]).toHaveAttribute('href', '/forensihash')
     expect(screen.getAllByRole('link', { name: 'DDNA' })[0]).toHaveAttribute('href', '/ddna')
+    expect(screen.getAllByRole('link', { name: 'Observatório' })[0]).toHaveAttribute('href', '/observatorio')
     expect(screen.getByRole('link', { name: 'Área do Cliente' })).toHaveAttribute('href', '/customer')
     expect(screen.queryByRole('link', { name: 'Tecnologia' })).not.toBeInTheDocument()
     expect(document.querySelector('a[href="/technology"]')).not.toBeInTheDocument()

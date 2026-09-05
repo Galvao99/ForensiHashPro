@@ -14,7 +14,7 @@ export function PublicLayout() {
         <Container className="footer-grid">
           <div className="footer-brand"><ArqenBrand theme="dark" /><p>Infraestrutura tecnológica para proveniência, integridade, custódia e análise de artefatos digitais.</p></div>
           <div><strong>Soluções</strong><Link to="/ddna">DDNA</Link><Link to="/forensihash">ForensiHash</Link></div>
-          <div><strong>Recursos</strong><Link to="/references">Referências</Link></div>
+          <div><strong>Pesquisa</strong><Link to="/observatorio">Observatório</Link><Link to="/observatorio/metodologia">Metodologia</Link><Link to="/references">Referências</Link></div>
           <div><strong>Legal</strong><Link to="/terms">Termos de Uso</Link><Link to="/privacy">Privacidade</Link></div>
           <p className="footer-note">© {new Date().getFullYear()} ARQEN. Os resultados técnicos exigem interpretação conjunta com os demais elementos disponíveis.</p>
         </Container>
