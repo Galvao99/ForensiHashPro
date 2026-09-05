@@ -1,0 +1,9 @@
+import { DocumentMetadata } from '../components/DocumentMetadata'
+import { Section } from '../components/ui'
+
+export function ObservatoryMethodologyPage() {
+  return <article className="observatory-page"><DocumentMetadata title="Metodologia do Observatório | Arqen" description="Metodologia, critérios e limitações da Pesquisa Nacional do Observatório da Perícia Judicial." />
+    <Section eyebrow="METODOLOGIA · v1.0" title="Como a pesquisa é estruturada" headingLevel="h1">
+      <div className="methodology-sections"><section><h2>Objeto</h2><p>Mapear profissionais presentes nos cadastros públicos consultados dos Tribunais de Justiça brasileiros.</p></section><section><h2>Unidade de análise</h2><p>Profissional único identificado segundo os critérios documentados de normalização da pesquisa.</p></section><section><h2>Procedimentos</h2><ol><li>Coleta da fonte pública</li><li>Preservação da origem</li><li>Normalização</li><li>Deduplicação</li><li>Classificação por UF</li><li>Tratamento de especialidades</li><li>Cálculo de indicadores relativos</li><li>Revisão</li></ol></section><section><h2>Limitações</h2><p>A presença no cadastro consultado não implica necessariamente atuação efetiva, disponibilidade atual ou número de nomeações realizadas pelo profissional.</p><p>Dados em pesquisa, parciais ou em revisão não são comparados com levantamentos concluídos.</p></section><section><h2>Prioridade editorial de fontes</h2><ol><li>Legislação ou ato normativo oficial</li><li>Conselho Nacional de Justiça</li><li>Tribunal responsável</li><li>Diário de Justiça</li><li>Governo federal ou estadual</li><li>IBGE ou conjunto oficial de dados públicos</li><li>Fonte secundária, somente quando necessária</li></ol><p>A ordem orienta a seleção editorial; não é uma pontuação automática de verdade.</p></section></div>
+    </Section></article>
+}

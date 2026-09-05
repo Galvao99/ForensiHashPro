@@ -7,6 +7,7 @@ const links = [
   ['/#solutions', 'Soluções'],
   ['/ddna', 'DDNA'],
   ['/forensihash', 'ForensiHash'],
+  ['/observatorio', 'Observatório'],
   ['/references', 'Recursos'],
 ]
 
