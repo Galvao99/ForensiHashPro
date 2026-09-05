@@ -408,6 +408,12 @@ class AnalysisService:
             raise PermissionError("Correlação entre artefatos não habilitada neste perfil.")
         return self.correlation_service.update_case(case_id, results)
 
+    def correlate_case_canonical(self, case_id: str, results: Sequence[AnalysisResult]):
+        """Return the versioned canonical graph/index/rule result without UI inference."""
+        if not self.profile.allows(AnalysisCapability.CROSS_ARTIFACT_CORRELATION):
+            raise PermissionError("Correlação entre artefatos não habilitada neste perfil.")
+        return self.correlation_service.analyze_canonical(case_id, results)
+
     def build_investigation_context(
         self,
         results: Sequence[AnalysisResult],

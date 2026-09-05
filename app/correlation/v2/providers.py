@@ -13,6 +13,8 @@ from app.entities.models import EntitySource, EntitySourceType
 from app.entities.models import EntityType as ResolvedEntityType
 from app.models import AnalysisResult
 from app.models.extracted_artifact import ExtractedArtifact
+from app.investigation.declared_hash import DeclaredHashExtractor
+from app.investigation.investigation_context import InvestigationContext
 
 
 class CorrelationSourceProvider(Protocol):
@@ -33,7 +35,11 @@ class HashCorrelationProvider:
             if value:
                 yield CorrelationCandidate(
                     entity_type, str(value), source_file,
-                    CorrelationProvenance(engine="hash_engine", field=field),
+                    CorrelationProvenance(
+                        engine="hash_engine", field=field, source_type="calculated_hash",
+                        parsing_method="calculated_from_artifact_bytes",
+                    ),
+                    semantic_role="calculated_hash",
                 )
 
 
@@ -65,6 +71,7 @@ class _ResolvedSourceProvider:
                     CorrelationProvenance(
                         engine=self.engine_name,
                         source_engine=source.extractor or source.source_type.value,
+                        source_type=source.source_type.value,
                         field=source.source_type.value, path=source.field_path,
                         page=source.page, start=source.start, end=source.end,
                     ), context=context,
@@ -121,10 +128,12 @@ class MetadataCorrelationProvider:
     """Conservative adapter: only explicitly mapped deterministic metadata fields."""
 
     provider_name = "metadata"
-    capabilities = frozenset({EntityType.TIMESTAMP, EntityType.FILENAME})
+    capabilities = frozenset({EntityType.TIMESTAMP, EntityType.FILENAME, EntityType.PRODUCER, EntityType.CREATOR})
     FIELD_TYPES = {
         "CreateDate": EntityType.TIMESTAMP, "ModifyDate": EntityType.TIMESTAMP,
         "FileName": EntityType.FILENAME, "SourceFile": EntityType.FILENAME,
+        "Producer": EntityType.PRODUCER, "Creator": EntityType.CREATOR,
+        "CreatorTool": EntityType.PRODUCER,
     }
 
     def provide(self, result: AnalysisResult, source_file: SourceFileIdentity) -> Iterable[CorrelationCandidate]:
@@ -137,7 +146,16 @@ class MetadataCorrelationProvider:
             if entity_type is not None and value is not None:
                 yield CorrelationCandidate(
                     entity_type, str(value), source_file,
-                    CorrelationProvenance(engine="metadata_engine", field=str(field), path=str(field)),
+                    CorrelationProvenance(
+                        engine="metadata_engine", source_type="metadata",
+                        field=str(field), path=str(field), metadata_key=str(field),
+                        xmp_namespace=str(field).split(":", 1)[0] if ":" in str(field) else None,
+                        xmp_key=leaf if ":" in str(field) else None,
+                    ),
+                    semantic_role={
+                        EntityType.PRODUCER: "producer",
+                        EntityType.CREATOR: "creator",
+                    }.get(entity_type),
                 )
 
 
@@ -191,8 +209,14 @@ class JsonCorrelationProvider:
                 entity_type, raw, source_file,
                 CorrelationProvenance(
                     engine="json_engine", source_engine="json_parser",
-                    field=item.key, path=item.path,
+                    source_type="structured_json", field=item.key, path=item.path,
+                    json_path=item.path, parsing_method="structured_field",
                 ), context=f"{item.key}: {raw}",
+                semantic_role=(
+                    "declared_hash" if entity_type in {EntityType.SHA256, EntityType.MD5}
+                    else "contract_number" if _normalized_key(item.key) == "document_identifier"
+                    else None
+                ),
             )
 
 
@@ -222,10 +246,84 @@ class TimelineCorrelationProvider:
                     path=event.field_path,
                     page=event.page, event_type=event.event_type,
                     offset_start=event.offset, source_timestamp=event.raw_timestamp,
-                    derived_view="timeline",
+                    derived_view="timeline", source_type=(
+                        "structured_json" if event.source_engine == "json_engine"
+                        else event.source_type
+                    ),
+                    raw_value=event.raw_timestamp, timestamp_precision=event.precision,
+                    timezone_status=event.timezone_status,
                 ), context=event.context or event.description,
                 normalization_value=event.timestamp,
             )
+
+
+class DeclaredHashCorrelationProvider:
+    """Adapts explicit declarations and unpromoted hash-like text separately."""
+
+    provider_name = "declared_hash"
+    capabilities = frozenset({EntityType.SHA256, EntityType.MD5})
+
+    def __init__(self, extractor: DeclaredHashExtractor | None = None) -> None:
+        self.extractor = extractor or DeclaredHashExtractor()
+
+    def provide(self, result: AnalysisResult, source_file: SourceFileIdentity) -> Iterable[CorrelationCandidate]:
+        evidence_ref = source_file.session_id or source_file.stable_id
+        for segment in _text_segments(result):
+            for item in self.extractor.extract_text(
+                segment.text, evidence_ref=evidence_ref,
+                filename=source_file.display_name, source_type=segment.source,
+                page=segment.page,
+            ):
+                entity_type = _hash_entity_type(item.algorithm)
+                if entity_type is None:
+                    continue
+                role = "declared_hash" if item.declared else "hash_like"
+                yield CorrelationCandidate(
+                    entity_type, item.value, source_file,
+                    CorrelationProvenance(
+                        engine="declared_hash_extractor", source_type=item.source_type,
+                        page=item.page, start=item.start, end=item.end,
+                        raw_value=item.value, parsing_method=item.extractor,
+                    ), context=item.context, semantic_role=role,
+                )
+
+
+class InvestigationContextCorrelationProvider:
+    """Compatibility adapter for facts that only exist in the legacy Case context."""
+
+    def provide_many(
+        self, context: InvestigationContext, results: Iterable[AnalysisResult],
+    ) -> Iterable[CorrelationCandidate]:
+        files = _context_files(results)
+        for role, fact_type, values in (
+            ("producer", EntityType.PRODUCER, context.producers),
+            ("creator", EntityType.CREATOR, context.creators),
+        ):
+            for key, raw in sorted(values.items()):
+                source_file = _source_for_context_key(key, context, files)
+                yield CorrelationCandidate(
+                    fact_type, raw, source_file,
+                    CorrelationProvenance(
+                        engine="metadata_engine", source_type="metadata",
+                        field=role, metadata_key=role,
+                    ), semantic_role=role,
+                )
+        for key, values in sorted(context.declared_hashes.items()):
+            source_file = _source_for_context_key(key, context, files)
+            for item in values:
+                fact_type = _hash_entity_type(item.algorithm)
+                if fact_type is None:
+                    continue
+                role = "declared_hash" if item.declared else "hash_like"
+                yield CorrelationCandidate(
+                    fact_type, item.value, source_file,
+                    CorrelationProvenance(
+                        engine="declared_hash_extractor", source_type=item.source_type,
+                        page=item.page, start=item.start, end=item.end,
+                        path=item.field_path, raw_value=item.value,
+                        parsing_method=item.extractor,
+                    ), context=item.context, semantic_role=role,
+                )
 
 
 class AnalysisResultCorrelationProvider:
@@ -234,7 +332,7 @@ class AnalysisResultCorrelationProvider:
     DEFAULT_PROVIDERS: tuple[CorrelationSourceProvider, ...] = (
         HashCorrelationProvider(), MetadataCorrelationProvider(), IpCorrelationProvider(),
         ResolvedEntityCorrelationProvider(), TextCorrelationProvider(), OcrCorrelationProvider(),
-        JsonCorrelationProvider(), TimelineCorrelationProvider(),
+        JsonCorrelationProvider(), DeclaredHashCorrelationProvider(), TimelineCorrelationProvider(),
     )
 
     def __init__(
@@ -317,3 +415,30 @@ def _normalized_key(value: str) -> str:
 
 def _json_path_depth(path: str) -> int:
     return 1 + path.count(".") + path.count("[")
+
+
+def _hash_entity_type(algorithm: str) -> EntityType | None:
+    return {"SHA-256": EntityType.SHA256, "MD5": EntityType.MD5}.get(algorithm.upper())
+
+
+def _context_files(results: Iterable[AnalysisResult]) -> dict[str, SourceFileIdentity]:
+    files: dict[str, SourceFileIdentity] = {}
+    for result in results:
+        source = source_file_identity(
+            display_name=result.file_info.name, path=result.file_info.path,
+            sha256=getattr(result.hashes, "sha256", None),
+            session_id=(result.evidence_source.evidence_id if result.evidence_source else None),
+        )
+        files[result.file_info.name] = source
+        files[str(result.file_info.path)] = source
+        files[str(result.file_info.path.resolve())] = source
+    return files
+
+
+def _source_for_context_key(
+    key: str, context: InvestigationContext, files: dict[str, SourceFileIdentity],
+) -> SourceFileIdentity:
+    source = files.get(key) or files.get(context.display_name_for(key))
+    if source is not None:
+        return source
+    return source_file_identity(display_name=context.display_name_for(key), path=key)

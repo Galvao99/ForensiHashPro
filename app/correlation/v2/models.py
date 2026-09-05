@@ -18,6 +18,8 @@ class EntityType(str, Enum):
     TIMESTAMP = "timestamp"
     FILENAME = "filename"
     DOCUMENT_IDENTIFIER = "document_identifier"
+    PRODUCER = "producer"
+    CREATOR = "creator"
 
 
 class RelationType(str, Enum):
@@ -25,6 +27,11 @@ class RelationType(str, Enum):
     SAME_ENTITY_ACROSS_FILES = "SAME_ENTITY_ACROSS_FILES"
     SAME_HASH = "SAME_HASH"
     DERIVED_FROM = "DERIVED_FROM"
+    OCCURRENCE_NORMALIZES_TO_FACT = "OCCURRENCE_NORMALIZES_TO_FACT"
+    STRUCTURED_ASSOCIATION = "STRUCTURED_ASSOCIATION"
+
+
+NORMALIZATION_VERSION = "1"
 
 
 @dataclass(frozen=True, slots=True)
@@ -67,6 +74,18 @@ class CorrelationProvenance:
     source_sha256: str | None = None
     extracted_sha256: str | None = None
     extraction_method: str | None = None
+    source_type: str | None = None
+    raw_value: str | None = None
+    parsing_method: str | None = None
+    timestamp_precision: str | None = None
+    timezone_status: str | None = None
+    metadata_key: str | None = None
+    json_path: str | None = None
+    csv_row: int | None = None
+    csv_column: str | None = None
+    sql_context: str | None = None
+    xmp_namespace: str | None = None
+    xmp_key: str | None = None
 
     def __post_init__(self) -> None:
         if not self.engine.strip():
@@ -81,6 +100,11 @@ class CorrelationProvenance:
         value.pop("event_type")
         value.pop("derived_view")
         value.pop("source_engine")
+        for annotation in (
+            "raw_value", "parsing_method", "timestamp_precision", "timezone_status",
+            "metadata_key", "json_path", "xmp_namespace", "xmp_key",
+        ):
+            value.pop(annotation)
         if self.derived_view is not None:
             value["source_timestamp"] = None
         return value
@@ -96,6 +120,8 @@ class CorrelationOccurrence:
     source_file: SourceFileIdentity
     provenance: CorrelationProvenance
     context: str | None = None
+    semantic_role: str | None = None
+    normalization_version: str = NORMALIZATION_VERSION
 
     def to_dict(self) -> dict[str, Any]:
         value = asdict(self)
@@ -113,6 +139,8 @@ class CorrelationEntity:
     occurrence_count: int
     unique_file_count: int
     unique_source_count: int
+    semantic_role: str | None = None
+    normalization_version: str = NORMALIZATION_VERSION
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -124,6 +152,8 @@ class CorrelationEntity:
             "occurrence_count": self.occurrence_count,
             "unique_file_count": self.unique_file_count,
             "unique_source_count": self.unique_source_count,
+            "semantic_role": self.semantic_role,
+            "normalization_version": self.normalization_version,
         }
 
 
@@ -186,6 +216,8 @@ class CorrelationCandidate:
     provenance: CorrelationProvenance
     context: str | None = None
     normalization_value: str | None = None
+    semantic_role: str | None = None
+    normalization_version: str = NORMALIZATION_VERSION
 
 
 @dataclass(frozen=True, slots=True)
@@ -193,6 +225,26 @@ class DerivedFromCandidate:
     derived_file: SourceFileIdentity
     source_file: SourceFileIdentity
     provenance: CorrelationProvenance
+
+
+@dataclass(frozen=True, slots=True)
+class StructuredRelationCandidate:
+    relation_type: RelationType
+    subject_id: str
+    object_ids: tuple[str, ...]
+    provenance: CorrelationProvenance
+
+    def __post_init__(self) -> None:
+        if self.relation_type is not RelationType.STRUCTURED_ASSOCIATION:
+            raise ValueError("Explicit parser relations must use STRUCTURED_ASSOCIATION.")
+        if not self.subject_id or not self.object_ids:
+            raise ValueError("Structured relation endpoints are required.")
+
+
+# Canonical terminology. The V2 names remain public compatibility aliases.
+CanonicalFact = CorrelationEntity
+CanonicalOccurrence = CorrelationOccurrence
+CanonicalProvenance = CorrelationProvenance
 
 
 def display_filename(path: str | Path) -> str:

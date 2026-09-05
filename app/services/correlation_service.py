@@ -37,6 +37,7 @@ from app.investigation.investigation_context import (
     InvestigationContext,
 )
 from app.investigation.case_correlation_index import CaseCorrelationIndex
+from app.correlation.v2.pipeline import CanonicalCasePipeline, CanonicalCasePipelineResult
 
 
 class CorrelationService:
@@ -63,6 +64,7 @@ class CorrelationService:
             ]
         )
         self._case_indexes: dict[str, CaseCorrelationIndex] = {}
+        self.canonical_pipeline = CanonicalCasePipeline()
 
     def build_context(
         self,
@@ -88,6 +90,12 @@ class CorrelationService:
         return self.engine.evaluate(
             context
         )
+
+    def analyze_canonical(
+        self, case_id: str, results: Sequence[AnalysisResult],
+    ) -> CanonicalCasePipelineResult:
+        """Canonical read model; legacy correlation remains during parity migration."""
+        return self.canonical_pipeline.analyze(case_id, results)
 
     def update_case(
         self,

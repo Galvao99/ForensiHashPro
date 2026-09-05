@@ -125,3 +125,13 @@ class CorrelationNormalizer:
     def _normalize_document_identifier(raw: str) -> str | None:
         value = raw.strip()
         return value if value else None
+
+    @staticmethod
+    def _normalize_producer(raw: str) -> str | None:
+        value = " ".join(raw.split())
+        return value.casefold() if value else None
+
+    @staticmethod
+    def _normalize_creator(raw: str) -> str | None:
+        value = " ".join(raw.split())
+        return value.casefold() if value else None
