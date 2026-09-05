@@ -7,12 +7,16 @@ from app.correlation.v2.models import (
     CorrelationSummary, DerivedFromCandidate, EntityType, RelationType,
     SourceFileIdentity,
     StructuredRelationCandidate, CanonicalFact, CanonicalOccurrence, CanonicalProvenance,
+    DeclaredHashTargetCandidate,
+    SignatureTemporalBindingCandidate,
 )
 from app.correlation.v2.providers import (
     AnalysisResultCorrelationProvider, CorrelationSourceProvider,
     HashCorrelationProvider, IpCorrelationProvider, MetadataCorrelationProvider,
     DeclaredHashCorrelationProvider,
     InvestigationContextCorrelationProvider,
+    CanonicalEvidenceBatch,
+    SignatureCorrelationProvider,
     JsonCorrelationProvider, JsonProviderLimits, OcrCorrelationProvider,
     ResolvedEntityCorrelationProvider, TextCorrelationProvider,
     TimelineCorrelationProvider,
@@ -33,6 +37,8 @@ __all__ = [
     "JsonCorrelationProvider", "JsonProviderLimits", "OcrCorrelationProvider",
     "ResolvedEntityCorrelationProvider", "SourceFileIdentity", "TextCorrelationProvider",
     "StructuredRelationCandidate",
+    "DeclaredHashTargetCandidate", "CanonicalEvidenceBatch",
+    "SignatureTemporalBindingCandidate", "SignatureCorrelationProvider",
     "TimelineCorrelationProvider",
     "derived_from_extracted_artifact", "source_file_identity", "stable_digest",
 ]

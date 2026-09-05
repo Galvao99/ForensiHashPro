@@ -218,8 +218,13 @@ QFrame#HomeDropArea { background: {surface_elevated}; border: 1px solid {border}
 QFrame#HomeDropArea[dropActive="true"] { background: {selected}; border: 2px solid {accent}; }
 QPushButton#HomeNewCaseButton { color: white; background: {accent}; border: 0; border-radius: 4px; min-height: 38px; padding: 0 18px; font-weight: 650; }
 QPushButton#HomeOpenCaseButton { color: {accent}; background: transparent; border: 0; min-height: 30px; }
+QFrame#HomeRecentCaseCard { background: {surface_elevated}; border: 0; border-bottom: 1px solid {border_subtle}; }
 QPushButton#HomeRecentCase, QPushButton#HomeExploreRow { color: {text_primary}; background: {surface_elevated}; border: 0; border-bottom: 1px solid {border_subtle}; padding: 12px; text-align: left; }
+QFrame#HomeRecentCaseCard QPushButton#HomeRecentCase { border-bottom: 0; }
 QPushButton#HomeRecentCase:hover, QPushButton#HomeExploreRow:hover { background: {hover}; }
+QPushButton#HomeRecentCaseDelete { color: {text_muted}; background: transparent; border: 0; border-radius: 3px; font-size: 17px; padding: 0; }
+QPushButton#HomeRecentCaseDelete:hover { color: #b42318; background: rgba(180, 35, 24, 0.07); }
+QPushButton#HomeRecentCaseDelete:pressed, QPushButton#HomeRecentCaseDelete:focus { color: #b42318; border: 1px solid {accent}; }
 QPushButton#HomeExploreRow:disabled { color: {text_muted}; }
 QFrame#HomeTips { background: {surface_elevated}; border: 1px solid {border_subtle}; border-radius: 5px; }
 QLabel#HomeTip { color: {text_secondary}; border-bottom: 1px solid {border_subtle}; padding: 10px 2px; }

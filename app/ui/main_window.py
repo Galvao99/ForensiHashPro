@@ -26,6 +26,7 @@ from PySide6.QtWidgets import (
 
 from app.models import AnalysisResult
 from app.services.analysis_service import AnalysisService
+from app.services.case_deletion_service import CaseDeletionService
 from app.ui.sidebar import Sidebar
 from app.ui.case_catalog import CaseCatalog, RecentCase
 from app.ui.current_case_selection import CurrentCaseSelection
@@ -53,7 +54,9 @@ class MainWindow(QWidget):
         self.settings_service = settings_service or SettingsService(paths=self.paths)
         self.settings = self.settings_service.load()
         self.case_catalog = CaseCatalog(self.paths.recent_cases_file)
+        self.case_deletion_service = CaseDeletionService(self.case_catalog)
         self.current_case_name: str | None = None
+        self.current_case_id: str | None = None
 
         self.current_result: AnalysisResult | None = None
         self.current_selection: CurrentCaseSelection | None = None
@@ -426,6 +429,7 @@ class MainWindow(QWidget):
         self.workspace.home_page.open_case_requested.connect(self.open_existing_case)
         self.workspace.home_page.dropped_paths.connect(self.create_new_case)
         self.workspace.home_page.recent_case_requested.connect(self.open_recent_case)
+        self.workspace.home_page.recent_case_delete_requested.connect(self.delete_recent_case)
         self.workspace.home_page.navigation_requested.connect(self.show_workspace_page)
         self.workspace.settings_page.theme_requested.connect(self.set_theme_mode)
         self.workspace.timeline_page.source_requested.connect(
@@ -593,6 +597,62 @@ class MainWindow(QWidget):
             return
         self._open_case_inputs(recent.name, [path])
 
+    def delete_recent_case(self, recent: RecentCase) -> None:
+        """Confirm and delete only ForensiHash-owned state for a recent case."""
+        if not self._confirm_recent_case_deletion(recent):
+            return
+        result = self.case_deletion_service.delete_case(recent.case_id)
+        if not result.success:
+            QMessageBox.warning(self, "Excluir caso", "Não foi possível excluir o caso.\nTente novamente.")
+            self.workspace.home_page.set_recent_cases(self.case_catalog.list())
+            return
+        self._invalidate_deleted_case(recent.case_id)
+        self.workspace.home_page.set_recent_cases(self.case_catalog.list())
+
+    def _confirm_recent_case_deletion(self, recent: RecentCase) -> bool:
+        dialog = QMessageBox(self)
+        dialog.setWindowTitle("Excluir caso?")
+        dialog.setIcon(QMessageBox.Icon.Warning)
+        count_line = f"\n\n{recent.file_count} arquivos fazem parte deste caso." if recent.file_count else ""
+        dialog.setText(
+            f'O caso "{recent.name}" será removido do ForensiHash.\n\n'
+            "Todos os dados de análise armazenados localmente para este caso também serão excluídos.\n\n"
+            "Os arquivos originais no seu dispositivo não serão excluídos."
+            f"{count_line}"
+        )
+        cancel = dialog.addButton("Cancelar", QMessageBox.ButtonRole.RejectRole)
+        delete = dialog.addButton("Excluir caso", QMessageBox.ButtonRole.DestructiveRole)
+        dialog.setDefaultButton(cancel)
+        dialog.exec()
+        return dialog.clickedButton() is delete
+
+    def _invalidate_deleted_case(self, case_id: str) -> None:
+        self._case_result_cache.pop(case_id, None)
+        discard = getattr(self.analysis_service, "discard_case_cache", None)
+        if callable(discard):
+            discard(case_id)
+        if self.current_case_id != case_id:
+            return
+        if self.analysis_worker is not None:
+            self.analysis_worker.cancel()
+        self.current_case_id = None
+        self.current_case_name = None
+        self.current_folder_path = None
+        self.current_result = None
+        self.current_selection = None
+        self.analysis_results = []
+        self.correlation_result = None
+        self._case_file_states = {}
+        self._case_file_errors = {}
+        self._case_progress = {}
+        self.file_strip.set_files([])
+        self.workspace.update_investigation_context(None)
+        self.workspace.home_page.set_case_open(False)
+        self.sidebar.set_case(None, 0, None)
+        self.topbar_context.setText("Nenhum Caso aberto")
+        self.case_icon.setVisible(False)
+        self.show_workspace_page("home")
+
     def _open_case_inputs(self, name: str, inputs: list[Path]) -> None:
         discovery_started = perf_counter()
         files: list[Path] = []
@@ -610,6 +670,7 @@ class MainWindow(QWidget):
         directory_inputs = [item for item in inputs if item.is_dir()]
         self.current_folder_path = directory_inputs[0] if len(inputs) == 1 and directory_inputs else None
         case_source = self.current_folder_path or files[0]
+        self.current_case_id = str(case_source.resolve())
         self.file_strip.set_files(files)
         self.sidebar.set_case(self.current_case_name, len(files), "Pronto")
         self.topbar_context.setText(self.current_case_name)

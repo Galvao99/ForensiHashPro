@@ -10,6 +10,7 @@ from app.correlation.v2.models import (
     CorrelationRelation,
     CorrelationReport,
     EntityType,
+    RelationType,
 )
 
 
@@ -67,6 +68,14 @@ class CaseEvidenceIndex:
     def relation(self, relation_id: str) -> CorrelationRelation | None:
         return self._relations_by_id.get(relation_id)
 
+    def relations_by_type(
+        self, relation_type: RelationType,
+    ) -> tuple[CorrelationRelation, ...]:
+        return tuple(
+            item for item in self.report.relations
+            if item.relation_type is relation_type
+        )
+
     def find(self, fact_type: EntityType, normalized_value: str) -> tuple[CorrelationOccurrence, ...]:
         return tuple(self._by_value.get((fact_type, normalized_value), ()))
 
@@ -81,6 +90,46 @@ class CaseEvidenceIndex:
 
     def by_semantic_role(self, role: str) -> tuple[CorrelationOccurrence, ...]:
         return tuple(self._by_role.get(role, ()))
+
+    def signatures_for_artifact(self, artifact_id: str) -> tuple[str, ...]:
+        values = {
+            signature_id
+            for relation in self.relations_by_type(RelationType.ARTIFACT_CONTAINS_SIGNATURE)
+            if relation.subject_id == artifact_id
+            for signature_id in relation.object_ids
+        }
+        return tuple(sorted(values))
+
+    def certificates_for_signature(self, signature_id: str) -> tuple[str, ...]:
+        values = {
+            certificate_id
+            for relation in self.relations_by_type(RelationType.SIGNATURE_USES_CERTIFICATE)
+            if relation.subject_id == signature_id
+            for certificate_id in relation.object_ids
+        }
+        return tuple(sorted(values))
+
+    def for_certificate(self, certificate_id: str) -> tuple[CorrelationOccurrence, ...]:
+        occurrence_ids = {
+            occurrence_id
+            for relation in self.relations_by_type(RelationType.CERTIFICATE_VALIDITY_INTERVAL)
+            if relation.subject_id == certificate_id
+            for occurrence_id in relation.object_ids
+        }
+        return self.trace_occurrences(occurrence_ids)
+
+    def for_signature(self, signature_id: str) -> tuple[CorrelationOccurrence, ...]:
+        occurrence_ids = {
+            occurrence_id
+            for relation in self.relations_by_type(RelationType.SIGNATURE_HAS_SIGNING_TIME)
+            if relation.subject_id == signature_id
+            for occurrence_id in relation.object_ids
+        }
+        for certificate_id in self.certificates_for_signature(signature_id):
+            occurrence_ids.update(
+                item.occurrence_id for item in self.for_certificate(certificate_id)
+            )
+        return self.trace_occurrences(occurrence_ids)
 
     def trace_occurrences(self, occurrence_ids: Iterable[str]) -> tuple[CorrelationOccurrence, ...]:
         return tuple(

@@ -4,7 +4,7 @@ from datetime import datetime
 from pathlib import Path
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtWidgets import QFrame, QLabel, QPushButton, QScrollArea, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QPushButton, QScrollArea, QVBoxLayout, QWidget
 
 from app.ui.case_catalog import RecentCase
 from app.ui.line_icons import HomeIllustration
@@ -17,6 +17,7 @@ class HomePage(QWidget):
     open_case_requested = Signal()
     dropped_paths = Signal(list)
     recent_case_requested = Signal(object)
+    recent_case_delete_requested = Signal(object)
     navigation_requested = Signal(str)
     open_file_requested = Signal()  # compatibility
     open_folder_requested = Signal()  # compatibility
@@ -136,11 +137,29 @@ class HomePage(QWidget):
                 accessed = datetime.fromisoformat(recent.last_opened).astimezone().strftime("%d/%m/%Y %H:%M")
             except ValueError:
                 accessed = recent.last_opened
+            card = QFrame()
+            card.setObjectName("HomeRecentCaseCard")
+            row = QHBoxLayout(card)
+            row.setContentsMargins(0, 0, 4, 0)
+            row.setSpacing(0)
             button = QPushButton(f"{recent.name}\n{recent.file_count} arquivo(s) · {accessed}")
             button.setObjectName("HomeRecentCase")
+            button.setProperty("caseId", recent.case_id)
             button.setAccessibleName(f"Abrir Caso {recent.name}")
             button.clicked.connect(lambda checked=False, item=recent: self.recent_case_requested.emit(item))
-            self.recent_layout.addWidget(button)
+            delete_button = QPushButton("×")
+            delete_button.setObjectName("HomeRecentCaseDelete")
+            delete_button.setProperty("caseId", recent.case_id)
+            delete_button.setFixedSize(28, 28)
+            delete_button.setToolTip("Excluir caso")
+            delete_button.setAccessibleName("Excluir caso")
+            delete_button.setCursor(Qt.CursorShape.PointingHandCursor)
+            delete_button.clicked.connect(
+                lambda checked=False, item=recent: self.recent_case_delete_requested.emit(item)
+            )
+            row.addWidget(button, stretch=1)
+            row.addWidget(delete_button, alignment=Qt.AlignmentFlag.AlignVCenter)
+            self.recent_layout.addWidget(card)
 
     def dragEnterEvent(self, event) -> None:
         if event.mimeData().hasUrls() and any(url.isLocalFile() for url in event.mimeData().urls()):

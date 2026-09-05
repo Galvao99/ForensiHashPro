@@ -6,7 +6,11 @@ from app.models.analysis_result import (
     MetadataResult,
 )
 from app.models.digital_signature_result import (
+    CertificateIdentity,
     DigitalSignatureResult,
+    SignatureLocator,
+    SignatureParseIssue,
+    SignatureRecord,
     SignatureAnalysisStatus,
     SignatureValidationStatus,
 )
@@ -60,6 +64,10 @@ __all__ = [
     "MagicNumberResult",
     "MagicNumberFinding",
     "DigitalSignatureResult",
+    "CertificateIdentity",
+    "SignatureLocator",
+    "SignatureParseIssue",
+    "SignatureRecord",
     "SignatureAnalysisStatus",
     "SignatureValidationStatus",
     "ComparisonResult",

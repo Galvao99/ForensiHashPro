@@ -120,6 +120,13 @@ class CorrelationService:
     ) -> CorrelationResult:
         return self.engine.evaluate(self._case_index(case_id).remove(file_path))
 
+    def discard_case(self, case_id: str) -> bool:
+        """Forget the volatile legacy index for one case."""
+        normalized = str(case_id).strip()
+        if not normalized:
+            return False
+        return self._case_indexes.pop(normalized, None) is not None
+
     def _case_index(self, case_id: str) -> CaseCorrelationIndex:
         normalized = str(case_id).strip()
         if not normalized:

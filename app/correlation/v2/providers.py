@@ -6,8 +6,11 @@ import re
 from typing import Protocol
 
 from app.correlation.v2.identity import source_file_identity
+from app.correlation.v2.identity import stable_digest
 from app.correlation.v2.models import (
-    CorrelationCandidate, CorrelationProvenance, EntityType, SourceFileIdentity,
+    CorrelationCandidate, CorrelationProvenance, DeclaredHashTargetCandidate,
+    EntityType, SourceFileIdentity,
+    SignatureTemporalBindingCandidate,
 )
 from app.entities.models import EntitySource, EntitySourceType
 from app.entities.models import EntityType as ResolvedEntityType
@@ -15,6 +18,7 @@ from app.models import AnalysisResult
 from app.models.extracted_artifact import ExtractedArtifact
 from app.investigation.declared_hash import DeclaredHashExtractor
 from app.investigation.investigation_context import InvestigationContext
+from app.services.temporal_parser import TemporalParser
 
 
 class CorrelationSourceProvider(Protocol):
@@ -225,12 +229,17 @@ class TimelineCorrelationProvider:
     capabilities = frozenset({EntityType.TIMESTAMP})
 
     def provide(self, result: AnalysisResult, source_file: SourceFileIdentity) -> Iterable[CorrelationCandidate]:
+        has_signature_collection = bool(
+            getattr(getattr(result, "digital_signature", None), "signatures", ())
+        )
         events = sorted(
             getattr(result, "timeline_events", ()) or (),
             key=lambda item: (item.timestamp or "", item.event_type, item.event_id),
         )
         for event in events:
             if event.temporal_status == "structural_only":
+                continue
+            if has_signature_collection and event.category == "signature":
                 continue
             raw = event.raw_timestamp or event.timestamp
             if not raw:
@@ -248,13 +257,186 @@ class TimelineCorrelationProvider:
                     offset_start=event.offset, source_timestamp=event.raw_timestamp,
                     derived_view="timeline", source_type=(
                         "structured_json" if event.source_engine == "json_engine"
+                        else "trusted_timestamp" if event.event_type == "timestamp_token"
+                        else "pdf_embedded_signature" if event.category == "signature"
                         else event.source_type
+                    ),
+                    object_id=(
+                        "embedded_signature:singleton"
+                        if event.category == "signature" else None
                     ),
                     raw_value=event.raw_timestamp, timestamp_precision=event.precision,
                     timezone_status=event.timezone_status,
                 ), context=event.context or event.description,
                 normalization_value=event.timestamp,
+                semantic_role=_timeline_semantic_role(event),
             )
+
+
+class SignatureCorrelationProvider:
+    """Projects canonical SignatureRecord collections into temporal evidence."""
+
+    provider_name = "signature"
+    capabilities = frozenset({EntityType.TIMESTAMP})
+
+    def __init__(self, parser: TemporalParser | None = None) -> None:
+        self.parser = parser or TemporalParser()
+
+    def provide(
+        self, result: AnalysisResult, source_file: SourceFileIdentity,
+    ) -> Iterable[CorrelationCandidate]:
+        for values in self._candidate_groups(result, source_file):
+            yield from values.values()
+
+    def binding(
+        self, result: AnalysisResult, source_file: SourceFileIdentity,
+    ) -> SignatureTemporalBindingCandidate | None:
+        values = self.bindings(result, source_file)
+        return values[0] if len(values) == 1 else None
+
+    def bindings(
+        self, result: AnalysisResult, source_file: SourceFileIdentity,
+    ) -> tuple[SignatureTemporalBindingCandidate, ...]:
+        signature = getattr(result, "digital_signature", None)
+        if signature is None or getattr(signature, "has_signature", None) is not True:
+            return ()
+        records = tuple(getattr(signature, "signatures", ()) or ())
+        if records:
+            candidates = self._candidate_groups(result, source_file)
+            bindings = [
+                binding for record, values in zip(records, candidates)
+                if (binding := self._record_binding(record, values)) is not None
+            ]
+            return tuple(sorted(bindings, key=lambda item: item.signature_id))
+        if getattr(signature, "signature_count", 0) != 1:
+            return ()
+        values = self._legacy_candidates(signature, source_file)
+        required_roles = {
+            "signer_declared_signing_time", "certificate_not_before",
+            "certificate_not_after",
+        }
+        issuer = str(getattr(signature, "issuer", "") or "").strip()
+        serial = str(getattr(signature, "serial_number", "") or "").strip()
+        if not issuer or not serial or not required_roles.issubset(values):
+            return ()
+        signature_id = stable_digest(
+            "signature", [source_file.stable_id, "embedded_signature:singleton"],
+        )
+        certificate_id = stable_digest(
+            "certificate", [source_file.stable_id, issuer, serial],
+        )
+        return (SignatureTemporalBindingCandidate(
+            signature_id, certificate_id,
+            values["signer_declared_signing_time"],
+            values["certificate_not_before"], values["certificate_not_after"],
+            CorrelationProvenance(
+                engine="digital_signature_engine", source_engine="pyhanko",
+                source_type="pdf_embedded_signature",
+                object_id="embedded_signature:singleton",
+                parsing_method="single_embedded_signature",
+            ),
+        ),)
+
+    def _candidate_groups(
+        self, result: AnalysisResult, source_file: SourceFileIdentity,
+    ) -> tuple[dict[str, CorrelationCandidate], ...]:
+        signature = getattr(result, "digital_signature", None)
+        if signature is None or getattr(signature, "has_signature", None) is not True:
+            return ()
+        records = tuple(getattr(signature, "signatures", ()) or ())
+        if records:
+            return tuple(self._record_candidates(record, source_file) for record in records)
+        return (self._legacy_candidates(signature, source_file),)
+
+    def _record_candidates(
+        self, record, source_file: SourceFileIdentity,
+    ) -> dict[str, CorrelationCandidate]:
+        certificate = record.certificate
+        definitions = (
+            ("signing_time", record.signing_time, "signer_declared_signing_time"),
+            ("valid_from", certificate.valid_from if certificate else None, "certificate_not_before"),
+            ("valid_until", certificate.valid_until if certificate else None, "certificate_not_after"),
+            ("trusted_timestamp", record.trusted_timestamp, "trusted_timestamp_time"),
+        )
+        return self._temporal_candidates(
+            definitions, source_file, record.signature_id,
+            record.locator.canonical,
+            certificate.certificate_id if certificate else None,
+            record.locator.object_number, record.locator.object_generation,
+            record.locator.signed_revision,
+        )
+
+    def _legacy_candidates(
+        self, signature, source_file: SourceFileIdentity,
+    ) -> dict[str, CorrelationCandidate]:
+        definitions = (
+            ("signing_time", getattr(signature, "signing_time", None), "signer_declared_signing_time"),
+            ("valid_from", getattr(signature, "valid_from", None), "certificate_not_before"),
+            ("valid_until", getattr(signature, "valid_until", None), "certificate_not_after"),
+            ("timestamp", getattr(signature, "timestamp", None), "trusted_timestamp_time"),
+        )
+        return self._temporal_candidates(
+            definitions, source_file, None, "embedded_signature:singleton", None,
+            None, None, None,
+        )
+
+    def _temporal_candidates(
+        self, definitions, source_file: SourceFileIdentity,
+        signature_id: str | None, locator: str, certificate_id: str | None,
+        object_number: int | None, object_generation: int | None,
+        signed_revision: int | None,
+    ) -> dict[str, CorrelationCandidate]:
+        candidates: dict[str, CorrelationCandidate] = {}
+        for field, raw, role in definitions:
+            parsed = self.parser.parse(raw)
+            if parsed is None:
+                continue
+            candidates[role] = CorrelationCandidate(
+                EntityType.TIMESTAMP, parsed.raw, source_file,
+                CorrelationProvenance(
+                    engine="digital_signature_engine", source_engine="pyhanko",
+                    source_type=(
+                        "trusted_timestamp" if role == "trusted_timestamp_time"
+                        else "pdf_embedded_signature"
+                    ),
+                    field=field, path=field, raw_value=parsed.raw,
+                    parsing_method="signature_result_adapter",
+                    timestamp_precision=parsed.precision,
+                    timezone_status=parsed.timezone_status,
+                    object_id=locator,
+                    object_number=object_number,
+                    object_generation=object_generation,
+                    block=signed_revision,
+                    asset_id=signature_id,
+                    embedded_id=certificate_id,
+                ), normalization_value=parsed.normalized, semantic_role=role,
+            )
+        return candidates
+
+    @staticmethod
+    def _record_binding(record, values) -> SignatureTemporalBindingCandidate | None:
+        certificate = record.certificate
+        required = {
+            "signer_declared_signing_time", "certificate_not_before",
+            "certificate_not_after",
+        }
+        if certificate is None or not required.issubset(values):
+            return None
+        return SignatureTemporalBindingCandidate(
+            record.signature_id, certificate.certificate_id,
+            values["signer_declared_signing_time"],
+            values["certificate_not_before"], values["certificate_not_after"],
+            CorrelationProvenance(
+                engine="digital_signature_engine", source_engine="pyhanko",
+                source_type="pdf_embedded_signature",
+                object_id=record.locator.canonical,
+                object_number=record.locator.object_number,
+                object_generation=record.locator.object_generation,
+                block=record.locator.signed_revision,
+                parsing_method="signature_record_v1",
+                embedded_id=certificate.certificate_id,
+            ),
+        )
 
 
 class DeclaredHashCorrelationProvider:
@@ -332,7 +514,8 @@ class AnalysisResultCorrelationProvider:
     DEFAULT_PROVIDERS: tuple[CorrelationSourceProvider, ...] = (
         HashCorrelationProvider(), MetadataCorrelationProvider(), IpCorrelationProvider(),
         ResolvedEntityCorrelationProvider(), TextCorrelationProvider(), OcrCorrelationProvider(),
-        JsonCorrelationProvider(), DeclaredHashCorrelationProvider(), TimelineCorrelationProvider(),
+        JsonCorrelationProvider(), DeclaredHashCorrelationProvider(),
+        SignatureCorrelationProvider(), TimelineCorrelationProvider(),
     )
 
     def __init__(
@@ -354,6 +537,96 @@ class AnalysisResultCorrelationProvider:
             )
             for provider in self.providers:
                 yield from provider.provide(result, source_file)
+
+    def provide_case(self, results: Iterable[AnalysisResult]) -> "CanonicalEvidenceBatch":
+        """Materialize facts and parser-supported cross-artifact bindings."""
+        materialized = tuple(results)
+        candidates = tuple(self.provide_many(materialized))
+        sources = _result_sources(materialized)
+        signature_provider = next(
+            (item for item in self.providers if isinstance(item, SignatureCorrelationProvider)),
+            None,
+        )
+        return CanonicalEvidenceBatch(
+            candidates=candidates,
+            declared_hash_targets=tuple(
+                self._json_hash_targets(materialized, candidates)
+            ),
+            signature_temporal_bindings=tuple(
+                binding for result in materialized
+                if signature_provider is not None
+                for binding in signature_provider.bindings(
+                    result, sources[id(result)],
+                )
+            ),
+        )
+
+    @staticmethod
+    def _json_hash_targets(
+        results: tuple[AnalysisResult, ...],
+        candidates: tuple[CorrelationCandidate, ...],
+    ) -> Iterable[DeclaredHashTargetCandidate]:
+        sources = _result_sources(results)
+        by_name: dict[str, list[SourceFileIdentity]] = {}
+        for source in sources.values():
+            by_name.setdefault(_exact_filename(source.display_name), []).append(source)
+        declarations = {
+            (item.source_file.stable_id, item.provenance.path, item.entity_type): item
+            for item in candidates
+            if item.semantic_role == "declared_hash"
+            and item.provenance.engine == "json_engine"
+        }
+        for result in results:
+            analysis = getattr(result, "json_analysis", None)
+            if analysis is None or not getattr(analysis, "is_valid", False):
+                continue
+            source = sources[id(result)]
+            grouped: dict[str, list[object]] = {}
+            for field in getattr(analysis, "fields", ()) or ():
+                grouped.setdefault(_json_parent(field.path), []).append(field)
+            for parent, fields in sorted(grouped.items()):
+                filenames = [
+                    field for field in fields
+                    if _normalized_key(field.key) in {"filename", "file_name"}
+                    and isinstance(field.value, str) and field.value.strip()
+                ]
+                hashes = [
+                    field for field in fields
+                    if _normalized_key(field.key) in {"sha256", "sha_256", "md5"}
+                ]
+                if len(filenames) != 1:
+                    continue
+                targets = [
+                    target for target in by_name.get(_exact_filename(filenames[0].value), ())
+                    if target.stable_id != source.stable_id
+                ]
+                if len(targets) != 1:
+                    continue
+                for field in hashes:
+                    fact_type = (
+                        EntityType.MD5 if _normalized_key(field.key) == "md5"
+                        else EntityType.SHA256
+                    )
+                    declaration = declarations.get((source.stable_id, field.path, fact_type))
+                    if declaration is None:
+                        continue
+                    yield DeclaredHashTargetCandidate(
+                        declaration=declaration,
+                        target_file=targets[0],
+                        provenance=CorrelationProvenance(
+                            engine="json_parser", source_type="structured_json",
+                            field=f"{filenames[0].key}+{field.key}", path=parent,
+                            json_path=parent, parsing_method="sibling_fields_exact_filename",
+                            raw_value=filenames[0].value,
+                        ),
+                    )
+
+
+@dataclass(frozen=True, slots=True)
+class CanonicalEvidenceBatch:
+    candidates: tuple[CorrelationCandidate, ...] = ()
+    declared_hash_targets: tuple[DeclaredHashTargetCandidate, ...] = ()
+    signature_temporal_bindings: tuple[SignatureTemporalBindingCandidate, ...] = ()
 
 
 def derived_from_extracted_artifact(
@@ -442,3 +715,38 @@ def _source_for_context_key(
     if source is not None:
         return source
     return source_file_identity(display_name=context.display_name_for(key), path=key)
+
+
+def _result_sources(
+    results: Iterable[AnalysisResult],
+) -> dict[int, SourceFileIdentity]:
+    return {
+        id(result): source_file_identity(
+            display_name=result.file_info.name, path=result.file_info.path,
+            sha256=getattr(result.hashes, "sha256", None),
+            session_id=(result.evidence_source.evidence_id if result.evidence_source else None),
+        )
+        for result in results
+    }
+
+
+def _exact_filename(value: str) -> str:
+    return str(value).strip().replace("\\", "/").rsplit("/", 1)[-1].casefold()
+
+
+def _json_parent(path: str) -> str:
+    normalized = str(path).strip()
+    return normalized.rsplit(".", 1)[0] if "." in normalized else "$"
+
+
+def _timeline_semantic_role(event) -> str | None:
+    if event.event_type == "signature":
+        return "signer_declared_signing_time"
+    if event.event_type == "timestamp_token":
+        return "trusted_timestamp_time"
+    if event.event_type == "certificate_validity":
+        return {
+            "valid_from": "certificate_not_before",
+            "valid_until": "certificate_not_after",
+        }.get(event.field_path)
+    return None

@@ -414,6 +414,10 @@ class AnalysisService:
             raise PermissionError("Correlação entre artefatos não habilitada neste perfil.")
         return self.correlation_service.analyze_canonical(case_id, results)
 
+    def discard_case_cache(self, case_id: str) -> bool:
+        """Invalidate volatile correlation state for a deleted local case."""
+        return self.correlation_service.discard_case(case_id)
+
     def build_investigation_context(
         self,
         results: Sequence[AnalysisResult],

@@ -29,6 +29,11 @@ class RelationType(str, Enum):
     DERIVED_FROM = "DERIVED_FROM"
     OCCURRENCE_NORMALIZES_TO_FACT = "OCCURRENCE_NORMALIZES_TO_FACT"
     STRUCTURED_ASSOCIATION = "STRUCTURED_ASSOCIATION"
+    DECLARED_HASH_TARGET = "DECLARED_HASH_TARGET"
+    SIGNATURE_HAS_SIGNING_TIME = "SIGNATURE_HAS_SIGNING_TIME"
+    SIGNATURE_USES_CERTIFICATE = "SIGNATURE_USES_CERTIFICATE"
+    CERTIFICATE_VALIDITY_INTERVAL = "CERTIFICATE_VALIDITY_INTERVAL"
+    ARTIFACT_CONTAINS_SIGNATURE = "ARTIFACT_CONTAINS_SIGNATURE"
 
 
 NORMALIZATION_VERSION = "1"
@@ -239,6 +244,47 @@ class StructuredRelationCandidate:
             raise ValueError("Explicit parser relations must use STRUCTURED_ASSOCIATION.")
         if not self.subject_id or not self.object_ids:
             raise ValueError("Structured relation endpoints are required.")
+
+
+@dataclass(frozen=True, slots=True)
+class DeclaredHashTargetCandidate:
+    """Parser-supported binding from one declaration occurrence to one artifact."""
+
+    declaration: CorrelationCandidate
+    target_file: SourceFileIdentity
+    provenance: CorrelationProvenance
+
+    def __post_init__(self) -> None:
+        if self.declaration.semantic_role != "declared_hash":
+            raise ValueError("Target binding requires a declared_hash candidate.")
+        if self.declaration.source_file.stable_id == self.target_file.stable_id:
+            raise ValueError("A declaration source cannot bind to itself in Case V1.")
+
+
+@dataclass(frozen=True, slots=True)
+class SignatureTemporalBindingCandidate:
+    """Structural association extracted from one signature object."""
+
+    signature_id: str
+    certificate_id: str
+    signing_time: CorrelationCandidate
+    not_before: CorrelationCandidate
+    not_after: CorrelationCandidate
+    provenance: CorrelationProvenance
+
+    def __post_init__(self) -> None:
+        expected = (
+            (self.signing_time, "signer_declared_signing_time"),
+            (self.not_before, "certificate_not_before"),
+            (self.not_after, "certificate_not_after"),
+        )
+        if not self.signature_id or not self.certificate_id:
+            raise ValueError("Signature and certificate identities are required.")
+        if any(item.semantic_role != role for item, role in expected):
+            raise ValueError("Signature temporal binding roles are inconsistent.")
+        artifacts = {item.source_file.stable_id for item, _ in expected}
+        if len(artifacts) != 1:
+            raise ValueError("Bound signature temporal evidence must share one artifact.")
 
 
 # Canonical terminology. The V2 names remain public compatibility aliases.
