@@ -112,17 +112,61 @@ p { color: var(--color-text-secondary); line-height: 1.7; }
 .observatory-empty { color: var(--arqen-muted); font-style: italic; }
 .methodology-sections { max-width: 850px; }
 .methodology-sections h2 { font-size: 1.4rem; }
+.map-heading { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 2rem; align-items: end; margin-top: 4rem; }
+.map-heading h3 { font-size: 1.7rem; }
+.map-disclaimer { max-width: 900px; padding-left: 1rem; border-left: 2px solid var(--arqen-border); font-size: .82rem; }
+.map-mode { display: flex; border: 1px solid var(--arqen-border); }
+.map-mode button { min-height: 44px; padding: .65rem 1rem; border: 0; background: transparent; cursor: pointer; font-size: .75rem; }
+.map-mode button + button { border-left: 1px solid var(--arqen-border); }
+.map-mode button[aria-pressed="true"] { background: var(--arqen-text); color: var(--arqen-white); }
+.map-explorer { display: grid; grid-template-columns: minmax(0,1.45fr) minmax(280px,.55fr); margin: 1.5rem 0 4rem; border: 1px solid var(--arqen-border); }
+.map-explorer > div { min-width: 0; padding: 1.5rem; }
+.brazil-research-map { display: block; width: min(100%,650px); height: auto; max-height: 620px; margin: auto; overflow: visible; }
+.map-state { cursor: pointer; }
+.map-state rect { fill: #ecebe7; stroke: #fff; stroke-width: 2; }
+.map-state text { fill: #4d4c48; font: 600 11px var(--font-mono); pointer-events: none; }
+.map-state--zero rect { fill: #fafafa; stroke: #777; stroke-dasharray: 3 2; }
+.map-state--low rect { fill: #cbd7d0; }
+.map-state--medium rect { fill: #829d8d; }
+.map-state--high rect { fill: #365e48; }
+.map-state--medium text, .map-state--high text { fill: #fff; }
+.map-state:hover rect, .map-state:focus rect, .map-state.is-selected rect { stroke: #111; stroke-width: 3; }
+.map-state:focus { outline: none; }
+.map-summary { min-width: 0; padding: 2rem; border-left: 1px solid var(--arqen-border); background: var(--arqen-surface); }
+.map-summary > span { color: var(--arqen-muted); font: .7rem var(--font-mono); }
+.map-summary > strong { display: block; margin-top: 2rem; overflow-wrap: anywhere; font-size: clamp(1.5rem,4vw,3rem); font-weight: 500; }
+.map-summary dl div { padding: .75rem 0; border-top: 1px solid var(--arqen-border); }
+.map-summary dt { color: var(--arqen-muted); font-size: .68rem; }
+.map-summary dd { margin: .3rem 0 0; overflow-wrap: anywhere; }
+.map-summary .button-link { margin-top: 1.25rem; }
+.map-legend { display: flex; flex-wrap: wrap; gap: .8rem 1.2rem; color: var(--arqen-muted); font-size: .68rem; }
+.observatory-rankings { display: grid; grid-template-columns: 1fr 1fr; gap: 3rem; margin-top: 3rem; }
+.observatory-rankings ol { padding: 0; list-style: none; border-top: 1px solid var(--arqen-border); }
+.observatory-rankings a { display: grid; grid-template-columns: 3rem 5rem 1fr; gap: 1rem; min-height: 48px; align-items: center; border-bottom: 1px solid var(--arqen-border); }
+.observatory-rankings small { color: var(--arqen-muted); overflow-wrap: anywhere; }
+.observatory-back { margin-bottom: 2rem; }
+.observatory-back a { display: inline-block; min-height: 44px; padding-top: .7rem; border-bottom: 1px solid currentColor; font-size: .78rem; }
+.state-tribunal { font: .8rem var(--font-mono); }
+.derived-context { padding: 1rem; border-left: 2px solid var(--arqen-border); background: var(--arqen-surface); font-size: .82rem; }
 
 @media (max-width: 900px) {
   .national-metrics, .observatory-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .observatory-metrics > div { border-bottom: 1px solid var(--arqen-border); }
   .state-research-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .map-heading, .map-explorer { grid-template-columns: 1fr; }
+  .map-summary { border-top: 1px solid var(--arqen-border); border-left: 0; }
 }
 @media (max-width: 600px) {
   .observatory-local-nav, .research-progress { align-items: flex-start; flex-direction: column; }
   .national-metrics, .observatory-metrics, .state-research-list { grid-template-columns: 1fr; }
   .observatory-metrics > div { border-right: 0; }
   .observatory-sources li, .regulatory-item dl div { grid-template-columns: 1fr; gap: .5rem; }
+  .map-mode { width: 100%; }
+  .map-mode button { flex: 1; min-width: 0; }
+  .map-explorer > div, .map-summary { padding: 1rem; }
+  .map-state rect { width: 42px; height: 42px; }
+  .observatory-rankings { grid-template-columns: 1fr; gap: 1.5rem; }
+  .observatory-rankings a { grid-template-columns: 2.5rem 4rem minmax(0,1fr); }
 }
 
 .form-notice { border: 1px solid var(--color-warning); border-left-width: 4px; padding: var(--space-4); margin-top: var(--space-4); background: var(--notice-background); color: var(--color-text); }
