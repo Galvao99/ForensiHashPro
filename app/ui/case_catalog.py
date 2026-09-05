@@ -17,6 +17,7 @@ class RecentCase:
     source_path: str
     file_count: int
     last_opened: str
+    case_id: str = ""
 
 
 class CaseCatalog:
@@ -24,6 +25,9 @@ class CaseCatalog:
         self.path = path
 
     def list(self) -> list[RecentCase]:
+        return self._load(require_available=True)[:12]
+
+    def _load(self, *, require_available: bool) -> list[RecentCase]:
         if not self.path.exists():
             return []
         try:
@@ -42,6 +46,7 @@ class CaseCatalog:
                     source_path=str(item["source_path"]),
                     file_count=max(0, int(item.get("file_count", 0))),
                     last_opened=str(item["last_opened"]),
+                    case_id=str(item.get("case_id") or item["source_path"]),
                 )
             except (KeyError, TypeError, ValueError):
                 continue
@@ -49,9 +54,9 @@ class CaseCatalog:
                 source_is_available = Path(case.source_path).exists()
             except OSError:
                 source_is_available = False
-            if case.name.strip() and source_is_available:
+            if case.name.strip() and (source_is_available or not require_available):
                 cases.append(case)
-        return cases[:12]
+        return cases
 
     def touch(self, name: str, source_path: Path, file_count: int) -> RecentCase:
         resolved = str(source_path.resolve())
@@ -60,8 +65,9 @@ class CaseCatalog:
             source_path=resolved,
             file_count=max(0, file_count),
             last_opened=datetime.now(timezone.utc).isoformat(),
+            case_id=resolved,
         )
-        cases = [item for item in self.list() if item.source_path != resolved]
+        cases = [item for item in self.list() if item.case_id != recent.case_id]
         cases.insert(0, recent)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         temporary = self.path.with_suffix(".tmp")
@@ -71,3 +77,21 @@ class CaseCatalog:
         )
         temporary.replace(self.path)
         return recent
+
+    def remove(self, case_id: str) -> bool:
+        """Atomically remove only the catalog entry identified by ``case_id``."""
+        normalized = str(case_id).strip()
+        if not normalized:
+            raise ValueError("case_id must not be empty")
+        cases = self._load(require_available=False)
+        remaining = [item for item in cases if item.case_id != normalized]
+        if len(remaining) == len(cases):
+            return False
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        temporary = self.path.with_suffix(".tmp")
+        temporary.write_text(
+            json.dumps([asdict(item) for item in remaining], ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        temporary.replace(self.path)
+        return True

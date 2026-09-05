@@ -37,6 +37,7 @@ from app.investigation.investigation_context import (
     InvestigationContext,
 )
 from app.investigation.case_correlation_index import CaseCorrelationIndex
+from app.correlation.v2.pipeline import CanonicalCasePipeline, CanonicalCasePipelineResult
 
 
 class CorrelationService:
@@ -63,6 +64,7 @@ class CorrelationService:
             ]
         )
         self._case_indexes: dict[str, CaseCorrelationIndex] = {}
+        self.canonical_pipeline = CanonicalCasePipeline()
 
     def build_context(
         self,
@@ -89,6 +91,12 @@ class CorrelationService:
             context
         )
 
+    def analyze_canonical(
+        self, case_id: str, results: Sequence[AnalysisResult],
+    ) -> CanonicalCasePipelineResult:
+        """Canonical read model; legacy correlation remains during parity migration."""
+        return self.canonical_pipeline.analyze(case_id, results)
+
     def update_case(
         self,
         case_id: str,
@@ -111,6 +119,13 @@ class CorrelationService:
         file_path: Path | str,
     ) -> CorrelationResult:
         return self.engine.evaluate(self._case_index(case_id).remove(file_path))
+
+    def discard_case(self, case_id: str) -> bool:
+        """Forget the volatile legacy index for one case."""
+        normalized = str(case_id).strip()
+        if not normalized:
+            return False
+        return self._case_indexes.pop(normalized, None) is not None
 
     def _case_index(self, case_id: str) -> CaseCorrelationIndex:
         normalized = str(case_id).strip()

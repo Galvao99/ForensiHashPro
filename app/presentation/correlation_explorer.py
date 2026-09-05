@@ -7,12 +7,15 @@ from hashlib import sha256
 from pathlib import Path
 import re
 from typing import Iterable, Sequence
+from itertools import chain
 
 from app.correlation.v2.engine import EvidenceGraphCorrelationEngine
 from app.correlation.v2.models import CorrelationEntity, EntityType
 from app.correlation.v2.providers import AnalysisResultCorrelationProvider
+from app.correlation.v2.providers import InvestigationContextCorrelationProvider
+from app.correlation.v2.index import CaseEvidenceIndex
+from app.correlation.v2.pipeline import IdenticalCalculatedHashRule
 from app.investigation.investigation_context import InvestigationContext
-from app.investigation.investigation_context_builder import InvestigationContextBuilder
 from app.investigation.correlation_result import CorrelationResult
 from app.models import AnalysisResult
 
@@ -131,6 +134,8 @@ _TYPE_LABELS = {
     EntityType.MD5: "MD5",
     EntityType.TIMESTAMP: "Valor temporal",
     EntityType.FILENAME: "Nome de arquivo",
+    EntityType.PRODUCER: "Produtor",
+    EntityType.CREATOR: "Criador",
 }
 
 _FIELD_LABELS = {
@@ -149,13 +154,18 @@ def build_correlation_explorer_model(
 ) -> CorrelationExplorerModel:
     """Project cached analysis facts into a neutral, read-only UI model."""
     materialized = tuple(results)
-    investigation = context or InvestigationContextBuilder().build(materialized)
-    report = EvidenceGraphCorrelationEngine().correlate(
-        AnalysisResultCorrelationProvider().provide_many(materialized)
+    primary = AnalysisResultCorrelationProvider().provide_many(materialized)
+    compatibility = (
+        InvestigationContextCorrelationProvider().provide_many(context, materialized)
+        if context is not None else ()
     )
-    elements = [_from_graph_entity(entity) for entity in report.entities]
-    elements.extend(_metadata_elements(investigation, materialized))
-    elements.extend(_declared_hash_elements(investigation, materialized))
+    report = EvidenceGraphCorrelationEngine().correlate(chain(primary, compatibility))
+    case_findings = IdenticalCalculatedHashRule().evaluate(CaseEvidenceIndex(report))
+    states = {
+        str(item.metadata.get("fact_id")): item.epistemic_state.value.upper()
+        for item in case_findings
+    }
+    elements = [_from_graph_entity(entity, states.get(entity.stable_id)) for entity in report.entities]
     ordered = tuple(sorted(elements, key=_element_key))
     return CorrelationExplorerModel(ordered, report.limitations)
 
@@ -256,7 +266,9 @@ def _verification_groups(
     )
 
 
-def _from_graph_entity(entity: CorrelationEntity) -> ExplorerElement:
+def _from_graph_entity(
+    entity: CorrelationEntity, deterministic: str | None = None,
+) -> ExplorerElement:
     occurrences = tuple(
         ExplorerOccurrence(
             occurrence_id=item.occurrence_id,
@@ -267,16 +279,11 @@ def _from_graph_entity(entity: CorrelationEntity) -> ExplorerElement:
             normalized_value=item.normalized_value,
             source_label=_source_label(item.provenance.engine),
             provenance_label=_provenance_label(item.provenance),
-            source_kind=_source_kind(entity.entity_type, item.provenance.engine),
+            source_kind=item.semantic_role or _source_kind(entity.entity_type, item.provenance.engine),
             page=item.provenance.page,
             context=item.context,
         )
         for item in entity.occurrences
-    )
-    kinds = {item.source_kind for item in occurrences}
-    deterministic = (
-        "MATCH" if entity.entity_type in {EntityType.SHA256, EntityType.MD5}
-        and kinds == {"calculated_hash"} and entity.unique_file_count > 1 else None
     )
     relation = (
         "Mesmo digest calculado a partir dos bytes"
@@ -291,61 +298,18 @@ def _from_graph_entity(entity: CorrelationEntity) -> ExplorerElement:
     )
     return ExplorerElement(
         entity.stable_id, _category(entity.entity_type),
-        _TYPE_LABELS.get(entity.entity_type, entity.entity_type.value),
+        _entity_type_label(entity),
         display_value, entity.normalized_value, occurrences, relation, deterministic,
     )
 
 
-def _metadata_elements(
-    context: InvestigationContext, results: Sequence[AnalysisResult],
-) -> list[ExplorerElement]:
-    paths = _paths_by_name(results)
-    collected: dict[tuple[str, str], list[ExplorerOccurrence]] = defaultdict(list)
-    for field, values in (("Produtor", context.producers), ("Criador", context.creators)):
-        for artifact_name, value in sorted(values.items()):
-            normalized = " ".join(value.casefold().split())
-            display_name, path = _artifact_identity(context, artifact_name, paths)
-            artifact_id = _stable("artifact", path or artifact_name)
-            occurrence_id = _stable("metadata", artifact_id, field, normalized)
-            collected[(field, normalized)].append(ExplorerOccurrence(
-                occurrence_id, artifact_id, display_name, path, value, normalized,
-                "Metadados", f"Campo de metadados · {field}", "metadata",
-            ))
-    return [
-        ExplorerElement(
-            _stable("metadata-entity", field, normalized), "metadata", field,
-            items[0].raw_value, normalized, tuple(items),
-            "Mesmo valor normalizado observado" if len({i.artifact_id for i in items}) > 1
-            else "Valor de metadados observado",
-        )
-        for (field, normalized), items in collected.items()
-    ]
-
-
-def _declared_hash_elements(
-    context: InvestigationContext, results: Sequence[AnalysisResult],
-) -> list[ExplorerElement]:
-    paths = _paths_by_name(results)
-    collected: dict[tuple[str, str, str], list[ExplorerOccurrence]] = defaultdict(list)
-    for artifact_name, values in sorted(context.declared_hashes.items()):
-        for item in values:
-            kind = "declared_hash" if item.declared else "hash_like"
-            display_name, path = _artifact_identity(context, artifact_name, paths)
-            artifact_id = _stable("artifact", path or artifact_name)
-            occurrence_id = _stable("declared-hash", artifact_id, item.evidence_ref, item.value, str(item.start))
-            collected[(item.algorithm, item.value, kind)].append(ExplorerOccurrence(
-                occurrence_id, artifact_id, display_name, path, item.value, item.value,
-                "Hash declarado" if item.declared else "String compatível com hash",
-                _declared_hash_provenance(item), kind, item.page, item.context or None,
-            ))
-    return [
-        ExplorerElement(
-            _stable("declared-hash-entity", algorithm, value, kind), "hashes",
-            f"{algorithm} declarado" if kind == "declared_hash" else f"String compatível com {algorithm}",
-            value, value, tuple(items), "Valor observado; papel semântico não promovido", None,
-        )
-        for (algorithm, value, kind), items in collected.items()
-    ]
+def _entity_type_label(entity: CorrelationEntity) -> str:
+    base = _TYPE_LABELS.get(entity.entity_type, entity.entity_type.value)
+    if entity.semantic_role == "declared_hash":
+        return f"{base} declarado"
+    if entity.semantic_role == "hash_like":
+        return f"String compatível com {base}"
+    return base
 
 
 def _category(entity_type: EntityType) -> str:
@@ -359,6 +323,8 @@ def _category(entity_type: EntityType) -> str:
         return "hashes"
     if entity_type is EntityType.TIMESTAMP:
         return "temporal"
+    if entity_type in {EntityType.PRODUCER, EntityType.CREATOR}:
+        return "metadata"
     return "other"
 
 
@@ -431,40 +397,6 @@ def compact_hash(value: str, edge: int = 6) -> str:
     if len(value) <= edge * 2 + 1:
         return value
     return f"{value[:edge]}…{value[-edge:]}"
-
-
-def _declared_hash_provenance(item: object) -> str:
-    raw_source = str(getattr(item, "source_type", "fonte técnica"))
-    parts = [{
-        "native_text": "Corpo do documento",
-        "legacy_text": "Texto extraído",
-        "ocr": "OCR",
-        "json": "Campo estruturado JSON",
-    }.get(raw_source, raw_source)]
-    field = getattr(item, "field_path", None)
-    page = getattr(item, "page", None)
-    if field:
-        parts.append(str(field))
-    if page is not None:
-        parts.append(f"Página {page}")
-    return " · ".join(parts)
-
-
-def _paths_by_name(results: Sequence[AnalysisResult]) -> dict[str, str]:
-    paths: dict[str, str] = {}
-    for result in results:
-        raw = str(result.file_info.path)
-        resolved = str(Path(result.file_info.path).resolve())
-        paths[result.file_info.name] = raw
-        paths[raw] = raw
-        paths[resolved] = raw
-    return paths
-
-
-def _artifact_identity(
-    context: InvestigationContext, key: str, paths: dict[str, str],
-) -> tuple[str, str | None]:
-    return context.display_name_for(key), paths.get(key)
 
 
 def _stable(namespace: str, *values: str) -> str:
