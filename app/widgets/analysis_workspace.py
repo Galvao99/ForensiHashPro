@@ -27,6 +27,8 @@ from app.services.analysis_service import AnalysisService
 from app.pages.diagnostics_page import DiagnosticsPage
 from app.pages.settings_page import SettingsPage
 from app.observability import HealthCheckService, ObservabilityService
+from app.ui.theme import theme_tokens
+from app.correlation.v2.pipeline import CanonicalCasePipelineResult
 
 
 class AnalysisWorkspace(QStackedWidget):
@@ -76,6 +78,7 @@ class AnalysisWorkspace(QStackedWidget):
         self.finding_page = FindingPage()
         self.timeline_page = TimelinePage()
         self.magic_number_page = MagicNumberPage()
+        self.magic_number_page.apply_theme(theme_tokens(theme_mode))
         self.digital_signature_page = DigitalSignaturePage()
         self.deep_file_explorer_page = DeepFileExplorerPage()
         self.integrity_page = IntegrityPage()
@@ -277,8 +280,11 @@ class AnalysisWorkspace(QStackedWidget):
         state: dict[str, object],
         results: list[AnalysisResult],
         correlation_result: CorrelationResult | None,
+        case_id: str | None = None,
+        canonical_result: CanonicalCasePipelineResult | None = None,
+        canonical_error: str | None = None,
     ) -> None:
         self.general_page.update_case(state, results, correlation_result)
         self.correlation_explorer_page.update_case(
-            results, correlation_result=correlation_result,
+            case_id, results, canonical_result, canonical_error,
         )

@@ -196,3 +196,19 @@ def test_selecting_unavailable_result_never_starts_analysis(qt_app, tmp_path: Pa
 
     assert calls == []
     window.close()
+
+
+def test_analysis_errors_are_sanitized_before_reaching_ui_state(qt_app, tmp_path: Path) -> None:
+    window = MainWindow(analysis_service=object())
+    evidence = tmp_path / "private" / "evidence.pdf"
+    raw_error = f"failed to read {evidence}"
+
+    window._on_file_failed(str(evidence), raw_error)
+    stored = window._case_file_errors[str(evidence.resolve())]
+    assert str(evidence) not in stored
+    assert "[path]" in stored
+
+    window._on_analysis_failed(raw_error)
+    assert str(evidence) not in window.status_label.text()
+    assert "[path]" in window.status_label.text()
+    window.close()

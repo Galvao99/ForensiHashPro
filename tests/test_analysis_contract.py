@@ -39,6 +39,7 @@ from app.services.timeline_service import TimelineService
 from app.workers.analysis_worker import AnalysisWorker
 from app.entities import EntitySource, EntitySourceType, EntityType, NormalizedEntity
 from app.investigation.correlation_result import CorrelationResult
+from app.observability import ObservabilityService
 
 
 UTC_NOW = datetime(2026, 8, 5, 12, 0, tzinfo=timezone.utc)
@@ -322,6 +323,7 @@ class _FakeCaseService(_FakeService):
     def __init__(self) -> None:
         self.analyzed_paths: list[Path] = []
         self.correlation_sizes: list[int] = []
+        self.canonical_sizes: list[int] = []
 
     def analyze(self, path: Path, *, analysis_id: str) -> AnalysisResult:
         self.analyzed_paths.append(path)
@@ -340,6 +342,10 @@ class _FakeCaseService(_FakeService):
         self.correlation_sizes.append(len(results))
         return CorrelationResult()
 
+    def correlate_case_canonical(self, case_id: str, results):
+        self.canonical_sizes.append(len(results))
+        return (case_id, tuple(results))
+
 
 def test_folder_batch_schedules_all_files_without_selection(tmp_path: Path) -> None:
     paths = [tmp_path / f"evidence-{index}.bin" for index in range(10)]
@@ -357,6 +363,32 @@ def test_folder_batch_schedules_all_files_without_selection(tmp_path: Path) -> N
     assert service.analyzed_paths == paths
     assert len(emitted) == 10
     assert service.correlation_sizes == list(range(0, 11))
+    assert service.canonical_sizes == [10]
+
+
+def test_worker_isolates_canonical_projection_failure(tmp_path: Path) -> None:
+    evidence = tmp_path / "evidence.bin"
+    evidence.write_bytes(b"evidence")
+
+    class FailingCanonicalService(_FakeCaseService):
+        def correlate_case_canonical(self, case_id: str, results):
+            raise RuntimeError("C:/sensitive/evidence.bin")
+
+    worker = AnalysisWorker(
+        analysis_service=FailingCanonicalService(), files=[evidence], case_id="case-1"
+    )
+    completed = []
+    failures = []
+    worker.completed.connect(completed.append)
+    worker.canonical_case_failed.connect(
+        lambda case_id, message: failures.append((case_id, message))
+    )
+
+    worker.run()
+
+    assert len(completed) == 1
+    assert failures == [("case-1", "Correlação canônica indisponível (RuntimeError).")]
+    assert "sensitive" not in failures[0][1]
 
 
 def test_folder_batch_reuses_valid_results_and_reports_progress(tmp_path: Path) -> None:
@@ -415,6 +447,92 @@ def test_folder_batch_progress_counts_failures(tmp_path: Path) -> None:
     assert progress[-1]["pending"] == 0
     assert progress[-1]["failed"] == 1
     assert states[-1] == (str(bad.resolve()), "failed")
+
+
+def test_observability_start_failure_does_not_mask_valid_analysis(tmp_path: Path) -> None:
+    evidence = tmp_path / "evidence.bin"
+    evidence.write_bytes(b"evidence")
+
+    class StartFailingObservability(ObservabilityService):
+        def start_job(self, **_kwargs) -> str:
+            raise RuntimeError("telemetry unavailable")
+
+    worker = AnalysisWorker(
+        analysis_service=_FakeCaseService(),
+        files=[evidence],
+        observability=StartFailingObservability(),
+    )
+    completed = []
+    failures = []
+    worker.completed.connect(completed.append)
+    worker.failed.connect(failures.append)
+
+    worker.run()
+
+    assert len(completed) == 1
+    assert len(completed[0]) == 1
+    assert failures == []
+
+
+def test_cached_partial_result_remains_partial_in_case_observability(tmp_path: Path) -> None:
+    evidence = tmp_path / "cached.bin"
+    evidence.write_bytes(b"cached")
+    cached = _legacy_result()
+    cached.file_info = replace(
+        cached.file_info,
+        name=evidence.name,
+        path=evidence,
+        size_bytes=evidence.stat().st_size,
+    )
+    observability = ObservabilityService()
+    case_ref = observability.begin_case(
+        "case-1", [(str(evidence), evidence.stat().st_size)], 0.0,
+    )
+    worker = AnalysisWorker(
+        analysis_service=_FakeCaseService(),
+        files=[evidence],
+        case_id="case-1",
+        cached_results={str(evidence.resolve()): cached},
+        observability=observability,
+    )
+    worker.case_ref = case_ref
+
+    worker.run()
+
+    performance = observability.snapshot().case_performance
+    assert performance is not None
+    assert performance.completed == 0
+    assert performance.partial == 1
+    assert performance.cache_hits == 1
+
+
+def test_user_cancellation_is_not_emitted_as_file_failure(tmp_path: Path) -> None:
+    evidence = tmp_path / "evidence.bin"
+    evidence.write_bytes(b"evidence")
+
+    class CancellingService(_FakeCaseService):
+        worker: AnalysisWorker
+
+        def analyze(self, path: Path, *, analysis_id: str) -> AnalysisResult:
+            result = super().analyze(path, analysis_id=analysis_id)
+            self.worker.cancel()
+            return result
+
+    service = CancellingService()
+    worker = AnalysisWorker(analysis_service=service, files=[evidence])
+    service.worker = worker
+    file_failures = []
+    worker_failures = []
+    completed = []
+    worker.file_failed.connect(lambda path, message: file_failures.append((path, message)))
+    worker.failed.connect(worker_failures.append)
+    worker.completed.connect(completed.append)
+
+    worker.run()
+
+    assert file_failures == []
+    assert worker_failures == []
+    assert completed == [[]]
 
 
 def test_export_service_writes_utf8_versioned_contract(tmp_path: Path) -> None:

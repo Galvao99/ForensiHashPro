@@ -119,8 +119,10 @@ def test_cache_is_lru_bounded(qt_app) -> None:
 
 def test_copy_hex_and_ascii_are_bounded_to_selection(qt_app) -> None:
     widget = grid(qt_app, 64); widget.set_selection(48, 51)
-    widget.copy_hex(); assert QApplication.clipboard().text() == "30 31 32 33"
-    widget.copy_ascii(); assert QApplication.clipboard().text() == "0123"
+    widget.copy_hex(); qt_app.processEvents()
+    assert QApplication.clipboard().text() == "30 31 32 33"
+    widget.copy_ascii(); qt_app.processEvents()
+    assert QApplication.clipboard().text() == "0123"
 
 
 def test_context_menu_contains_only_real_actions(qt_app) -> None:

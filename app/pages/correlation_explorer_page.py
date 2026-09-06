@@ -3,22 +3,33 @@ from __future__ import annotations
 from collections import defaultdict
 from pathlib import Path
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtWidgets import (
-    QComboBox, QFrame, QHBoxLayout, QLabel, QLineEdit, QPushButton, QScrollArea,
+    QBoxLayout, QComboBox, QFrame, QHBoxLayout, QLabel, QLineEdit, QProgressBar, QPushButton, QScrollArea,
     QSplitter, QStackedWidget, QVBoxLayout, QWidget,
 )
 
-from app.investigation.investigation_context import InvestigationContext
-from app.investigation.correlation_result import CorrelationResult
+from app.correlation.v2.pipeline import CanonicalCasePipelineResult
 from app.models import AnalysisResult
 from app.presentation.correlation_explorer import (
     CaseCorrelationSummary, CorrelationExplorerModel, CrossSourceVerificationGroup,
-    ExplorerElement, ExplorerOccurrence, build_case_correlation_summary,
+    CorrelationCategorySummary, ExplorerElement, ExplorerOccurrence, build_case_correlation_summary,
     build_correlation_explorer_model, compact_hash, filter_correlation_elements,
 )
 from app.presentation.file_type_icons import file_extension_label, file_type_icon_name
 from app.ui.line_icons import LineIcon
+
+
+class _ContentAwareButton(QPushButton):
+    """Keyboard-accessible row whose geometry follows its child layout."""
+
+    def sizeHint(self) -> QSize:
+        hint = super().sizeHint()
+        return hint.expandedTo(self.layout().sizeHint()) if self.layout() is not None else hint
+
+    def minimumSizeHint(self) -> QSize:
+        hint = super().minimumSizeHint()
+        return hint.expandedTo(self.layout().minimumSize()) if self.layout() is not None else hint
 
 
 class CorrelationExplorerPage(QWidget):
@@ -26,6 +37,7 @@ class CorrelationExplorerPage(QWidget):
 
     artifact_requested = Signal(str)
     source_requested = Signal(str, str)
+    MAX_VISIBLE_OCCURRENCES_PER_ARTIFACT = 50
 
     CATEGORIES = (
         ("all", "Todos os elementos"),
@@ -42,13 +54,17 @@ class CorrelationExplorerPage(QWidget):
         super().__init__()
         self.setObjectName("CorrelationExplorerPage")
         self._model = CorrelationExplorerModel(())
+        self._case_id: str | None = None
         self._case_fingerprint: tuple[tuple[str, int], ...] = ()
-        self._correlation_fingerprint: int | None = None
+        self._snapshot_fingerprint: int | None = None
+        self._canonical_error: str | None = None
         self._selected_id: str | None = None
         self._summary = CaseCorrelationSummary(frozenset(), 0, 0, frozenset(), (), ())
         self._summary_category_scope: frozenset[str] | None = None
         self._setting_summary_filter = False
         self._element_buttons: dict[str, QPushButton] = {}
+        self.summary_metric_layout: QBoxLayout | None = None
+        self.explorer_controls_layout: QBoxLayout | None = None
         self._build_ui()
 
     def _build_ui(self) -> None:
@@ -61,13 +77,14 @@ class CorrelationExplorerPage(QWidget):
         explorer_root = QVBoxLayout(self.explorer_view)
         explorer_root.setContentsMargins(0, 0, 0, 0)
         explorer_root.setSpacing(10)
-        back = QPushButton("‹  Voltar")
+        back = QPushButton("← Voltar às Correlações")
         back.setObjectName("CorrelationBackButton")
         back.setAccessibleName("Voltar ao resumo de correlações")
         back.clicked.connect(self.show_summary)
         explorer_root.addWidget(back, alignment=Qt.AlignmentFlag.AlignLeft)
 
         controls = QHBoxLayout()
+        self.explorer_controls_layout = controls
         self.search = QLineEdit()
         self.search.setObjectName("CorrelationExplorerSearch")
         self.search.setPlaceholderText("Buscar CPF, IP, hash, identificador, Produtor...")
@@ -121,6 +138,7 @@ class CorrelationExplorerPage(QWidget):
         view.setObjectName("CorrelationSummaryScroll")
         view.setWidgetResizable(True)
         view.setFrameShape(QFrame.Shape.NoFrame)
+        view.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         content = QWidget()
         self.summary_layout = QVBoxLayout(content)
         self.summary_layout.setContentsMargins(2, 0, 8, 8)
@@ -131,6 +149,7 @@ class CorrelationExplorerPage(QWidget):
 
     def _render_summary(self) -> None:
         self._clear(self.summary_layout)
+        self.summary_metric_layout = None
         subtitle = QLabel(
             "Visão consolidada das relações técnicas observadas entre os artefatos deste Caso."
         )
@@ -141,11 +160,34 @@ class CorrelationExplorerPage(QWidget):
         self.summary_layout.addWidget(subtitle)
         self.summary_layout.addWidget(note)
 
+        if self._case_id is None:
+            self.summary_layout.addWidget(self._note("Nenhum caso selecionado."))
+            return
+        if not self._summary.analyzed_artifact_count:
+            self.summary_layout.addWidget(self._note(
+                "A análise do caso ainda não produziu dados de correlação."
+            ))
+            return
+        if self._snapshot_fingerprint is None:
+            self.summary_layout.addWidget(self._note(
+                f"{self._summary.analyzed_artifact_count} artefato(s) analisado(s)."
+            ))
+            if self._canonical_error:
+                heading = QLabel("LIMITAÇÕES DE ANÁLISE")
+                heading.setObjectName("SectionLabel")
+                self.summary_layout.addWidget(heading)
+                self.summary_layout.addWidget(self._note(self._canonical_error))
+            else:
+                self.summary_layout.addWidget(self._note(
+                    "A análise do caso ainda não produziu dados de correlação."
+                ))
+            return
+
         metrics = QFrame()
         metrics.setObjectName("CorrelationSummaryMetrics")
-        metric_layout = QHBoxLayout(metrics)
-        metric_layout.setContentsMargins(0, 10, 0, 10)
-        metric_layout.setSpacing(0)
+        self.summary_metric_layout = QHBoxLayout(metrics)
+        metric_layout = self.summary_metric_layout
+        metric_layout.setContentsMargins(0, 10, 0, 10); metric_layout.setSpacing(0)
         correlated = self._metric_button(
             self._summary.correlated_element_count, "elementos correlacionados"
         )
@@ -158,32 +200,29 @@ class CorrelationExplorerPage(QWidget):
             self._summary.participating_artifact_count,
             "artefatos com relações interartefato",
         ))
-        metric_layout.addWidget(self._metric(
-            len(self._summary.categories), "categorias técnicas"
-        ))
+        self._apply_responsive_layout(self.width())
         self.summary_layout.addWidget(metrics)
 
         coverage = QLabel(
-            f"{self._summary.artifact_without_relation_count} artefato(s) sem "
-            "relações interartefato observadas."
+            f"{self._summary.participating_artifact_count} de "
+            f"{self._summary.analyzed_artifact_count} artefatos participam de ao menos "
+            "uma relação entre artefatos."
         )
         coverage.setObjectName("CorrelationCoverageNote")
         self.summary_layout.addWidget(coverage)
 
+        if not self._summary.correlated_element_count:
+            self.summary_layout.addWidget(self._note(
+                "Nenhum elemento técnico foi observado em mais de um artefato com os dados atualmente disponíveis."
+            ))
+
         if self._summary.categories:
-            heading = QLabel("CATEGORIAS TÉCNICAS")
+            heading = QLabel("POR CATEGORIA")
             heading.setObjectName("SectionLabel")
             self.summary_layout.addWidget(heading)
+            maximum = max(item.element_count for item in self._summary.categories)
             for category in self._summary.categories:
-                button = QPushButton(f"{category.label}\n{category.element_count} elemento(s) correlacionado(s)")
-                button.setObjectName("CorrelationSummaryRow")
-                button.setAccessibleName(
-                    f"Abrir {category.label}: {category.element_count} elementos correlacionados"
-                )
-                button.clicked.connect(
-                    lambda _=False, key=category.key: self.show_explorer(key)
-                )
-                self.summary_layout.addWidget(button)
+                self.summary_layout.addWidget(self._category_row(category, maximum))
 
         if self._summary.verification_groups:
             heading = QLabel("VERIFICAÇÕES ENTRE FONTES")
@@ -196,15 +235,32 @@ class CorrelationExplorerPage(QWidget):
                 button.setObjectName("CorrelationVerificationRow")
                 button.clicked.connect(lambda _=False, item=group: self._show_verification_group(item))
                 self.summary_layout.addWidget(button)
+        else:
+            heading = QLabel("VERIFICAÇÕES ENTRE FONTES")
+            heading.setObjectName("SectionLabel")
+            self.summary_layout.addWidget(heading)
+            self.summary_layout.addWidget(self._note(
+                "Nenhuma verificação determinística entre fontes está disponível para este caso."
+            ))
 
-        all_button = QPushButton("Ver todas as correlações")
+        if self._model.limitations:
+            heading = QLabel("LIMITAÇÕES DE ANÁLISE")
+            heading.setObjectName("SectionLabel")
+            self.summary_layout.addWidget(heading)
+            self.summary_layout.addWidget(self._note(
+                f"{len(self._model.limitations)} verificação(ões) não puderam ser concluídas."
+            ))
+            for limitation in self._model.limitations:
+                self.summary_layout.addWidget(self._note(limitation))
+
+        all_button = QPushButton("Ver todos os elementos  →")
         all_button.setObjectName("CorrelationExploreAllButton")
         all_button.clicked.connect(lambda: self.show_explorer())
         self.summary_layout.addWidget(all_button, alignment=Qt.AlignmentFlag.AlignLeft)
 
     def _show_verification_group(self, group: CrossSourceVerificationGroup) -> None:
         self._clear(self.verification_layout)
-        back = QPushButton("‹  Voltar")
+        back = QPushButton("← Voltar às Correlações")
         back.setObjectName("CorrelationBackButton")
         back.clicked.connect(self.show_summary)
         self.verification_layout.addWidget(back, alignment=Qt.AlignmentFlag.AlignLeft)
@@ -219,8 +275,10 @@ class CorrelationExplorerPage(QWidget):
             block_layout = QVBoxLayout(block)
             block_layout.setContentsMargins(10, 10, 10, 10)
             block_layout.setSpacing(4)
-            file_name = verification.source_file or "Artefato não informado"
-            block_layout.addWidget(QLabel(file_name))
+            block_layout.addWidget(QLabel(verification.title))
+            rule = QLabel(f"Regra determinística · versão {verification.rule_version}")
+            rule.setObjectName("CorrelationProvenance")
+            block_layout.addWidget(rule)
             for label, value in verification.details:
                 detail = QLabel(f"{label}: {value}")
                 detail.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
@@ -232,6 +290,17 @@ class CorrelationExplorerPage(QWidget):
             description.setObjectName("CorrelationRelationLabel")
             description.setWordWrap(True)
             block_layout.addWidget(description)
+            if verification.supporting_occurrences:
+                support_title = QLabel("FONTES DE SUPORTE")
+                support_title.setObjectName("SectionLabel")
+                block_layout.addWidget(support_title)
+                for occurrence in verification.supporting_occurrences:
+                    support = QLabel(
+                        f"{occurrence.artifact_name} · {occurrence.provenance_label}"
+                    )
+                    support.setWordWrap(True)
+                    support.setObjectName("CorrelationProvenance")
+                    block_layout.addWidget(support)
             layout.addWidget(block)
         self.verification_layout.addWidget(scroll)
         self.content_stack.setCurrentWidget(self.verification_view)
@@ -256,6 +325,26 @@ class CorrelationExplorerPage(QWidget):
         button.setObjectName("CorrelationMetricButton")
         return button
 
+    def _category_row(self, category: CorrelationCategorySummary, maximum: int) -> QPushButton:
+        button = _ContentAwareButton()
+        button.setObjectName("CorrelationSummaryRow")
+        button.setAccessibleName(
+            f"Abrir {category.label}: {category.element_count} elementos correlacionados"
+        )
+        layout = QHBoxLayout(button)
+        layout.setContentsMargins(10, 7, 10, 7); layout.setSpacing(10)
+        label = QLabel(category.label); label.setObjectName("CorrelationCategoryLabel")
+        bar = QProgressBar(); bar.setObjectName("CorrelationCategoryBar")
+        bar.setRange(0, max(1, maximum)); bar.setValue(category.element_count)
+        bar.setTextVisible(False); bar.setAccessibleName(
+            f"{category.element_count} elementos em {category.label}"
+        )
+        count = QLabel(str(category.element_count)); count.setObjectName("CorrelationCategoryCount")
+        layout.addWidget(label, 2); layout.addWidget(bar, 3); layout.addWidget(count)
+        layout.addWidget(LineIcon("chevron-right", button, 15))
+        button.clicked.connect(lambda _=False, key=category.key: self.show_explorer(key))
+        return button
+
     @staticmethod
     def _scroll(name: str) -> tuple[QScrollArea, QWidget, QVBoxLayout]:
         scroll = QScrollArea()
@@ -272,25 +361,33 @@ class CorrelationExplorerPage(QWidget):
         return scroll, content, layout
 
     def update_case(
-        self, results: list[AnalysisResult], context: InvestigationContext | None = None,
-        correlation_result: CorrelationResult | None = None,
+        self, case_id: str | None, results: list[AnalysisResult],
+        snapshot: CanonicalCasePipelineResult | None,
+        canonical_error: str | None = None,
     ) -> None:
         fingerprint = tuple(sorted(
             (str(Path(result.file_info.path).resolve()), id(result)) for result in results
         ))
-        correlation_fingerprint = id(correlation_result) if correlation_result is not None else None
+        snapshot_fingerprint = id(snapshot) if snapshot is not None else None
         if (
-            fingerprint == self._case_fingerprint
-            and correlation_fingerprint == self._correlation_fingerprint
+            case_id == self._case_id
+            and fingerprint == self._case_fingerprint
+            and snapshot_fingerprint == self._snapshot_fingerprint
+            and canonical_error == self._canonical_error
         ):
             return
-        if fingerprint != self._case_fingerprint:
-            self._case_fingerprint = fingerprint
-            self._model = build_correlation_explorer_model(results, context=context)
-        self._correlation_fingerprint = correlation_fingerprint
-        self._summary = build_case_correlation_summary(
-            self._model, results, correlation_result,
-        )
+        if snapshot is not None and snapshot.case_result.case_id != case_id:
+            return
+        case_changed = case_id != self._case_id
+        self._case_id = case_id; self._case_fingerprint = fingerprint
+        self._snapshot_fingerprint = snapshot_fingerprint
+        self._canonical_error = canonical_error
+        self._model = build_correlation_explorer_model(snapshot) if snapshot is not None else CorrelationExplorerModel(())
+        self._summary = build_case_correlation_summary(self._model, results)
+        if case_changed:
+            self.search.clear(); self.category.setCurrentIndex(0); self.sorting.setCurrentIndex(0)
+            self._summary_category_scope = None; self._selected_id = None
+            self.show_summary()
         if self._selected_id not in {item.stable_id for item in self._model.elements}:
             self._selected_id = None
         self._refresh_list()
@@ -330,15 +427,14 @@ class CorrelationExplorerPage(QWidget):
             str(self.category.currentData() or "all"),
             str(self.sorting.currentData() or "technical"),
         )
-        if not self.search.text().strip():
-            visible = tuple(
-                item for item in visible
-                if item.stable_id in self._summary.correlated_element_ids
-                and (
-                    self._summary_category_scope is None
-                    or item.category in self._summary_category_scope
-                )
+        visible = tuple(
+            item for item in visible
+            if item.stable_id in self._summary.correlated_element_ids
+            and (
+                self._summary_category_scope is None
+                or item.category in self._summary_category_scope
             )
+        )
         if self.sorting.currentData() == "artifacts":
             self.list_layout.addWidget(self._note("Ordenado por número de artefatos; a ordem não expressa relevância."))
         elif self.sorting.currentData() == "occurrences":
@@ -348,7 +444,7 @@ class CorrelationExplorerPage(QWidget):
             self._show_empty_detail()
             return
         for element in visible:
-            button = QPushButton()
+            button = _ContentAwareButton()
             button.setObjectName("CorrelationElementRow")
             button.setCheckable(True)
             button.setChecked(element.stable_id == self._selected_id)
@@ -450,12 +546,19 @@ class CorrelationExplorerPage(QWidget):
         artifact_row.addWidget(extension_label)
         artifact_row.addWidget(count)
         layout.addLayout(artifact_row)
-        for occurrence in occurrences:
+        visible_occurrences = occurrences[:self.MAX_VISIBLE_OCCURRENCES_PER_ARTIFACT]
+        for occurrence in visible_occurrences:
             provenance = QLabel(f"Fonte: {occurrence.provenance_label}")
             provenance.setObjectName("CorrelationProvenance")
             provenance.setWordWrap(True)
             provenance.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
             layout.addWidget(provenance)
+        hidden_count = len(occurrences) - len(visible_occurrences)
+        if hidden_count:
+            layout.addWidget(self._note(
+                f"{hidden_count} ocorrência(s) adicional(is) preservada(s) no modelo canônico; "
+                "a visualização foi limitada para manter a interface responsiva."
+            ))
         if first.artifact_path:
             source = QPushButton("Abrir vestígio técnico")
             source.setObjectName("InlineActionButton")
@@ -474,6 +577,24 @@ class CorrelationExplorerPage(QWidget):
         self.detail_layout.addWidget(self._note(
             "Selecione um elemento para explorar os artefatos e as ocorrências associadas."
         ))
+
+    def resizeEvent(self, event) -> None:
+        self._apply_responsive_layout(event.size().width())
+        super().resizeEvent(event)
+
+    def _apply_responsive_layout(self, width: int) -> None:
+        narrow = width < 760
+        self.splitter.setOrientation(
+            Qt.Orientation.Vertical if narrow else Qt.Orientation.Horizontal
+        )
+        if self.summary_metric_layout is not None:
+            self.summary_metric_layout.setDirection(
+                QBoxLayout.Direction.TopToBottom if narrow else QBoxLayout.Direction.LeftToRight
+            )
+        if self.explorer_controls_layout is not None:
+            self.explorer_controls_layout.setDirection(
+                QBoxLayout.Direction.TopToBottom if narrow else QBoxLayout.Direction.LeftToRight
+            )
 
     @staticmethod
     def _counts(artifacts: int, occurrences: int) -> str:

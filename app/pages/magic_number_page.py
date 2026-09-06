@@ -6,13 +6,14 @@ from typing import Callable
 from PySide6.QtCore import QUrl, Qt, QThreadPool, Signal
 from PySide6.QtGui import QDesktopServices, QFontDatabase, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
-    QApplication, QCheckBox, QFileDialog, QFrame, QHBoxLayout, QLabel, QLineEdit,
+    QApplication, QCheckBox, QFileDialog, QFrame, QGridLayout, QHBoxLayout, QLabel, QLineEdit,
     QMessageBox, QPushButton, QSizePolicy, QVBoxLayout, QWidget,
 )
 
 from app.models import AnalysisResult
 from app.models.extracted_artifact import ExtractedArtifact
 from app.services.byte_range_extraction_service import ByteRangeError, ByteRangeExtractionService
+from app.ui.theme import ThemeTokens, theme_tokens
 from app.widgets.binary_inspector.hex_grid import HexGridWidget
 from app.widgets.deep_file_explorer.tasks import ExplorerTask
 
@@ -62,12 +63,15 @@ class MagicNumberPage(QWidget):
         header = QFrame(); header.setObjectName("MagicCompactHeader")
         header_layout = QVBoxLayout(header); header_layout.setContentsMargins(10, 6, 10, 6); header_layout.setSpacing(2)
         top = QHBoxLayout(); top.addWidget(self.title); top.addSpacing(16); top.addWidget(self.file_value, 1); top.addWidget(self.source_badge)
-        file_line = QHBoxLayout(); file_line.addSpacing(self.title.sizeHint().width() + 16); file_line.addWidget(self.file_meta_value)
+        file_line = QHBoxLayout(); file_line.addWidget(self.file_meta_value)
         file_line.addWidget(self.detected_type)
         file_line.addWidget(self.mime); file_line.addWidget(self.extension_value); file_line.addStretch()
-        technical_line = QHBoxLayout(); technical_line.addWidget(QLabel("SIGNATURE")); technical_line.addWidget(self.signature_value)
+        technical_line = QHBoxLayout()
+        self.signature_caption = QLabel("ASSINATURA")
+        technical_line.addWidget(self.signature_caption); technical_line.addWidget(self.signature_value)
         technical_line.addSpacing(12); technical_line.addWidget(self.match_value); technical_line.addStretch()
-        technical_line.addWidget(QLabel("SHA-256")); technical_line.addWidget(self.source_hash_value, 1)
+        self.source_hash_caption = QLabel("SHA-256")
+        technical_line.addWidget(self.source_hash_caption); technical_line.addWidget(self.source_hash_value, 1)
         self.copy_source_hash_button = QPushButton("Copiar"); technical_line.addWidget(self.copy_source_hash_button)
         header_layout.addLayout(top); header_layout.addLayout(file_line); header_layout.addLayout(technical_line)
 
@@ -85,21 +89,25 @@ class MagicNumberPage(QWidget):
         self.hex_viewer.detect_requested.connect(self.detect_selection_type)
         self.hex_viewer.hash_requested.connect(self.calculate_selection_hash)
         self.hex_viewer.extract_requested.connect(self.extract_selection)
-        hex_toolbar = QHBoxLayout(); hex_toolbar.setContentsMargins(8, 3, 8, 3)
+        hex_toolbar_frame = QFrame(); hex_toolbar_frame.setObjectName("HexToolbar")
+        hex_toolbar = QHBoxLayout(hex_toolbar_frame); hex_toolbar.setContentsMargins(8, 3, 8, 3)
         hex_label = QLabel("HEX"); hex_label.setObjectName("TechnicalCaption")
-        self.goto_input = QLineEdit(); self.goto_input.setPlaceholderText("0x00000000"); self.goto_input.setFixedWidth(130)
+        self.goto_input = QLineEdit(); self.goto_input.setPlaceholderText("0x00000000")
+        self.goto_input.setMinimumWidth(96); self.goto_input.setMaximumWidth(160)
         self.goto_input.setFont(QFontDatabase.systemFont(QFontDatabase.FixedFont))
-        self.goto_button = QPushButton("Go")
-        self.back_button = QPushButton("←"); self.forward_button = QPushButton("→")
-        self.back_button.setFixedWidth(34); self.forward_button.setFixedWidth(34)
-        hex_toolbar.addWidget(hex_label); hex_toolbar.addStretch(); hex_toolbar.addWidget(QLabel("Go to offset"))
+        self.goto_button = QPushButton("Ir")
+        self.back_button = QPushButton("Anterior"); self.forward_button = QPushButton("Próximo")
+        self.back_button.setToolTip("Voltar ao offset anterior")
+        self.forward_button.setToolTip("Avançar ao próximo offset do histórico")
+        self.goto_caption = QLabel("Ir para offset")
+        hex_toolbar.addWidget(hex_label); hex_toolbar.addStretch(); hex_toolbar.addWidget(self.goto_caption)
         hex_toolbar.addWidget(self.goto_input); hex_toolbar.addWidget(self.goto_button)
         hex_toolbar.addWidget(self.back_button); hex_toolbar.addWidget(self.forward_button)
-        hex_layout.addLayout(hex_toolbar)
+        hex_layout.addWidget(hex_toolbar_frame)
         grid_row = QHBoxLayout(); grid_row.setContentsMargins(0, 0, 0, 0); grid_row.setSpacing(0)
         grid_row.addWidget(self.hex_viewer, 1)
         self.byte_inspector = QFrame(); self.byte_inspector.setObjectName("ByteInspector")
-        self.byte_inspector.setMinimumWidth(148); self.byte_inspector.setMaximumWidth(176)
+        self.byte_inspector.setMinimumWidth(136); self.byte_inspector.setMaximumWidth(168)
         inspector_layout = QVBoxLayout(self.byte_inspector); inspector_layout.setContentsMargins(8, 8, 8, 8)
         inspector_layout.setSpacing(2)
         inspector_title = QLabel("BYTE INSPECTOR"); inspector_title.setObjectName("TechnicalCaption")
@@ -123,12 +131,14 @@ class MagicNumberPage(QWidget):
 
         selection = QFrame(); selection.setObjectName("SelectionBar")
         self.selection_bar = selection
-        selection_layout = QHBoxLayout(selection); selection_layout.setContentsMargins(8, 5, 8, 5)
+        selection_layout = QGridLayout(selection); selection_layout.setContentsMargins(8, 5, 8, 5)
+        selection_layout.setHorizontalSpacing(6); selection_layout.setVerticalSpacing(4)
         selection_title = QLabel("SELECTION"); selection_title.setObjectName("TechnicalCaption")
         self.selection_title = selection_title
         self.start_input = QLineEdit(); self.start_input.setPlaceholderText("0x00000000")
         self.end_input = QLineEdit(); self.end_input.setPlaceholderText("0x000000FF")
-        self.start_input.setFixedWidth(96); self.end_input.setFixedWidth(96)
+        self.start_input.setMinimumWidth(88); self.start_input.setMaximumWidth(128)
+        self.end_input.setMinimumWidth(88); self.end_input.setMaximumWidth(128)
         self.start_input.setFont(QFontDatabase.systemFont(QFontDatabase.FixedFont))
         self.end_input.setFont(QFontDatabase.systemFont(QFontDatabase.FixedFont))
         self.range_status = QLabel("Selecione um intervalo para habilitar as ações.")
@@ -147,11 +157,14 @@ class MagicNumberPage(QWidget):
         self.open_folder_button = QPushButton("Abrir pasta")
         self.analyze_button = QPushButton("Analisar no ForensiHash")
         self.open_folder_button.hide(); self.analyze_button.hide()
-        selection_layout.addWidget(selection_title); selection_layout.addWidget(QLabel("Start")); selection_layout.addWidget(self.start_input)
-        selection_layout.addWidget(QLabel("End")); selection_layout.addWidget(self.end_input); selection_layout.addWidget(self.range_status, 1)
-        selection_layout.addWidget(self.detect_button); selection_layout.addWidget(self.hash_button)
-        selection_layout.addWidget(self.extract_button); selection_layout.addWidget(self.sidecar_checkbox)
-        selection_layout.addWidget(self.open_folder_button)
+        selection_layout.addWidget(selection_title, 0, 0)
+        selection_layout.addWidget(QLabel("Início"), 0, 1); selection_layout.addWidget(self.start_input, 0, 2)
+        selection_layout.addWidget(QLabel("Fim"), 0, 3); selection_layout.addWidget(self.end_input, 0, 4)
+        selection_layout.addWidget(self.range_status, 0, 5, 1, 4)
+        selection_layout.addWidget(self.detect_button, 1, 2); selection_layout.addWidget(self.hash_button, 1, 3)
+        selection_layout.addWidget(self.extract_button, 1, 4); selection_layout.addWidget(self.sidecar_checkbox, 1, 5)
+        selection_layout.addWidget(self.open_folder_button, 1, 6)
+        selection_layout.setColumnStretch(5, 1)
 
         status_bar = QFrame(); status_bar.setObjectName("BinaryStatusBar")
         self.status_bar = status_bar
@@ -169,7 +182,7 @@ class MagicNumberPage(QWidget):
         for status_label in (self.offset_status, self.selection_status, self.file_size_status,
                              self.loaded_status, self.position_status):
             status_label.setMinimumWidth(0)
-            status_label.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
+            status_label.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
 
         for flexible_label in (self.file_value, self.match_value, self.source_hash_value,
                                self.range_status, self.feedback):
@@ -203,14 +216,21 @@ class MagicNumberPage(QWidget):
         self.setTabOrder(self.goto_input, self.goto_button); self.setTabOrder(self.goto_button, self.hex_viewer)
         self.setTabOrder(self.hex_viewer, self.start_input)
         self.setTabOrder(self.start_input, self.end_input); self.setTabOrder(self.end_input, self.detect_button)
-        self._apply_local_style()
+        self.apply_theme(theme_tokens("light"))
 
     def resizeEvent(self, event) -> None:
-        compact = event.size().width() < 1100
-        self.byte_inspector.setFixedWidth(148 if compact else 168)
+        compact = event.size().width() < 900
+        narrow = event.size().width() < 760
+        self.byte_inspector.setVisible(not narrow)
         self.source_badge.setVisible(not compact)
         self.feedback.setVisible(not compact)
         self.selection_title.setVisible(not compact)
+        self.goto_caption.setVisible(not narrow)
+        for widget in (self.source_hash_caption, self.source_hash_value,
+                       self.copy_source_hash_button, self.match_value):
+            widget.setVisible(not narrow)
+        for widget in (self.file_size_status, self.loaded_status, self.position_status):
+            widget.setVisible(not narrow)
         super().resizeEvent(event)
 
     @staticmethod
@@ -230,6 +250,7 @@ class MagicNumberPage(QWidget):
         self.mime.setText(magic.mime_type)
         self.signature_value.setText(magic.signature or "—")
         self.file_value.setText(result.file_info.name)
+        self.file_value.setToolTip(result.file_info.name)
         self.file_meta_value.setText(self._format_size(self._file_size))
         self.extension_value.setText(magic.extension or "(sem extensão)")
         self.match_value.setText("Extensão compatível" if magic.extension_matches
@@ -262,7 +283,7 @@ class MagicNumberPage(QWidget):
                                                                  maximum_bytes=self.MAXIMUM_HEX_BYTES),
                      lambda data: self._hex_loaded(data, base, request_id)
                      if generation == self._generation and path == self._source_path else None,
-                     lambda category, message: self.hex_viewer.set_error(category, message)
+                     lambda category, message: self._show_hex_error(category, message)
                      if generation == self._generation and path == self._source_path else None)
 
     def _hex_loaded(self, data: object, base_offset: int, request_id: int) -> None:
@@ -271,6 +292,16 @@ class MagicNumberPage(QWidget):
         self.loaded_status.setText(
             f"Loaded window: {self._format_size(len(payload))} · cache {self.hex_viewer.cached_window_count}"
         )
+
+    def _show_hex_error(self, category: str, _message: str) -> None:
+        safe_messages = {
+            "unsupported": "O arquivo de origem não está disponível.",
+            "invalid_range": "A faixa solicitada está fora dos limites do arquivo.",
+            "limit_exceeded": "A faixa solicitada excede o limite de leitura.",
+            "malformed": "A faixa solicitada não pôde ser lida integralmente.",
+        }
+        self.hex_viewer.set_error(category, safe_messages.get(category, "Não foi possível ler os bytes solicitados."))
+        self.feedback.setText("Visualização hexadecimal indisponível")
 
     def selected_range(self) -> tuple[int, int, int]:
         if self._source_path is None:
@@ -463,8 +494,19 @@ class MagicNumberPage(QWidget):
         self.feedback.setText(loading)
         self._submit(lambda: operation(path),
                      lambda value: success(value) if generation == self._generation and path == self._source_path else None,
-                     lambda category, message: self.feedback.setText(f"Operação indisponível · {category} · {message}")
+                     lambda category, message: self._show_operation_error(category, message)
                      if generation == self._generation and path == self._source_path else None)
+
+    def _show_operation_error(self, category: str, _message: str) -> None:
+        safe_messages = {
+            "unsupported": "arquivo de origem indisponível",
+            "invalid_range": "faixa fora dos limites do arquivo",
+            "limit_exceeded": "faixa acima do limite configurado",
+            "malformed": "faixa não pôde ser lida integralmente",
+        }
+        self.feedback.setText(
+            f"Operação indisponível · {safe_messages.get(category, 'erro de leitura')}"
+        )
 
     def _extraction_completed(self, value: object) -> None:
         artifact = value
@@ -499,12 +541,15 @@ class MagicNumberPage(QWidget):
         task.signals.finished.connect(lambda task=task: self._tasks.discard(task))
         self.thread_pool.start(task)
 
-    def _apply_local_style(self) -> None:
-        self.setStyleSheet("""
-            QFrame#HexWorkspace { border: 1px solid #263442; background: #0b1119; }
-            QAbstractScrollArea#HexGrid { border: 0; background: #0b1119; }
-            QFrame#ByteInspector { border: 0; border-left: 1px solid #263442; background: #0d141d; }
-            QFrame#HexWorkspace QLabel { color: #d8e2ec; }
-            QFrame#HexWorkspace QLabel#InspectorCaption { color: #8593a2; }
-            QFrame#HexWorkspace QLabel#InspectorValue { color: #eef4fa; }
-        """)
+    def apply_theme(self, tokens: ThemeTokens) -> None:
+        """Apply the active application theme to the custom-painted Hex canvas."""
+        self.hex_viewer.set_theme_colors(
+            background=tokens.hex_background,
+            toolbar_background=tokens.hex_toolbar_background,
+            text=tokens.hex_text,
+            secondary=tokens.hex_secondary,
+            offset=tokens.hex_offset,
+            separator=tokens.hex_separator,
+            selection=tokens.hex_selection,
+            current=tokens.hex_current,
+        )
