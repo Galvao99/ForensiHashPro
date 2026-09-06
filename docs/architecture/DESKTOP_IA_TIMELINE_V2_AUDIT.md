@@ -16,6 +16,50 @@ Auditoria realizada em 4 de setembro de 2026, antes de alterações funcionais.
 
 Direção adotada: reorganizar as rotas existentes em HOME, CASE, FILE e TOOLS; manter uma única Timeline de arquivo; introduzir DTOs de apresentação imutáveis para pontos, referências não classificadas e intervalos; e fazer as duas visualizações consumirem exatamente a mesma coleção transformada, sem leitura de arquivo ou chamada de engine.
 
+## Timeline UX V2 — fechamento de apresentação
+
+Auditoria de apresentação realizada em 6 de setembro de 2026:
+
+- A fonte única permanece `AnalysisResult.timeline_events`. `TimelinePage` cria um
+  único `TimelinePresentation` imutável e entrega a mesma instância às visões
+  Visual e Detalhada. Alternar o `QStackedWidget`, selecionar, abrir detalhes e
+  agrupar markers não chama `TimelineService`, providers, engines ou regras.
+- Eventos disponíveis continuam sendo os já produzidos para metadata/XMP,
+  ContractDate selecionada e referências textuais, assinatura/timestamp,
+  validade de certificado, JSON, filesystem, processamento FH e estrutura PDF.
+  Nenhum evento foi adicionado ou reclassificado no dataset canônico.
+- Precisão e timezone já chegavam em cada `TimelineEvent`. Valores aware são
+  comparáveis no domínio UTC; naive permanecem no domínio civil. Para posição
+  visual de `YEAR`, `MONTH` e `DAY`, o presenter usa o centro neutro do intervalo
+  de precisão produzido pelo `TemporalParser`, sem exibir ou afirmar um horário.
+- O intervalo do certificado continua sendo formado apenas por NotBefore e
+  NotAfter canônicos no mesmo domínio. A apresentação só constrói o intervalo
+  quando há exatamente um par; não escolhe endpoints ambíguos por ordem.
+- Relações SigningTime × certificado e data documental × metadata são apenas
+  projetadas de `CanonicalCasePipelineResult`. O presenter liga um finding a um
+  evento somente quando artifact, semantic role, valor normalizado e campo
+  permitem correspondência única. Ausência ou ambiguidade não gera label.
+- Categorias e cores são exclusivamente apresentação: documental, assinatura,
+  metadata, filesystem, estrutural, processamento FH, certificado e referência.
+  Texto e forma acompanham toda cor; nenhuma delas representa risco, severidade
+  ou relevância.
+- A escala horizontal é linear no domínio temporal real e usa ticks adaptativos.
+  Clustering ocorre depois da ordenação por posição em `O(n log n)` e preserva
+  todos os pontos. A Timeline Visual é um único widget pintado, sem widget por
+  evento; a Detalhada materializa lotes de até 200 linhas e oferece progressão.
+- Filtros por categoria e zoom temporal foram deliberadamente adiados. Ambos
+  exigem decisões adicionais sobre viewport, preservação de scroll e clipping
+  de intervalos; não foi implementado espalhamento visual que falsifique escala.
+- Limitação canônica preservada: a Timeline atual projeta para a coleção legada
+  apenas a primeira assinatura de `DigitalSignatureResult.signatures`. A UX não
+  cria eventos para as demais assinaturas. Uma evolução desse dataset pertence
+  a patch próprio de TimelineService, com bindings explícitos por certificado.
+
+Semântica preservada: ordem não prova causalidade; ModDate não prova alteração;
+CreationDate não prova criação jurídica; SigningTime não prova validade
+criptográfica; intervalo de certificado não prova confiança; data documental
+não prova data contratual; cor e frequência não indicam relevância.
+
 ## Revisão da Sidebar
 
 A especificação revisada removeu a função de navegador de arquivos da Sidebar. A lista e a pesquisa laterais foram eliminadas; o File Strip passou a encaminhar o `Path` diretamente ao mesmo handler que atualiza `CurrentCaseSelection`. A identidade do Caso e sua contagem factual permanecem na Sidebar, mas nenhum nome ou linha de artefato é renderizado ali. O logo do Home e o logo duplicado da Top Bar foram removidos, mantendo o logo oficial ampliado da Sidebar como única âncora de marca do shell.

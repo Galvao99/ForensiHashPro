@@ -57,7 +57,10 @@ def test_temporal_parser_preserves_precision_timezone_and_raw(
     assert parsed.normalized == normalized
 
 
-@pytest.mark.parametrize("raw", ["", "not-a-date", "2023-02-31", 1690000000])
+@pytest.mark.parametrize(
+    "raw",
+    ["", "not-a-date", "2023-02-31", "2023-01-26T15:51:40+99:00", 1690000000],
+)
 def test_temporal_parser_rejects_unsupported_values(raw):
     assert TemporalParser().parse(raw) is None
 

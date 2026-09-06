@@ -39,6 +39,16 @@ class ThemeTokens:
     hex_separator: str
     hex_selection: str
     hex_current: str
+    timeline_document: str
+    timeline_signature: str
+    timeline_metadata: str
+    timeline_filesystem: str
+    timeline_structural: str
+    timeline_fh: str
+    timeline_certificate: str
+    timeline_axis: str
+    timeline_grid: str
+    timeline_secondary: str
     radius_small: int = 2
     radius_panel: int = 2
     spacing: int = 8
@@ -75,6 +85,16 @@ DARK_THEME = ThemeTokens(
     hex_separator="#303840",
     hex_selection="#294B6D",
     hex_current="#75ADE8",
+    timeline_document="#58A6A6",
+    timeline_signature="#6E9FD2",
+    timeline_metadata="#9A83C7",
+    timeline_filesystem="#9099A2",
+    timeline_structural="#C19A55",
+    timeline_fh="#68A77F",
+    timeline_certificate="#73A584",
+    timeline_axis="#8B949E",
+    timeline_grid="#30363D",
+    timeline_secondary="#9DA3A9",
 )
 
 LIGHT_THEME = ThemeTokens(
@@ -108,6 +128,16 @@ LIGHT_THEME = ThemeTokens(
     hex_separator="#D6DBE1",
     hex_selection="#CFE2F5",
     hex_current="#155AA8",
+    timeline_document="#267878",
+    timeline_signature="#356C9F",
+    timeline_metadata="#70559A",
+    timeline_filesystem="#68737E",
+    timeline_structural="#8A672A",
+    timeline_fh="#34744B",
+    timeline_certificate="#477A58",
+    timeline_axis="#6F7984",
+    timeline_grid="#D7DCE2",
+    timeline_secondary="#68737E",
 )
 
 
@@ -281,18 +311,46 @@ QPushButton#FileStripScrollButton:hover { background: {hover}; color: {text_prim
 QScrollBar:horizontal { background: transparent; height: 5px; margin: 0; }
 QScrollBar::handle:horizontal { background: {border_strong}; min-width: 28px; border-radius: 2px; }
 QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal { width: 0; }
-QPushButton#TimelineModeButton { min-width: 82px; min-height: 30px; background: transparent; color: {text_secondary}; border: 1px solid {border}; border-radius: {radius_small}px; }
-QPushButton#TimelineModeButton:checked { color: {text_primary}; background: {selected}; border-color: {accent}; font-weight: 600; }
-QPushButton#TimelineModeButton:focus, QPushButton#TimelineSourceButton:focus, QPushButton#TimelineReferencesButton:focus { border: 1px solid {accent}; }
-QFrame#TimelineV2EventRow { background: {surface_elevated}; border: 0; border-bottom: 1px solid {border_subtle}; }
-QFrame#TimelineV2EventRow:focus { border-left: 2px solid {accent}; }
-QLabel#TimelineV2Marker { color: {text_primary}; font-size: 12px; }
-QLabel#TimelineV2EventTitle { color: {text_primary}; font-weight: 600; }
-QLabel#TimelineV2EventTime { color: {text_primary}; }
-QLabel#TimelineV2Secondary, QLabel#TimelineV2Description, QLabel#TimelineV2Empty { color: {text_secondary}; }
-QPushButton#TimelineSourceButton, QPushButton#TimelineReferencesButton { color: {text_secondary}; background: transparent; border: 1px solid {border}; border-radius: {radius_small}px; min-height: 27px; padding: 0 9px; }
-QPushButton#TimelineSourceButton:hover, QPushButton#TimelineReferencesButton:hover { background: {hover}; color: {text_primary}; }
-QWidget#VisualTimeline { background: {surface_elevated}; border: 1px solid {border}; }
+QFrame#TimelineModeControl { background: {surface_secondary}; border: 1px solid {border_subtle}; border-radius: 3px; }
+QPushButton#TimelineModeButton { min-width: 76px; min-height: 28px; max-height: 28px; padding: 0 10px; background: transparent; color: {text_secondary}; border: 1px solid transparent; border-radius: 2px; text-align: center; }
+QPushButton#TimelineModeButton:hover { background: {hover}; color: {text_primary}; }
+QPushButton#TimelineModeButton:checked { color: {text_primary}; background: {surface_elevated}; border: 0; border-bottom: 2px solid {border_strong}; font-weight: 600; }
+QPushButton#TimelineModeButton:focus, QPushButton#TimelineSourceButton:focus, QPushButton#TimelineDetailsButton:focus, QPushButton#TimelineReferencesButton:focus, QPushButton#TimelineMoreButton:focus, QPushButton#TimelinePopoverEvent:focus, QPushButton#TimelinePopoverClose:focus { border: 1px dashed {border_strong}; }
+QLabel#TimelineArtifactContext { color: {text_muted}; font-size: 11px; }
+QScrollArea#DetailedTimelineScroll, QScrollArea#DetailedTimelineScroll > QWidget > QWidget, QWidget#DetailedTimelineContainer { background: transparent; border: 0; }
+QFrame#TimelineV2EventRow { background: transparent; border: 0; border-bottom: 1px solid {border_subtle}; }
+QFrame#TimelineV2EventRow:hover { background: {hover}; }
+QFrame#TimelineV2EventRow[selected="true"] { background: {selected}; border-left: 2px solid {border_strong}; }
+QFrame#TimelineV2EventRow:focus { border-left: 2px solid {border_strong}; }
+QWidget#TimelineVerticalRail { background: transparent; }
+QFrame#TimelineVerticalLineV2 { background: {timeline_grid}; border: 0; min-width: 1px; max-width: 1px; }
+QLabel#TimelineV2Marker { color: {timeline_axis}; background: transparent; font-size: 12px; min-width: 18px; min-height: 18px; }
+QLabel#TimelineV2Category, QLabel#TimelinePopoverCategory { color: {timeline_secondary}; background: transparent; font-size: 9px; font-weight: 700; letter-spacing: 0.8px; }
+QLabel#TimelineV2Marker[timelineCategory="document"], QLabel#TimelineV2Category[timelineCategory="document"], QLabel#TimelinePopoverCategory[timelineCategory="document"] { color: {timeline_document}; }
+QLabel#TimelineV2Marker[timelineCategory="signature"], QLabel#TimelineV2Category[timelineCategory="signature"], QLabel#TimelinePopoverCategory[timelineCategory="signature"] { color: {timeline_signature}; }
+QLabel#TimelineV2Marker[timelineCategory="metadata"], QLabel#TimelineV2Category[timelineCategory="metadata"], QLabel#TimelinePopoverCategory[timelineCategory="metadata"] { color: {timeline_metadata}; }
+QLabel#TimelineV2Marker[timelineCategory="filesystem"], QLabel#TimelineV2Category[timelineCategory="filesystem"], QLabel#TimelinePopoverCategory[timelineCategory="filesystem"] { color: {timeline_filesystem}; }
+QLabel#TimelineV2Marker[timelineCategory="structural"], QLabel#TimelineV2Category[timelineCategory="structural"], QLabel#TimelinePopoverCategory[timelineCategory="structural"] { color: {timeline_structural}; }
+QLabel#TimelineV2Marker[timelineCategory="fh"], QLabel#TimelineV2Category[timelineCategory="fh"], QLabel#TimelinePopoverCategory[timelineCategory="fh"] { color: {timeline_fh}; }
+QLabel#TimelineV2Marker[timelineCategory="certificate"], QLabel#TimelineV2Category[timelineCategory="certificate"], QLabel#TimelinePopoverCategory[timelineCategory="certificate"] { color: {timeline_certificate}; }
+QLabel#TimelineV2EventTitle, QLabel#TimelinePopoverTitle { color: {text_primary}; font-weight: 600; }
+QLabel#TimelineV2EventTime, QLabel#TimelinePopoverTime { color: {text_primary}; font-family: "Consolas", monospace; }
+QLabel#TimelineV2Secondary, QLabel#TimelineV2Description, QLabel#TimelineV2Empty, QLabel#TimelineV2Technical, QLabel#TimelinePopoverDetail { color: {text_secondary}; }
+QWidget#TimelineTechnicalPanel { background: {surface_secondary}; border: 1px solid {border_subtle}; border-radius: 2px; }
+QPushButton#TimelineSourceButton, QPushButton#TimelineDetailsButton, QPushButton#TimelineReferencesButton, QPushButton#TimelineMoreButton, QPushButton#TimelinePopoverClose { color: {text_secondary}; background: transparent; border: 1px solid {border}; border-radius: {radius_small}px; min-height: 27px; padding: 0 9px; }
+QPushButton#TimelineSourceButton:hover, QPushButton#TimelineDetailsButton:hover, QPushButton#TimelineReferencesButton:hover, QPushButton#TimelineMoreButton:hover, QPushButton#TimelinePopoverClose:hover { background: {hover}; color: {text_primary}; }
+QPushButton#TimelineDetailsButton:checked { background: {surface_secondary}; color: {text_primary}; border-color: {border_strong}; }
+QPushButton#TimelineReferencesButton, QPushButton#TimelineMoreButton { text-align: left; margin-top: 6px; }
+QWidget#VisualTimeline { background: {surface_elevated}; border: 1px solid {border}; border-radius: 3px; }
+QFrame#TimelinePopover { background: {surface_elevated}; border: 1px solid {border_strong}; border-radius: 4px; }
+QPushButton#TimelinePopoverEvent { color: {text_primary}; background: transparent; border: 0; border-left: 3px solid {timeline_axis}; border-bottom: 1px solid {border_subtle}; border-radius: 0; text-align: left; min-height: 32px; padding: 4px 7px; }
+QPushButton#TimelinePopoverEvent:hover { background: {hover}; }
+QPushButton#TimelinePopoverEvent[timelineCategory="document"] { border-left-color: {timeline_document}; }
+QPushButton#TimelinePopoverEvent[timelineCategory="signature"] { border-left-color: {timeline_signature}; }
+QPushButton#TimelinePopoverEvent[timelineCategory="metadata"] { border-left-color: {timeline_metadata}; }
+QPushButton#TimelinePopoverEvent[timelineCategory="filesystem"] { border-left-color: {timeline_filesystem}; }
+QPushButton#TimelinePopoverEvent[timelineCategory="structural"] { border-left-color: {timeline_structural}; }
+QPushButton#TimelinePopoverEvent[timelineCategory="fh"] { border-left-color: {timeline_fh}; }
 
 /* V3: instrument-like internal page language. */
 QFrame#BaseCard, QFrame#CardContent, QFrame#InfoCard, QFrame#metadataCard,

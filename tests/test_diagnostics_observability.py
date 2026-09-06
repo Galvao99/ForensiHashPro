@@ -20,7 +20,7 @@ def health(identifier, status, required=False):
 
 def test_operational_states_are_disjoint_from_epistemic_states():
     assert {item.value for item in OperationalStatus} == {"OK", "DEGRADED", "UNAVAILABLE", "ERROR"}
-    assert not {"MATCH", "MISMATCH", "UNKNOWN", "NOT_APPLICABLE"} & {item.value for item in OperationalStatus}
+    assert not {"MATCH", "MISMATCH", "OBSERVED", "UNKNOWN", "NOT_APPLICABLE"} & {item.value for item in OperationalStatus}
 
 
 def test_system_health_ok():

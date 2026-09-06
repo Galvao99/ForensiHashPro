@@ -578,6 +578,7 @@ class MainWindow(QWidget):
         if app is not None:
             app.setStyleSheet(load_desktop_stylesheet(self.paths, theme_tokens(mode)))
         self.workspace.magic_number_page.apply_theme(theme_tokens(mode))
+        self.workspace.timeline_page.apply_theme(theme_tokens(mode))
         self._update_brand_assets(mode)
         self.sidebar.set_theme_mode(theme_tokens(mode).name)
         self.workspace.home_page.set_theme_mode(theme_tokens(mode).name)

@@ -77,6 +77,7 @@ class AnalysisWorkspace(QStackedWidget):
         self.metadata_page = MetadataPage()
         self.finding_page = FindingPage()
         self.timeline_page = TimelinePage()
+        self.timeline_page.apply_theme(theme_tokens(theme_mode))
         self.magic_number_page = MagicNumberPage()
         self.magic_number_page.apply_theme(theme_tokens(theme_mode))
         self.digital_signature_page = DigitalSignaturePage()
@@ -288,3 +289,4 @@ class AnalysisWorkspace(QStackedWidget):
         self.correlation_explorer_page.update_case(
             case_id, results, canonical_result, canonical_error,
         )
+        self.timeline_page.update_case_result(case_id, canonical_result)
