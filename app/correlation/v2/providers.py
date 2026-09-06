@@ -134,11 +134,16 @@ class MetadataCorrelationProvider:
     provider_name = "metadata"
     capabilities = frozenset({EntityType.TIMESTAMP, EntityType.FILENAME, EntityType.PRODUCER, EntityType.CREATOR})
     FIELD_TYPES = {
-        "CreateDate": EntityType.TIMESTAMP, "ModifyDate": EntityType.TIMESTAMP,
+        "CreationDate": EntityType.TIMESTAMP, "CreateDate": EntityType.TIMESTAMP,
+        "ModDate": EntityType.TIMESTAMP, "ModifyDate": EntityType.TIMESTAMP,
+        "MetadataDate": EntityType.TIMESTAMP,
         "FileName": EntityType.FILENAME, "SourceFile": EntityType.FILENAME,
         "Producer": EntityType.PRODUCER, "Creator": EntityType.CREATOR,
         "CreatorTool": EntityType.PRODUCER,
     }
+
+    def __init__(self, parser: TemporalParser | None = None) -> None:
+        self.parser = parser or TemporalParser()
 
     def provide(self, result: AnalysisResult, source_file: SourceFileIdentity) -> Iterable[CorrelationCandidate]:
         raw = getattr(getattr(result, "metadata", None), "raw", {})
@@ -148,6 +153,7 @@ class MetadataCorrelationProvider:
             leaf = str(field).rsplit(":", 1)[-1]
             entity_type = self.FIELD_TYPES.get(leaf)
             if entity_type is not None and value is not None:
+                parsed = self.parser.parse(value) if entity_type is EntityType.TIMESTAMP else None
                 yield CorrelationCandidate(
                     entity_type, str(value), source_file,
                     CorrelationProvenance(
@@ -155,11 +161,18 @@ class MetadataCorrelationProvider:
                         field=str(field), path=str(field), metadata_key=str(field),
                         xmp_namespace=str(field).split(":", 1)[0] if ":" in str(field) else None,
                         xmp_key=leaf if ":" in str(field) else None,
+                        raw_value=str(value),
+                        parsing_method="temporal_parser" if parsed is not None else None,
+                        timestamp_precision=parsed.precision if parsed is not None else None,
+                        timezone_status=parsed.timezone_status if parsed is not None else None,
                     ),
                     semantic_role={
                         EntityType.PRODUCER: "producer",
                         EntityType.CREATOR: "creator",
-                    }.get(entity_type),
+                    }.get(entity_type) or (
+                        _metadata_temporal_role(str(field)) if parsed is not None else None
+                    ),
+                    normalization_value=parsed.normalized if parsed is not None else None,
                 )
 
 
@@ -740,6 +753,10 @@ def _json_parent(path: str) -> str:
 
 
 def _timeline_semantic_role(event) -> str | None:
+    if event.event_type == "contract_date":
+        return "document_date"
+    if event.source_engine == "metadata_engine" and event.source_type == "metadata":
+        return _metadata_temporal_role(event.field_path or "")
     if event.event_type == "signature":
         return "signer_declared_signing_time"
     if event.event_type == "timestamp_token":
@@ -749,4 +766,36 @@ def _timeline_semantic_role(event) -> str | None:
             "valid_from": "certificate_not_before",
             "valid_until": "certificate_not_after",
         }.get(event.field_path)
+    return None
+
+
+def _metadata_temporal_role(field: str) -> str | None:
+    """Map only supported document-metadata fields; never filesystem dates."""
+    raw = str(field).strip()
+    group, separator, leaf = raw.partition(":")
+    if not separator:
+        group, leaf = "", group
+    group_key = group.casefold()
+    leaf_key = leaf.casefold()
+    if group_key == "pdf":
+        return {
+            "creationdate": "pdf_creation_date",
+            "createdate": "pdf_creation_date",
+            "modifydate": "pdf_modify_date",
+            "moddate": "pdf_modify_date",
+        }.get(leaf_key)
+    if group_key.startswith("xmp"):
+        return {
+            "createdate": "xmp_create_date",
+            "modifydate": "xmp_modify_date",
+            "metadatadate": "xmp_metadata_date",
+        }.get(leaf_key)
+    if not group_key:
+        return {
+            "creationdate": "metadata_creation_date",
+            "createdate": "metadata_creation_date",
+            "modifydate": "metadata_modify_date",
+            "moddate": "metadata_modify_date",
+            "metadatadate": "metadata_date",
+        }.get(leaf_key)
     return None
