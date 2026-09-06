@@ -1,12 +1,17 @@
+from hashlib import sha256
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QPalette
 from PySide6.QtWidgets import QApplication, QScrollArea
 
 from app.engines.magic_number_engine import MagicNumberEngine
 from app.pages.magic_number_page import MagicNumberPage
 from app.services.byte_range_extraction_service import ByteRangeExtractionService
+from app.ui.theme import DARK_THEME, LIGHT_THEME, load_desktop_stylesheet
+from app.settings import ApplicationPaths
 
 
 @pytest.fixture(scope="module")
@@ -139,6 +144,58 @@ def test_go_to_offset_loads_a_bounded_window_and_rejects_invalid_input(qt_app, t
     assert widget.offset_status.text() == "Offset: 0x00010021"
     widget.goto_input.setText(hex(source.stat().st_size)); widget.go_to_offset()
     assert "outside file bounds" in widget.feedback.text()
+    widget.goto_input.setText("-1"); widget.go_to_offset()
+    assert "outside file bounds" in widget.feedback.text()
+
+
+@pytest.mark.parametrize("tokens", [LIGHT_THEME, DARK_THEME])
+def test_hex_theme_uses_semantic_palette_without_crashing(qt_app, tokens) -> None:
+    widget = page()
+    qt_app.setStyleSheet(load_desktop_stylesheet(ApplicationPaths.discover(), tokens))
+    widget.apply_theme(tokens)
+    palette = widget.hex_viewer.palette()
+    assert palette.color(QPalette.Base).name() == tokens.hex_background.lower()
+    assert palette.color(QPalette.Text).name() == tokens.hex_text.lower()
+    assert palette.color(QPalette.Highlight).name() == tokens.hex_selection.lower()
+    assert palette.color(QPalette.Link).name() == tokens.hex_current.lower()
+    qt_app.setStyleSheet(load_desktop_stylesheet(ApplicationPaths.discover(), LIGHT_THEME))
+
+
+def test_empty_and_unavailable_evidence_have_neutral_sanitized_states(qt_app, tmp_path: Path) -> None:
+    empty = tmp_path / "empty.bin"; empty.write_bytes(b"")
+    widget = page(); widget.update_analysis(result(empty))
+    assert widget.hex_viewer.file_size == 0
+    assert widget.hex_viewer._empty_message == "Arquivo vazio"
+
+    missing = tmp_path / "private-location" / "missing.bin"
+    widget._show_hex_error("unavailable", f"failed to open {missing}")
+    assert str(missing) not in widget.hex_viewer._error
+    assert "Não foi possível ler" in widget.hex_viewer._error
+
+
+def test_hex_interaction_never_modifies_source_evidence(qt_app, tmp_path: Path) -> None:
+    source = tmp_path / "immutable-evidence.bin"
+    source.write_bytes(bytes(range(256)) * 512)
+    before = sha256(source.read_bytes()).hexdigest()
+    widget = page(); widget.update_analysis(result(source))
+    widget.goto_input.setText("0x10021"); widget.go_to_offset()
+    widget.hex_viewer.set_selection(0x10020, 0x10023)
+    widget.copy_selected_bytes(); widget.copy_selected_ascii()
+    widget.close()
+    after = sha256(source.read_bytes()).hexdigest()
+    assert after == before
+
+
+def test_long_filename_keeps_full_context_and_narrow_layout(qt_app, tmp_path: Path) -> None:
+    long_name = f"{'technical_evidence_' * 8}.bin"
+    source = tmp_path / long_name; source.write_bytes(b"evidence")
+    widget = page(); widget.update_analysis(result(source)); widget.resize(700, 640); widget.show()
+    qt_app.processEvents()
+    assert widget.file_value.toolTip() == long_name
+    assert not widget.byte_inspector.isVisibleTo(widget)
+    assert widget.hex_viewer.horizontalScrollBarPolicy() == Qt.ScrollBarAsNeeded
+    assert not widget.findChildren(QScrollArea)
+    widget.hide()
 
 
 @pytest.mark.parametrize("width,height", [(960, 640), (1366, 768), (1920, 1080)])

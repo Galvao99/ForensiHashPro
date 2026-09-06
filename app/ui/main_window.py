@@ -25,6 +25,7 @@ from PySide6.QtWidgets import (
 )
 
 from app.models import AnalysisResult
+from app.observability.sanitization import sanitize_message
 from app.services.analysis_service import AnalysisService
 from app.services.case_deletion_service import CaseDeletionService
 from app.ui.sidebar import Sidebar
@@ -62,6 +63,9 @@ class MainWindow(QWidget):
         self.current_selection: CurrentCaseSelection | None = None
         self.analysis_results: list[AnalysisResult] = []
         self.correlation_result = None
+        self.canonical_case_result = None
+        self._canonical_case_error: str | None = None
+        self._analysis_case_identity: str | None = None
         self._case_result_cache: dict[str, dict[str, AnalysisResult]] = {}
         self._case_file_states: dict[str, str] = {}
         self._case_file_errors: dict[str, str] = {}
@@ -573,6 +577,7 @@ class MainWindow(QWidget):
         app = QApplication.instance()
         if app is not None:
             app.setStyleSheet(load_desktop_stylesheet(self.paths, theme_tokens(mode)))
+        self.workspace.magic_number_page.apply_theme(theme_tokens(mode))
         self._update_brand_assets(mode)
         self.sidebar.set_theme_mode(theme_tokens(mode).name)
         self.workspace.home_page.set_theme_mode(theme_tokens(mode).name)
@@ -642,6 +647,9 @@ class MainWindow(QWidget):
         self.current_selection = None
         self.analysis_results = []
         self.correlation_result = None
+        self.canonical_case_result = None
+        self._canonical_case_error = None
+        self._analysis_case_identity = None
         self._case_file_states = {}
         self._case_file_errors = {}
         self._case_progress = {}
@@ -808,6 +816,8 @@ class MainWindow(QWidget):
         self.current_result = None
         self._case_file_errors = {}
         self.correlation_result = None
+        self.canonical_case_result = None
+        self._canonical_case_error = None
 
         case_id = (
             str(self.current_folder_path.resolve())
@@ -822,6 +832,8 @@ class MainWindow(QWidget):
         }
         if case_id:
             self._case_result_cache[case_id] = cached_results
+        case_identity = case_id or str(files[0].resolve())
+        self._analysis_case_identity = case_identity
         self._case_file_states = {
             str(path.resolve()): (
                 "analyzed" if str(path.resolve()) in cached_results else "pending"
@@ -854,7 +866,6 @@ class MainWindow(QWidget):
         self._refresh_case_overview()
 
         observability = getattr(self.analysis_service, "observability", None)
-        case_identity = case_id or str(files[0].resolve())
         case_ref = (
             observability.begin_case(
                 case_identity,
@@ -919,6 +930,12 @@ class MainWindow(QWidget):
 
         self.analysis_worker.investigation_completed.connect(
             self._on_investigation_completed
+        )
+        self.analysis_worker.canonical_case_completed.connect(
+            self._on_canonical_case_completed
+        )
+        self.analysis_worker.canonical_case_failed.connect(
+            self._on_canonical_case_failed
         )
 
         self.analysis_worker.completed.connect(
@@ -985,14 +1002,15 @@ class MainWindow(QWidget):
             f"Erro ao analisar {file_path}: "
             f"{error}"
         )
+        safe_error = sanitize_message(error)
         key = str(Path(file_path).resolve())
-        self._case_file_errors[key] = error
+        self._case_file_errors[key] = safe_error
         if self.current_selection is not None and self.current_selection.key == key:
             self.current_selection.status = "failed"
             self.current_selection.result = None
-            self.current_selection.error = error
+            self.current_selection.error = safe_error
             self.current_result = None
-            self.workspace.clear_selected_analysis(Path(file_path), "failed", error)
+            self.workspace.clear_selected_analysis(Path(file_path), "failed", safe_error)
             self.context_label.setText(f"{Path(file_path).name} • FALHA")
         self._refresh_case_overview()
 
@@ -1016,6 +1034,24 @@ class MainWindow(QWidget):
                 correlation_result
             ),
         )
+        self._refresh_case_overview()
+
+    def _on_canonical_case_completed(self, result: object) -> None:
+        case_result = getattr(result, "case_result", None)
+        if (
+            case_result is None
+            or case_result.case_id != self._analysis_case_identity
+        ):
+            return
+        self.canonical_case_result = result
+        self._canonical_case_error = None
+        self._refresh_case_overview()
+
+    def _on_canonical_case_failed(self, case_id: str, message: str) -> None:
+        if case_id != self._analysis_case_identity:
+            return
+        self.canonical_case_result = None
+        self._canonical_case_error = message
         self._refresh_case_overview()
 
     def _on_analysis_completed(
@@ -1124,7 +1160,7 @@ class MainWindow(QWidget):
         """
 
         self._show_status(
-            f"Falha na análise: {error}",
+            f"Falha na análise: {sanitize_message(error)}",
             progress=0,
         )
 
@@ -1271,6 +1307,9 @@ class MainWindow(QWidget):
             dict(self._case_progress),
             list(self.analysis_results),
             self.correlation_result,
+            self._analysis_case_identity,
+            self.canonical_case_result,
+            self._canonical_case_error,
         )
         if self.current_case_name:
             analyzed = int(self._case_progress.get("analyzed", 0))

@@ -70,13 +70,6 @@ class HexGridWidget(QAbstractScrollArea):
         self.setFocusPolicy(Qt.StrongFocus)
         self.setMouseTracking(True)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
-        palette = self.palette()
-        palette.setColor(QPalette.Base, QColor("#0b1119"))
-        palette.setColor(QPalette.AlternateBase, QColor("#111a24"))
-        palette.setColor(QPalette.Text, QColor("#d8e2ec"))
-        palette.setColor(QPalette.PlaceholderText, QColor("#8290a0"))
-        palette.setColor(QPalette.Mid, QColor("#263442"))
-        self.setPalette(palette)
         self._font = QFontDatabase.systemFont(QFontDatabase.FixedFont)
         self._font.setPointSize(9)
         self._metrics = QFontMetricsF(self._font)
@@ -92,6 +85,7 @@ class HexGridWidget(QAbstractScrollArea):
         self._loading = False
         self._error = ""
         self._hover_offset: int | None = None
+        self._empty_message = "Nenhum arquivo carregado"
         self.verticalScrollBar().valueChanged.connect(self._scroll_changed)
         self.horizontalScrollBar().valueChanged.connect(lambda _value: self.viewport().update())
 
@@ -139,6 +133,7 @@ class HexGridWidget(QAbstractScrollArea):
         self._pending_pages.clear()
         self._loading = False
         self._error = ""
+        self._empty_message = "Arquivo vazio" if self._file_size == 0 else ""
         self._configure_scrollbar()
         self._configure_horizontal_scrollbar()
         self.viewport().update()
@@ -148,6 +143,33 @@ class HexGridWidget(QAbstractScrollArea):
 
     def clear(self) -> None:
         self.set_file(0)
+        self._empty_message = "Nenhum arquivo carregado"
+        self.viewport().update()
+
+    def set_theme_colors(
+        self,
+        *,
+        background: str,
+        toolbar_background: str,
+        text: str,
+        secondary: str,
+        offset: str,
+        separator: str,
+        selection: str,
+        current: str,
+    ) -> None:
+        """Apply semantic theme colors to the custom-painted read-only grid."""
+        palette = self.palette()
+        palette.setColor(QPalette.Base, QColor(background))
+        palette.setColor(QPalette.AlternateBase, QColor(toolbar_background))
+        palette.setColor(QPalette.Text, QColor(text))
+        palette.setColor(QPalette.PlaceholderText, QColor(secondary))
+        palette.setColor(QPalette.Mid, QColor(separator))
+        palette.setColor(QPalette.Dark, QColor(offset))
+        palette.setColor(QPalette.Highlight, QColor(selection))
+        palette.setColor(QPalette.Link, QColor(current))
+        self.setPalette(palette)
+        self.viewport().update()
 
     def set_grid_font(self, font: QFont) -> None:
         """Apply display font and recompute geometry from its real metrics."""
@@ -272,7 +294,7 @@ class HexGridWidget(QAbstractScrollArea):
         if not self._file_size:
             painter.setPen(palette.color(QPalette.PlaceholderText))
             painter.drawText(self.viewport().rect().adjusted(20, self.HEADER_HEIGHT, -20, 0),
-                             Qt.AlignCenter, "Nenhum arquivo carregado")
+                             Qt.AlignCenter, self._empty_message)
         elif self._loading and not self._cache:
             painter.setPen(palette.color(QPalette.PlaceholderText))
             painter.drawText(self.viewport().rect(), Qt.AlignCenter, "Carregando janela binária…")
@@ -430,7 +452,7 @@ class HexGridWidget(QAbstractScrollArea):
 
     def _paint_row(self, painter: QPainter, geometry: HexGridGeometry, y: int,
                    offset: int, palette: QPalette) -> None:
-        painter.setPen(palette.color(QPalette.PlaceholderText))
+        painter.setPen(palette.color(QPalette.Dark))
         painter.save(); painter.setClipRect(geometry.offset_rect)
         offset_row = QRect(geometry.offset_rect.left() + self.OFFSET_PADDING, y,
                            geometry.offset_rect.width() - self.OFFSET_PADDING * 2, self._row_height)
@@ -447,16 +469,19 @@ class HexGridWidget(QAbstractScrollArea):
             selected = bounds is not None and bounds[0] <= absolute <= bounds[1]
             cursor = absolute == self._cursor
             hover = absolute == self._hover_offset
-            color = QColor(45, 104, 151, 118)
             for rect, text in ((hex_rect, f"{byte:02X}" if byte is not None else "··"),
                                (ascii_rect, (chr(byte) if 32 <= byte <= 126 else ".") if byte is not None else "·")):
                 clip = geometry.hex_rect if rect is hex_rect else geometry.ascii_rect
                 painter.save(); painter.setClipRect(clip)
-                if selected: painter.fillRect(rect.adjusted(1, 1, -1, -1), color)
+                if selected:
+                    painter.fillRect(rect.adjusted(1, 1, -1, -1), palette.color(QPalette.Highlight))
                 if cursor:
-                    painter.setPen(QColor("#8fc7ef")); painter.drawRect(rect.adjusted(1, 1, -2, -2))
+                    painter.setPen(palette.color(QPalette.Link))
+                    painter.drawRect(rect.adjusted(1, 1, -2, -2))
                 elif hover:
-                    painter.fillRect(rect.adjusted(1, 2, -1, -2), QColor(140, 158, 176, 28))
+                    hover_color = palette.color(QPalette.PlaceholderText)
+                    hover_color.setAlpha(28)
+                    painter.fillRect(rect.adjusted(1, 2, -1, -2), hover_color)
                 painter.setPen(palette.color(QPalette.Text) if byte is not None else palette.color(QPalette.Mid))
                 painter.drawText(rect, Qt.AlignCenter, text)
                 painter.restore()

@@ -31,6 +31,14 @@ class ThemeTokens:
     scrollbar_thumb: str
     scrollbar_thumb_hover: str
     scrollbar_thumb_pressed: str
+    hex_background: str
+    hex_toolbar_background: str
+    hex_text: str
+    hex_secondary: str
+    hex_offset: str
+    hex_separator: str
+    hex_selection: str
+    hex_current: str
     radius_small: int = 2
     radius_panel: int = 2
     spacing: int = 8
@@ -59,6 +67,14 @@ DARK_THEME = ThemeTokens(
     scrollbar_thumb="#68737E",
     scrollbar_thumb_hover="#85909B",
     scrollbar_thumb_pressed="#A2ABB4",
+    hex_background="#111417",
+    hex_toolbar_background="#15191D",
+    hex_text="#E3E7EB",
+    hex_secondary="#AAB2BA",
+    hex_offset="#8F9AA5",
+    hex_separator="#303840",
+    hex_selection="#294B6D",
+    hex_current="#75ADE8",
 )
 
 LIGHT_THEME = ThemeTokens(
@@ -84,6 +100,14 @@ LIGHT_THEME = ThemeTokens(
     scrollbar_thumb="#8A949F",
     scrollbar_thumb_hover="#6F7984",
     scrollbar_thumb_pressed="#59636E",
+    hex_background="#FAFBFC",
+    hex_toolbar_background="#F1F3F5",
+    hex_text="#20252B",
+    hex_secondary="#59636E",
+    hex_offset="#66717D",
+    hex_separator="#D6DBE1",
+    hex_selection="#CFE2F5",
+    hex_current="#155AA8",
 )
 
 
@@ -303,6 +327,20 @@ QLabel#DiagnosticsDetails { color: {text_secondary}; background: {surface_second
 QFrame#MagicCompactHeader, QFrame#SelectionBar, QFrame#BinaryStatusBar {
     background: {surface_elevated}; border: 0; border-bottom: 1px solid {border};
 }
+QFrame#MagicCompactHeader QLabel, QFrame#SelectionBar QLabel,
+QFrame#BinaryStatusBar QLabel { background: transparent; }
+QFrame#HexWorkspace {
+    background: {hex_background}; border: 1px solid {hex_separator}; border-radius: {radius_small}px;
+}
+QFrame#HexToolbar, QFrame#ByteInspector {
+    background: {hex_toolbar_background}; border: 0;
+}
+QFrame#ByteInspector { border-left: 1px solid {hex_separator}; }
+QAbstractScrollArea#HexGrid { background: {hex_background}; border: 0; }
+QFrame#HexWorkspace QLabel { color: {hex_text}; }
+QFrame#HexWorkspace QLabel#TechnicalCaption,
+QFrame#HexWorkspace QLabel#InspectorCaption { color: {hex_secondary}; }
+QFrame#HexWorkspace QLabel#InspectorValue { color: {hex_text}; }
 QLabel#CurrentFileName, QLabel#MagicDetectedType, QLabel#InspectorValue { color: {text_primary}; }
 QLabel#CurrentFileMeta, QLabel#TechnicalCaption, QLabel#InspectorCaption,
 QLabel#MagicFeedback { color: {text_secondary}; }
@@ -337,6 +375,15 @@ QPushButton#CorrelationSummaryRow, QPushButton#CorrelationVerificationRow {
 QPushButton#CorrelationSummaryRow:hover, QPushButton#CorrelationVerificationRow:hover {
     background: {hover};
 }
+QLabel#CorrelationCategoryLabel, QLabel#CorrelationCategoryCount {
+    color: {text_primary}; background: transparent;
+}
+QLabel#CorrelationCategoryCount { min-width: 28px; font-weight: 600; }
+QProgressBar#CorrelationCategoryBar {
+    background: {surface_secondary}; border: 0; border-radius: 2px;
+    min-height: 6px; max-height: 6px;
+}
+QProgressBar#CorrelationCategoryBar::chunk { background: {text_muted}; border-radius: 2px; }
 QPushButton#CorrelationBackButton {
     background: transparent; color: {text_secondary}; border: 0;
     border-radius: 0; padding: 3px 2px; text-align: left;
@@ -352,6 +399,7 @@ QPushButton#CorrelationElementRow {
     background: transparent; color: {text_primary}; text-align: left;
     border: 0; border-bottom: 1px solid {border_subtle}; border-radius: 0;
 }
+QPushButton#CorrelationElementRow QLabel { background: transparent; }
 QPushButton#CorrelationElementRow:hover { background: {hover}; }
 QPushButton#CorrelationElementRow:checked {
     background: {selected}; border-left: 2px solid {accent};

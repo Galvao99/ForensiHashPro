@@ -3,20 +3,11 @@ from __future__ import annotations
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime
-from hashlib import sha256
 from pathlib import Path
 import re
 from typing import Iterable, Sequence
-from itertools import chain
-
-from app.correlation.v2.engine import EvidenceGraphCorrelationEngine
 from app.correlation.v2.models import CorrelationEntity, EntityType
-from app.correlation.v2.providers import AnalysisResultCorrelationProvider
-from app.correlation.v2.providers import InvestigationContextCorrelationProvider
-from app.correlation.v2.index import CaseEvidenceIndex
-from app.correlation.v2.pipeline import IdenticalCalculatedHashRule
-from app.investigation.investigation_context import InvestigationContext
-from app.investigation.correlation_result import CorrelationResult
+from app.correlation.v2.pipeline import CanonicalCasePipelineResult
 from app.models import AnalysisResult
 
 
@@ -59,6 +50,8 @@ class ExplorerElement:
 class CorrelationExplorerModel:
     elements: tuple[ExplorerElement, ...]
     limitations: tuple[str, ...] = ()
+    deterministic_element_ids: frozenset[str] = frozenset()
+    verification_groups: tuple["CrossSourceVerificationGroup", ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -79,6 +72,10 @@ class CrossSourceVerification:
     source_file: str | None
     target_file: str | None
     details: tuple[tuple[str, str], ...]
+    rule_id: str = ""
+    rule_version: str = ""
+    supporting_occurrences: tuple[ExplorerOccurrence, ...] = ()
+    relation_id: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -89,7 +86,7 @@ class CrossSourceVerificationGroup:
 
     @property
     def state_counts(self) -> tuple[tuple[str, int], ...]:
-        order = ("CONVERGENTE", "DIVERGENTE", "INDETERMINADA", "NÃO APLICÁVEL")
+        order = ("MATCH", "MISMATCH", "UNKNOWN", "NOT_APPLICABLE")
         return tuple((state, sum(item.state == state for item in self.items)) for state in order)
 
 
@@ -148,26 +145,32 @@ _FIELD_LABELS = {
 
 
 def build_correlation_explorer_model(
-    results: Sequence[AnalysisResult],
-    *,
-    context: InvestigationContext | None = None,
+    snapshot: CanonicalCasePipelineResult,
 ) -> CorrelationExplorerModel:
-    """Project cached analysis facts into a neutral, read-only UI model."""
-    materialized = tuple(results)
-    primary = AnalysisResultCorrelationProvider().provide_many(materialized)
-    compatibility = (
-        InvestigationContextCorrelationProvider().provide_many(context, materialized)
-        if context is not None else ()
-    )
-    report = EvidenceGraphCorrelationEngine().correlate(chain(primary, compatibility))
-    case_findings = IdenticalCalculatedHashRule().evaluate(CaseEvidenceIndex(report))
+    """Project one canonical Case snapshot without executing analysis in the UI."""
+    report = snapshot.graph
+    case_findings = snapshot.case_result.findings
     states = {
         str(item.metadata.get("fact_id")): item.epistemic_state.value.upper()
         for item in case_findings
+        if item.metadata.get("fact_id")
     }
     elements = [_from_graph_entity(entity, states.get(entity.stable_id)) for entity in report.entities]
     ordered = tuple(sorted(elements, key=_element_key))
-    return CorrelationExplorerModel(ordered, report.limitations)
+    deterministic_ids: set[str] = set()
+    for finding in case_findings:
+        deterministic_ids.update(
+            occurrence.entity_id for occurrence_id in finding.supporting_occurrence_ids
+            if (occurrence := snapshot.index.occurrence(occurrence_id)) is not None
+        )
+        for key in ("fact_id", "declared_fact_id", "calculated_fact_id"):
+            if value := finding.metadata.get(key):
+                deterministic_ids.add(str(value))
+    limitations = tuple(item.message for item in snapshot.case_result.limitations) + tuple(report.limitations)
+    return CorrelationExplorerModel(
+        ordered, limitations, frozenset(deterministic_ids),
+        _verification_groups(snapshot),
+    )
 
 
 def filter_correlation_elements(
@@ -194,10 +197,12 @@ def filter_correlation_elements(
 def build_case_correlation_summary(
     model: CorrelationExplorerModel,
     results: Sequence[AnalysisResult],
-    correlation_result: CorrelationResult | None,
 ) -> CaseCorrelationSummary:
-    """Summarize distinct values spanning >=2 artifacts; never count file pairs."""
-    qualifying = tuple(item for item in model.elements if item.artifact_count >= 2)
+    """Count distinct cross-artifact or deterministically verified canonical facts."""
+    qualifying = tuple(
+        item for item in model.elements
+        if item.artifact_count >= 2 or item.stable_id in model.deterministic_element_ids
+    )
     category_counts: dict[str, int] = defaultdict(int)
     category_labels: dict[str, str] = {}
     participant_ids: set[str] = set()
@@ -211,80 +216,74 @@ def build_case_correlation_summary(
         CorrelationCategorySummary(key, category_labels[key], category_counts[key])
         for key in category_order if category_counts[key]
     )
-    groups = _verification_groups(correlation_result)
     artifacts = {str(Path(item.file_info.path).resolve()) for item in results}
     return CaseCorrelationSummary(
         frozenset(item.stable_id for item in qualifying), len(qualifying),
-        len(artifacts), frozenset(participant_ids), categories, groups,
+        len(artifacts), frozenset(participant_ids), categories, model.verification_groups,
     )
 
 
 def _verification_groups(
-    result: CorrelationResult | None,
+    snapshot: CanonicalCasePipelineResult,
 ) -> tuple[CrossSourceVerificationGroup, ...]:
     grouped: dict[str, list[CrossSourceVerification]] = defaultdict(list)
-    for index, finding in enumerate(getattr(result, "findings", ()) or ()):
-        category = str(getattr(finding, "category", ""))
-        rule_id = str(getattr(finding, "rule_id", ""))
-        if rule_id == "metadata_contract_date":
-            group_key, group_label = "document_metadata_date", "Data documental × Metadados"
-            days = getattr(finding, "metadata", {}).get("diferenca_dias")
-            state = "DIVERGENTE" if isinstance(days, int) and days > 0 else "CONVERGENTE"
-            detail_keys = (
-                ("Data documental", "data_pactuacao"),
-                ("Data de criação", "data_criacao_metadados"),
-                ("Diferença em dias", "diferenca_dias"),
-            )
-        elif category in {"embedded_hash_match", "declared_hash_mismatch", "embedded_hash_unmatched"}:
-            group_key, group_label = "declared_calculated_hash", "Hash declarado × Hash calculado"
-            state = {
-                "embedded_hash_match": "CONVERGENTE",
-                "declared_hash_mismatch": "DIVERGENTE",
-                "embedded_hash_unmatched": "INDETERMINADA",
-            }[category]
-            detail_keys = (("Algoritmo", "algorithm"), ("Hash declarado", "hash"))
-        else:
+    registry = {
+        "case.identical_calculated_hash": ("identical_hash", "Hashes calculados idênticos"),
+        "case.declared_hash_verification": ("declared_hash", "Hash declarado × hash calculado"),
+        "case.signing_time_certificate_validity": (
+            "signing_time_interval", "SigningTime × intervalo temporal do certificado",
+        ),
+    }
+    for finding in snapshot.case_result.findings:
+        definition = registry.get(finding.rule_id)
+        if definition is None:
             continue
-        metadata = getattr(finding, "metadata", {})
-        details = tuple(
-            (label, format_temporal_ptbr(str(metadata[key])) if "data_" in key else str(metadata[key]))
-            for label, key in detail_keys if key in metadata
+        group_key, group_label = definition
+        supports = tuple(
+            _from_occurrence(occurrence)
+            for occurrence in snapshot.index.trace_occurrences(finding.supporting_occurrence_ids)
         )
-        finding_id = getattr(finding, "finding_id", "") or _stable(
-            "verification", rule_id, category, str(index), str(getattr(finding, "source_file", ""))
+        details = tuple(
+            (_metadata_label(key), _metadata_value(key, value))
+            for key, value in sorted(finding.metadata.items())
+            if key in {"algorithm", "position", "delta_seconds"}
         )
         grouped[group_key].append(CrossSourceVerification(
-            finding_id, group_key, group_label, state,
-            str(getattr(finding, "title", "Verificação técnica")),
-            str(getattr(finding, "description", "")),
-            getattr(finding, "source_file", None), getattr(finding, "target_file", None), details,
+            finding.finding_id, group_key, group_label,
+            finding.epistemic_state.value.upper(), finding.title, finding.statement,
+            supports[0].artifact_name if supports else None,
+            supports[-1].artifact_name if len(supports) > 1 else None,
+            details, finding.rule_id, finding.rule_version, supports, finding.relation_id,
         ))
-    order = ("document_metadata_date", "declared_calculated_hash")
+    order = ("identical_hash", "declared_hash", "signing_time_interval")
     return tuple(
         CrossSourceVerificationGroup(key, items[0].group_label, tuple(items))
         for key in order if (items := grouped.get(key))
     )
 
 
+def _metadata_label(key: str) -> str:
+    return {
+        "algorithm": "Algoritmo", "position": "Posição temporal",
+        "delta_seconds": "Distância do intervalo (segundos)",
+        "source_artifact_id": "Artefato da declaração",
+        "target_artifact_id": "Artefato verificado",
+        "signature_id": "Assinatura", "certificate_id": "Certificado",
+        "signing_time_relation_id": "Relação SigningTime",
+        "certificate_interval_relation_id": "Relação do intervalo",
+    }.get(key, key.replace("_", " ").capitalize())
+
+
+def _metadata_value(key: str, value: object) -> str:
+    if key == "position":
+        return {"inside": "dentro", "before": "antes", "after": "depois"}.get(str(value), str(value))
+    return str(value)
+
+
 def _from_graph_entity(
     entity: CorrelationEntity, deterministic: str | None = None,
 ) -> ExplorerElement:
-    occurrences = tuple(
-        ExplorerOccurrence(
-            occurrence_id=item.occurrence_id,
-            artifact_id=item.source_file.stable_id,
-            artifact_name=item.source_file.display_name,
-            artifact_path=item.source_file.path,
-            raw_value=item.raw_value,
-            normalized_value=item.normalized_value,
-            source_label=_source_label(item.provenance.engine),
-            provenance_label=_provenance_label(item.provenance),
-            source_kind=item.semantic_role or _source_kind(entity.entity_type, item.provenance.engine),
-            page=item.provenance.page,
-            context=item.context,
-        )
-        for item in entity.occurrences
-    )
+    occurrences = tuple(_from_occurrence(item) for item in entity.occurrences)
     relation = (
         "Mesmo digest calculado a partir dos bytes"
         if deterministic == "MATCH"
@@ -303,6 +302,23 @@ def _from_graph_entity(
     )
 
 
+def _from_occurrence(item: object) -> ExplorerOccurrence:
+    entity_type = getattr(item, "entity_type")
+    provenance = getattr(item, "provenance")
+    source_file = getattr(item, "source_file")
+    return ExplorerOccurrence(
+        occurrence_id=str(getattr(item, "occurrence_id")),
+        artifact_id=str(source_file.stable_id),
+        artifact_name=str(source_file.display_name),
+        artifact_path=source_file.path,
+        raw_value=str(getattr(item, "raw_value")),
+        normalized_value=str(getattr(item, "normalized_value")),
+        source_label=_source_label(provenance.engine),
+        provenance_label=_provenance_label(provenance),
+        source_kind=getattr(item, "semantic_role") or _source_kind(entity_type, provenance.engine),
+        page=provenance.page,
+        context=getattr(item, "context"),
+    )
 def _entity_type_label(entity: CorrelationEntity) -> str:
     base = _TYPE_LABELS.get(entity.entity_type, entity.entity_type.value)
     if entity.semantic_role == "declared_hash":
@@ -351,8 +367,8 @@ def _source_label(engine: str) -> str:
 
 def _provenance_label(provenance: object) -> str:
     parts = [_source_label(str(getattr(provenance, "engine", "fonte técnica")))]
-    field = getattr(provenance, "field", None)
-    path = getattr(provenance, "path", None)
+    field = getattr(provenance, "field", None) or getattr(provenance, "metadata_key", None)
+    path = getattr(provenance, "json_path", None) or getattr(provenance, "path", None)
     page = getattr(provenance, "page", None)
     if field:
         parts.append(presentation_field_label(str(field)))
@@ -360,6 +376,27 @@ def _provenance_label(provenance: object) -> str:
         parts.append(str(path))
     if page is not None:
         parts.append(f"Página {page}")
+    coordinates = (
+        ("Bloco", getattr(provenance, "block", None)),
+        ("Objeto PDF", getattr(provenance, "object_number", None)),
+        ("Geração", getattr(provenance, "object_generation", None)),
+        ("Stream", getattr(provenance, "stream_id", None)),
+        ("Segmento", getattr(provenance, "segment", None)),
+        ("Marcador", getattr(provenance, "marker", None)),
+        ("Offset", getattr(provenance, "absolute_offset", None)),
+        ("Início", getattr(provenance, "offset_start", None)),
+        ("Fim", getattr(provenance, "offset_end", None)),
+        ("Linha CSV", getattr(provenance, "csv_row", None)),
+        ("Coluna CSV", getattr(provenance, "csv_column", None)),
+        ("XMP", getattr(provenance, "xmp_key", None)),
+    )
+    parts.extend(f"{label} {value}" for label, value in coordinates if value is not None)
+    precision = getattr(provenance, "timestamp_precision", None)
+    timezone = getattr(provenance, "timezone_status", None)
+    if precision:
+        parts.append(f"Precisão {precision}")
+    if timezone:
+        parts.append(f"Fuso {timezone}")
     return " · ".join(parts)
 
 
@@ -397,11 +434,6 @@ def compact_hash(value: str, edge: int = 6) -> str:
     if len(value) <= edge * 2 + 1:
         return value
     return f"{value[:edge]}…{value[-edge:]}"
-
-
-def _stable(namespace: str, *values: str) -> str:
-    payload = "\x1f".join((namespace, *values)).encode("utf-8")
-    return sha256(payload).hexdigest()
 
 
 def _search_key(value: str) -> str:
