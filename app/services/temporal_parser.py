@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import TypeAlias
 
 
@@ -39,6 +39,16 @@ class ParsedTimestamp:
     utc_normalized: str | None = None
 
 
+@dataclass(frozen=True, slots=True)
+class TemporalInterval:
+    """Half-open interval represented by the precision declared in evidence."""
+
+    start: datetime
+    end: datetime
+    precision: str
+    timezone_status: str
+
+
 class TemporalParser:
     """Parser conservador: reconhece formatos, mas nunca completa para exposicao."""
 
@@ -57,13 +67,17 @@ class TemporalParser:
             return None
         parts = match.groupdict()
         precision = self._precision(parts)
+        timezone_token = parts.get("tz")
+        timezone_value = self._timezone(timezone_token)
+        if timezone_token and timezone_value is None:
+            return None
         try:
             dt = datetime(
                 int(parts["year"]), int(parts.get("month") or 1), int(parts.get("day") or 1),
                 int(parts.get("hour") or 0), int(parts.get("minute") or 0),
                 int(parts.get("second") or 0),
                 int((parts.get("fraction") or "0").ljust(6, "0")),
-                tzinfo=self._timezone(parts.get("tz")),
+                tzinfo=timezone_value,
             )
         except ValueError:
             return None
@@ -88,6 +102,46 @@ class TemporalParser:
             ordered.second, ordered.microsecond,
         )
         return (0 if aware else 1, components, parsed.normalized)
+
+    def interval(self, value: object) -> TemporalInterval | None:
+        """Expand only the precision present in evidence into ``[start, end)``.
+
+        The interval preserves the timestamp's timezone domain.  In particular,
+        a naive value remains naive and is never assigned the host timezone.
+        """
+        parsed = value if isinstance(value, ParsedTimestamp) else self.parse(value)
+        if parsed is None:
+            return None
+        start = parsed.comparable
+        try:
+            if parsed.precision == "year":
+                end = start.replace(year=start.year + 1)
+            elif parsed.precision == "month":
+                end = (
+                    start.replace(year=start.year + 1, month=1)
+                    if start.month == 12
+                    else start.replace(month=start.month + 1)
+                )
+            elif parsed.precision == "day":
+                end = start + timedelta(days=1)
+            elif parsed.precision == "minute":
+                end = start + timedelta(minutes=1)
+            elif parsed.precision == "second":
+                end = start + timedelta(seconds=1)
+            elif parsed.precision == "millisecond":
+                end = start + timedelta(milliseconds=1)
+            elif parsed.precision == "microsecond":
+                end = start + timedelta(microseconds=1)
+            else:
+                return None
+        except (OverflowError, ValueError):
+            return None
+        return TemporalInterval(
+            start=start,
+            end=end,
+            precision=parsed.precision,
+            timezone_status=parsed.timezone_status,
+        )
 
     @staticmethod
     def _precision(parts: dict[str, str | None]) -> str:

@@ -86,7 +86,7 @@ class CrossSourceVerificationGroup:
 
     @property
     def state_counts(self) -> tuple[tuple[str, int], ...]:
-        order = ("MATCH", "MISMATCH", "UNKNOWN", "NOT_APPLICABLE")
+        order = ("OBSERVADA", "MATCH", "MISMATCH", "UNKNOWN", "NOT_APPLICABLE")
         return tuple((state, sum(item.state == state for item in self.items)) for state in order)
 
 
@@ -138,7 +138,9 @@ _TYPE_LABELS = {
 _FIELD_LABELS = {
     "accessed_at": "Data de acesso", "created_at": "Data de criação",
     "modified_at": "Data de modificação", "createdate": "Data de criação",
-    "modifydate": "Data de modificação", "producer": "Produtor",
+    "creationdate": "Data de criação", "modifydate": "Data de modificação",
+    "moddate": "Data de modificação", "metadatadate": "Data de metadados",
+    "producer": "Produtor",
     "creator": "Criador", "filename": "Nome do arquivo",
     "sourcefile": "Arquivo de origem", "native_text": "Corpo do documento",
 }
@@ -233,6 +235,9 @@ def _verification_groups(
         "case.signing_time_certificate_validity": (
             "signing_time_interval", "SigningTime × intervalo temporal do certificado",
         ),
+        "case.document_date_metadata_temporal_relation": (
+            "document_date_metadata", "Data documental × metadados",
+        ),
     }
     for finding in snapshot.case_result.findings:
         definition = registry.get(finding.rule_id)
@@ -246,16 +251,25 @@ def _verification_groups(
         details = tuple(
             (_metadata_label(key), _metadata_value(key, value))
             for key, value in sorted(finding.metadata.items())
-            if key in {"algorithm", "position", "delta_seconds"}
+            if key in {
+                "algorithm", "position", "delta_seconds", "metadata_field",
+                "relation_type", "document_raw_value", "metadata_raw_value",
+                "document_normalized_value", "metadata_normalized_value",
+                "document_precision", "metadata_precision",
+                "document_timezone_status", "metadata_timezone_status",
+            }
         )
         grouped[group_key].append(CrossSourceVerification(
             finding.finding_id, group_key, group_label,
-            finding.epistemic_state.value.upper(), finding.title, finding.statement,
+            _presentation_state(finding.epistemic_state.value), finding.title, finding.statement,
             supports[0].artifact_name if supports else None,
             supports[-1].artifact_name if len(supports) > 1 else None,
             details, finding.rule_id, finding.rule_version, supports, finding.relation_id,
         ))
-    order = ("identical_hash", "declared_hash", "signing_time_interval")
+    order = (
+        "identical_hash", "declared_hash", "signing_time_interval",
+        "document_date_metadata",
+    )
     return tuple(
         CrossSourceVerificationGroup(key, items[0].group_label, tuple(items))
         for key in order if (items := grouped.get(key))
@@ -271,13 +285,45 @@ def _metadata_label(key: str) -> str:
         "signature_id": "Assinatura", "certificate_id": "Certificado",
         "signing_time_relation_id": "Relação SigningTime",
         "certificate_interval_relation_id": "Relação do intervalo",
+        "metadata_field": "Campo de metadado",
+        "relation_type": "Relação temporal observada",
+        "document_raw_value": "Data documental · valor bruto",
+        "metadata_raw_value": "Metadado · valor bruto",
+        "document_normalized_value": "Data documental · valor normalizado",
+        "metadata_normalized_value": "Metadado · valor normalizado",
+        "document_precision": "Data documental · precisão",
+        "metadata_precision": "Metadado · precisão",
+        "document_timezone_status": "Data documental · timezone",
+        "metadata_timezone_status": "Metadado · timezone",
     }.get(key, key.replace("_", " ").capitalize())
 
 
 def _metadata_value(key: str, value: object) -> str:
     if key == "position":
         return {"inside": "dentro", "before": "antes", "after": "depois"}.get(str(value), str(value))
+    if key == "relation_type":
+        return {
+            "document_date_before_metadata": "metadado posterior à data documental",
+            "document_date_after_metadata": "metadado anterior à data documental",
+            "temporal_overlap": "sobreposição temporal",
+        }.get(str(value), str(value))
+    if key in {"document_normalized_value", "metadata_normalized_value"}:
+        return format_temporal_ptbr(str(value))
+    if key in {"document_precision", "metadata_precision"}:
+        return {
+            "year": "ano", "month": "mês", "day": "dia", "minute": "minuto",
+            "second": "segundo", "millisecond": "milissegundo",
+            "microsecond": "microssegundo",
+        }.get(str(value), str(value))
+    if key in {"document_timezone_status", "metadata_timezone_status"}:
+        return {"explicit": "explícito", "unknown": "não especificado"}.get(
+            str(value), str(value),
+        )
     return str(value)
+
+
+def _presentation_state(value: str) -> str:
+    return "OBSERVADA" if value == "observed" else value.upper()
 
 
 def _from_graph_entity(
@@ -362,6 +408,7 @@ def _source_label(engine: str) -> str:
         "filesystem": "Sistema de arquivos",
         "signature_engine": "Assinatura digital",
         "timeline": "Linha temporal",
+        "contract_date_extractor": "Data documental no texto",
     }.get(engine, engine.replace("_", " ").title())
 
 

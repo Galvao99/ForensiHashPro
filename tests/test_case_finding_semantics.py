@@ -43,6 +43,7 @@ def finding(
     [
         (EpistemicState.MATCH, Severity.INFO),
         (EpistemicState.MISMATCH, Severity.INFO),
+        (EpistemicState.OBSERVED, Severity.INFO),
         (EpistemicState.MISMATCH, Severity.WARNING),
         (EpistemicState.UNKNOWN, Severity.INFO),
         (EpistemicState.UNKNOWN, Severity.WARNING),

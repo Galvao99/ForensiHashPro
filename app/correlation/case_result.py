@@ -19,6 +19,7 @@ class EpistemicState(str, Enum):
 
     MATCH = "match"
     MISMATCH = "mismatch"
+    OBSERVED = "observed"
     UNKNOWN = "unknown"
     NOT_APPLICABLE = "not_applicable"
 
@@ -65,8 +66,9 @@ class CaseFinding:
         if self.epistemic_state in {
             EpistemicState.MATCH,
             EpistemicState.MISMATCH,
+            EpistemicState.OBSERVED,
         } and not supports:
-            raise ValueError("MATCH and MISMATCH findings require factual supports.")
+            raise ValueError("Observed deterministic findings require factual supports.")
 
         object.__setattr__(self, "rule_id", rule_id)
         object.__setattr__(self, "rule_version", rule_version)

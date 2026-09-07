@@ -8,6 +8,7 @@ from app.correlation.case_result import (
     CaseFinding, CaseResult, EpistemicState, RuleExecutionLimitation,
 )
 from app.correlation.v2.engine import EvidenceGraphCorrelationEngine
+from app.correlation.v2.identity import stable_digest
 from app.correlation.v2.index import CaseEvidenceIndex
 from app.correlation.v2.models import (
     CorrelationOccurrence, CorrelationRelation, CorrelationReport,
@@ -17,6 +18,7 @@ from app.correlation.v2.providers import AnalysisResultCorrelationProvider
 from app.enum.severity import Severity
 from app.models import AnalysisResult
 from app.processing import ProcessingStatus
+from app.services.temporal_parser import TemporalInterval, TemporalParser
 
 
 class DeterministicCaseRule(Protocol):
@@ -262,6 +264,137 @@ class SigningTimeCertificateValidityRule:
         )
 
 
+class DocumentDateMetadataTemporalRule:
+    """Describe a supported same-artifact temporal relation without inference."""
+
+    rule_id = "case.document_date_metadata_temporal_relation"
+    rule_version = "1"
+    required_fact_types = frozenset({EntityType.TIMESTAMP})
+    document_role = "document_date"
+    metadata_roles = frozenset({
+        "pdf_creation_date",
+        "pdf_modify_date",
+        "xmp_create_date",
+        "xmp_modify_date",
+        "xmp_metadata_date",
+        # Compatibility for legacy ungrouped ExifTool projections.  The exact
+        # field remains in provenance and is never relabelled as PDF or XMP.
+        "metadata_creation_date",
+        "metadata_modify_date",
+        "metadata_date",
+    })
+
+    def __init__(self, parser: TemporalParser | None = None) -> None:
+        self.parser = parser or TemporalParser()
+
+    def evaluate(self, index: CaseEvidenceIndex) -> tuple[CaseFinding, ...]:
+        documents_by_artifact = _occurrences_by_artifact(
+            index.by_semantic_role(self.document_role)
+        )
+        metadata_by_artifact: dict[str, list[CorrelationOccurrence]] = {}
+        for role in sorted(self.metadata_roles):
+            for occurrence in index.by_semantic_role(role):
+                metadata_by_artifact.setdefault(
+                    occurrence.source_file.stable_id, []
+                ).append(occurrence)
+
+        findings: list[CaseFinding] = []
+        for artifact_id in sorted(set(documents_by_artifact) & set(metadata_by_artifact)):
+            document_occurrences = documents_by_artifact[artifact_id]
+            # Ambiguity is normal absence of a conclusion, not a rule failure.
+            if len(document_occurrences) != 1:
+                continue
+            document = document_occurrences[0]
+            for metadata in sorted(
+                metadata_by_artifact[artifact_id], key=lambda item: item.occurrence_id,
+            ):
+                relation = self._relation(document, metadata)
+                if relation is None:
+                    continue
+                relation_type = relation
+                metadata_field = (
+                    metadata.provenance.metadata_key
+                    or metadata.provenance.field
+                    or metadata.semantic_role
+                    or "metadata"
+                )
+                relation_id = stable_digest(
+                    "document-date-metadata-relation-v1",
+                    [
+                        self.rule_id,
+                        self.rule_version,
+                        artifact_id,
+                        document.occurrence_id,
+                        metadata.occurrence_id,
+                        metadata.semantic_role,
+                        relation_type,
+                    ],
+                )
+                findings.append(CaseFinding(
+                    rule_id=self.rule_id,
+                    rule_version=self.rule_version,
+                    epistemic_state=EpistemicState.OBSERVED,
+                    severity=Severity.INFO,
+                    title=f"Data documental × {metadata_field}",
+                    statement=_document_metadata_statement(
+                        str(metadata_field), relation_type,
+                    ),
+                    supporting_occurrence_ids=(
+                        document.occurrence_id, metadata.occurrence_id,
+                    ),
+                    relation_id=relation_id,
+                    metadata={
+                        "artifact_id": artifact_id,
+                        "document_fact_id": document.entity_id,
+                        "metadata_fact_id": metadata.entity_id,
+                        "document_occurrence_id": document.occurrence_id,
+                        "metadata_occurrence_id": metadata.occurrence_id,
+                        "document_role": document.semantic_role,
+                        "metadata_role": metadata.semantic_role,
+                        "metadata_field": metadata_field,
+                        "document_raw_value": document.raw_value,
+                        "metadata_raw_value": metadata.raw_value,
+                        "document_normalized_value": document.normalized_value,
+                        "metadata_normalized_value": metadata.normalized_value,
+                        "document_precision": document.provenance.timestamp_precision,
+                        "metadata_precision": metadata.provenance.timestamp_precision,
+                        "document_timezone_status": document.provenance.timezone_status,
+                        "metadata_timezone_status": metadata.provenance.timezone_status,
+                        "relation_type": relation_type,
+                    },
+                ))
+        return tuple(sorted(findings, key=lambda item: item.finding_id))
+
+    def _relation(
+        self,
+        document: CorrelationOccurrence,
+        metadata: CorrelationOccurrence,
+    ) -> str | None:
+        if (
+            not document.provenance.timestamp_precision
+            or not metadata.provenance.timestamp_precision
+            or not document.provenance.timezone_status
+            or not metadata.provenance.timezone_status
+        ):
+            return None
+        document_parsed = self.parser.parse(document.normalized_value)
+        metadata_parsed = self.parser.parse(metadata.normalized_value)
+        if document_parsed is None or metadata_parsed is None:
+            return None
+        if (
+            document_parsed.precision != document.provenance.timestamp_precision
+            or metadata_parsed.precision != metadata.provenance.timestamp_precision
+            or document_parsed.timezone_status != document.provenance.timezone_status
+            or metadata_parsed.timezone_status != metadata.provenance.timezone_status
+        ):
+            return None
+        document_interval = self.parser.interval(document_parsed)
+        metadata_interval = self.parser.interval(metadata_parsed)
+        if document_interval is None or metadata_interval is None:
+            return None
+        return _compare_temporal_intervals(document_interval, metadata_interval)
+
+
 @dataclass(frozen=True, slots=True)
 class CanonicalCasePipelineResult:
     graph: CorrelationReport
@@ -284,6 +417,7 @@ class CanonicalCasePipeline:
         self.rules = tuple(rules) if rules is not None else (
             IdenticalCalculatedHashRule(), DeclaredHashVerificationRule(),
             SigningTimeCertificateValidityRule(),
+            DocumentDateMetadataTemporalRule(),
         )
 
     def analyze(self, case_id: str, results: Sequence[AnalysisResult]) -> CanonicalCasePipelineResult:
@@ -351,3 +485,51 @@ def _temporal_value(value: str) -> datetime | None:
 
 def _utc_if_aware(value: datetime) -> datetime:
     return value.astimezone(timezone.utc) if value.utcoffset() is not None else value
+
+
+def _occurrences_by_artifact(
+    occurrences: Sequence[CorrelationOccurrence],
+) -> dict[str, tuple[CorrelationOccurrence, ...]]:
+    grouped: dict[str, list[CorrelationOccurrence]] = {}
+    for occurrence in occurrences:
+        grouped.setdefault(occurrence.source_file.stable_id, []).append(occurrence)
+    return {
+        artifact_id: tuple(sorted(values, key=lambda item: item.occurrence_id))
+        for artifact_id, values in grouped.items()
+    }
+
+
+def _compare_temporal_intervals(
+    document: TemporalInterval,
+    metadata: TemporalInterval,
+) -> str | None:
+    document_aware = document.start.utcoffset() is not None
+    metadata_aware = metadata.start.utcoffset() is not None
+    if document_aware != metadata_aware:
+        return None
+    document_start = _utc_if_aware(document.start)
+    document_end = _utc_if_aware(document.end)
+    metadata_start = _utc_if_aware(metadata.start)
+    metadata_end = _utc_if_aware(metadata.end)
+    if document_end <= metadata_start:
+        return "document_date_before_metadata"
+    if metadata_end <= document_start:
+        return "document_date_after_metadata"
+    return "temporal_overlap"
+
+
+def _document_metadata_statement(metadata_field: str, relation: str) -> str:
+    if relation == "document_date_before_metadata":
+        return (
+            f"O valor temporal registrado no campo {metadata_field} é posterior ao "
+            "intervalo representado pela data documental observada no mesmo artefato."
+        )
+    if relation == "document_date_after_metadata":
+        return (
+            f"O valor temporal registrado no campo {metadata_field} é anterior ao "
+            "intervalo representado pela data documental observada no mesmo artefato."
+        )
+    return (
+        f"O intervalo temporal registrado no campo {metadata_field} se sobrepõe ao "
+        "intervalo representado pela data documental observada no mesmo artefato."
+    )
