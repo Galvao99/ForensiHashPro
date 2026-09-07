@@ -6,7 +6,7 @@ import indexHtml from '../../index.html?raw'
 const routeTitles: Array<[string, string]> = [
   ['/', 'ARQEN | Infraestrutura para Evidências Digitais'],
   ['/ddna', 'DDNA | Custódia e Proveniência Digital — ARQEN'],
-  ['/forensihash', 'ForensiHash | Análise de Artefatos Digitais — ARQEN'],
+  ['/forensihash', 'ForensiHash | Análise e correlação de evidências — ARQEN'],
   ['/references', 'Referências Técnicas e Jurídicas | ARQEN'],
   ['/login', 'Acessar plataforma | ARQEN'],
   ['/register', 'Criar conta | ForensiHash'],

@@ -39,7 +39,7 @@ export function HomePage() {
         <p className="lead">Produtos distintos para etapas complementares do ciclo de evidências digitais, sob uma única arquitetura de marca.</p>
         <div className="solution-grid">
           <article className="solution-card solution-card--ddna"><span className="solution-index">01 / DIGITAL CUSTODY · PROVENANCE</span><div><h3>DDNA</h3><p>Infraestrutura proposta para registrar o estado de artefatos digitais, contexto, relações e histórico de custódia a partir de um marco T0, permitindo verificações posteriores.</p></div><Link to="/ddna">Conhecer DDNA <span aria-hidden="true">↗</span></Link><small>RESEARCH / DEVELOPMENT</small></article>
-          <article className="solution-card solution-card--forensi"><span className="solution-index">02 / DIGITAL ANALYSIS</span><div><h3>ForensiHash</h3><p>Ferramenta de análise técnica de artefatos digitais, hashes, metadados, estrutura, timeline, correlações e outros elementos disponíveis no produto.</p></div><Link to="/forensihash">Conhecer ForensiHash <span aria-hidden="true">↗</span></Link><small>PRODUTO EM DESENVOLVIMENTO</small></article>
+          <article className="solution-card solution-card--forensi"><span className="solution-index">02 / DIGITAL ANALYSIS</span><div><h3>ForensiHash</h3><p>Plataforma desktop de análise técnica e correlação de evidências presentes em arquivos digitais, com proveniência e revisão pelo perito.</p></div><Link to="/forensihash">Conhecer ForensiHash <span aria-hidden="true">↗</span></Link><small>PRODUTO EM DESENVOLVIMENTO</small></article>
         </div>
       </Section>
 
