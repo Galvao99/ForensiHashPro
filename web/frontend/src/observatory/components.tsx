@@ -1,6 +1,14 @@
 import { Link } from 'react-router-dom'
-import type { ResearchSource, ResearchStatus, StateResearch } from './models'
-import { COVERAGE_LABELS, STATUS_LABELS, professionalsPer100k } from './models'
+import type { ResearchMetric, ResearchSource, ResearchStatus, StateResearch } from './models'
+import {
+  COUNT_TYPE_LABELS, COVERAGE_LABELS, METHODOLOGY_LABELS, STATUS_LABELS,
+  UNIT_LABELS, metricFor,
+} from './models'
+
+export function formatResearchDate(value: string): string {
+  const [year, month, day] = value.split('-')
+  return `${day}/${month}/${year}`
+}
 
 export function BackLink({ to = '/observatorio', children = 'Voltar ao Observatório' }: { to?: string; children?: string }) {
   return <nav className="observatory-back" aria-label="Navegação de retorno"><Link to={to}>← {children}</Link></nav>
@@ -11,35 +19,48 @@ export function ResearchStatusBadge({ status }: { status: ResearchStatus }) {
 }
 
 export function SourceList({ sources }: { sources: ResearchSource[] }) {
-  if (!sources.length) return <p className="observatory-empty">Fontes ainda não incorporadas.</p>
+  if (!sources.length) return <p className="observatory-empty">Fonte documental ainda não incorporada à publicação.</p>
   return <ol className="observatory-sources">{sources.map(source => <li key={source.id}>
-    <div><strong>{source.title}</strong><span>{source.organization} · acesso em {source.accessedAt}</span>{source.description && <p>{source.description}</p>}</div>
+    <div>
+      <strong>{source.title}</strong>
+      <span>{source.institution} · {source.sourceType} · acesso em {formatResearchDate(source.accessedAt)}</span>
+      {source.description && <p>{source.description}</p>}
+    </div>
     <a href={source.url} target="_blank" rel="noopener noreferrer">Consultar fonte original ↗</a>
   </li>)}</ol>
 }
 
-export function Metric({ label, value }: { label: string; value?: number | string }) {
-  return <div><strong>{value === undefined ? 'Dados em consolidação' : typeof value === 'number' ? value.toLocaleString('pt-BR') : value}</strong><span>{label}</span></div>
+export function ResearchMetricCard({ metric }: { metric: ResearchMetric }) {
+  return <div className="research-metric">
+    <span>{metric.label}</span>
+    <strong>{metric.value.toLocaleString('pt-BR')}</strong>
+    <p>{UNIT_LABELS[metric.unit]}</p>
+    <small>{COUNT_TYPE_LABELS[metric.countType]} · {METHODOLOGY_LABELS[metric.methodologyType]}</small>
+  </div>
 }
 
 export function StateResearchList({ states }: { states: StateResearch[] }) {
-  return <div className="state-research-list">{states.map(state => <article key={state.uf}>
-    <div><span className="state-uf">{state.uf}</span><h3>{state.stateName}</h3></div>
-    <ResearchStatusBadge status={state.status} />
-    <p>{state.digitalCoreCount === undefined ? 'Sem quantitativo consolidado' : `${state.digitalCoreCount.toLocaleString('pt-BR')} · Núcleo digital/TI`}</p>
-    <small>{COVERAGE_LABELS[state.coverage]}</small>
-    <Link to={`/observatorio/estado/${state.uf.toLowerCase()}`}>Ver estado</Link>
-  </article>)}</div>
+  return <div className="state-research-list">{states.map(state => {
+    const digital = metricFor(state, 'DIGITAL')
+    return <article key={state.uf}>
+      <div><span className="state-uf">{state.uf}</span><h3>{state.stateName}</h3></div>
+      <ResearchStatusBadge status={state.status} />
+      <p>{digital ? `${digital.value.toLocaleString('pt-BR')} · ${digital.label}` : 'Sem quantitativo de Núcleo Digital'}</p>
+      <small>{COVERAGE_LABELS[state.coverage]}</small>
+      <Link to={`/observatorio/estado/${state.uf.toLowerCase()}`}>Ver ficha metodológica</Link>
+    </article>
+  })}</div>
 }
 
 export function StateMetrics({ state }: { state: StateResearch }) {
-  const perCapita = professionalsPer100k(state)
-  return <div className="observatory-metrics">
-    <Metric label="Registros encontrados" value={state.sourceRecordsCount} />
-    <Metric label="Profissionais únicos identificados" value={state.uniqueProfessionalsCount} />
-    <Metric label="Profissionais do núcleo digital/TI" value={state.digitalCoreCount} />
-    {state.researchedSubsetUniqueCount !== undefined && <Metric label="Profissionais únicos no recorte pesquisado" value={state.researchedSubsetUniqueCount} />}
-    {state.credentialSpecialtyCount !== undefined && <Metric label="Credenciais/especialidades observadas — não representa pessoas" value={state.credentialSpecialtyCount} />}
-    <Metric label="Profissionais cadastrados por 100 mil habitantes" value={perCapita === undefined ? undefined : perCapita.toLocaleString('pt-BR', { maximumFractionDigits: 1 })} />
+  if (!state.metrics.length) return <p className="observatory-empty">Nenhum quantitativo foi publicado para esta UF.</p>
+  return <div className="state-metric-grid">{state.metrics.map(metric => <ResearchMetricCard key={metric.metricId} metric={metric} />)}</div>
+}
+
+export function MethodologicalNotice() {
+  return <div className="methodological-notice" role="note" aria-label="Aviso metodológico">
+    <strong>Pesquisa em andamento</strong>
+    <p>Os quantitativos representam resultados observados nas bases públicas consultadas. Não constituem censo oficial nem contagem definitiva de profissionais em atividade.</p>
+    <p>Os números podem aumentar ou diminuir após novas coletas, atualizações dos tribunais, deduplicações, revisões de classificação ou aprimoramentos metodológicos.</p>
   </div>
 }

@@ -1,170 +1,181 @@
-import { cleanup, render, screen, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { App } from '../App'
+import { bubbleRadius } from '../observatory/BrazilResearchMap'
 import { SourceList } from '../observatory/components'
-import { cnjResolution233, stateResearch } from '../observatory/data'
-import { comparableRanking, professionalsPer100k, validateStateResearch, type StateResearch } from '../observatory/models'
+import { cnjResolution233, researchRevisions, researchSnapshots, stateResearch } from '../observatory/data'
+import { metricFor, validateStateResearch } from '../observatory/models'
 
 function renderAt(path: string) {
   window.history.pushState({}, '', path)
   return render(<App />)
 }
 
-const completed: StateResearch = {
-  uf: 'RJ', stateName: 'Rio de Janeiro', status: 'COMPLETED', sourceRecordsCount: 12165,
-  uniqueProfessionalsCount: 10804, specialtiesCount: 1957, methodologyVersion: 'v1.0',
-  coverage: 'INTEGRAL_DEDUPLICATED',
-  population: { value: 17_000_000, referenceYear: 2025, source: cnjResolution233 },
-  limitations: [], sources: [cnjResolution233],
-}
-
-describe('Observatório da Perícia Judicial', () => {
+describe('Observatório da Perícia Judicial — pesquisa V1', () => {
   beforeEach(() => vi.stubGlobal('fetch', vi.fn(() => Promise.resolve({ ok: false, status: 401, json: async () => ({}) } as Response))))
 
-  it('é público, renderiza sem autenticação e está na navbar', () => {
+  it('é público, explicita pesquisa em andamento e oferece metodologia clicável', () => {
     renderAt('/observatorio')
-    expect(screen.getByRole('heading', { level: 1, name: /dados, normas e transformações/i })).toBeInTheDocument()
-    expect(screen.getAllByRole('link', { name: 'Observatório' })[0]).toHaveAttribute('href', '/observatorio')
-    expect(screen.getByText('Pesquisa Nacional 2026')).toBeInTheDocument()
-    expect(screen.getByText('Pesquisa em andamento')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1, name: /o que já sabemos/i })).toBeInTheDocument()
+    expect(screen.getAllByText(/pesquisa em andamento/i).length).toBeGreaterThan(0)
+    expect(screen.getByRole('link', { name: 'Pesquisa e Metodologia' })).toHaveAttribute('href', '/observatorio/metodologia')
+    expect(screen.getByText(/não constituem censo oficial/i)).toBeInTheDocument()
+    expect(screen.getByText(/podem aumentar ou diminuir/i)).toBeInTheDocument()
+  })
+
+  it('renderiza mapa geográfico local com paths das 27 UFs', () => {
+    const { container } = renderAt('/observatorio')
+    const map = screen.getByRole('group', { name: /mapa geográfico interativo do brasil/i })
+    expect(within(map).getAllByRole('button')).toHaveLength(27)
+    expect(container.querySelectorAll('.map-state path')).toHaveLength(27)
+    expect(container.querySelectorAll('.map-state rect')).toHaveLength(0)
+    expect(map).toHaveAttribute('viewBox', '0 0 600 600')
+  })
+
+  it('usa raiz quadrada no raio para tornar a área proporcional', () => {
+    const small = bubbleRadius(100, 10_000)
+    const large = bubbleRadius(400, 10_000)
+    expect(large / small).toBeCloseTo(2)
+    expect((large * large) / (small * small)).toBeCloseTo(4)
+  })
+
+  it('não cria bolha nem zero para métrica ausente', async () => {
+    const { container } = renderAt('/observatorio')
+    await userEvent.click(screen.getByRole('button', { name: 'Cadastro Geral' }))
+    const acre = screen.getByRole('button', { name: /Acre, AC.*Sem quantitativo consolidado/i })
+    expect(acre.querySelector('circle')).toBeNull()
+    await userEvent.click(acre)
+    expect(screen.getByRole('complementary')).toHaveTextContent('Sem quantitativo consolidado')
+    expect(container.textContent).not.toContain('0 profissionais')
+  })
+
+  it('alterna Núcleo Digital e Cadastro Geral preservando a UF selecionada', async () => {
+    renderAt('/observatorio')
+    const amapa = screen.getByRole('button', { name: /Amapá, AP.*Núcleo Digital.*11/i })
+    await userEvent.click(amapa)
+    expect(screen.getByRole('complementary')).toHaveTextContent('Amapá')
+    await userEvent.click(screen.getByRole('button', { name: 'Cadastro Geral' }))
+    expect(screen.getByRole('button', { name: 'Cadastro Geral' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('complementary')).toHaveTextContent('352')
+    expect(screen.getByRole('complementary')).toHaveTextContent('Amapá')
+    await userEvent.click(screen.getByRole('button', { name: 'Núcleo Digital' }))
+    expect(screen.getByRole('complementary')).toHaveTextContent('11')
+  })
+
+  it('mostra Outras especialidades como levantamento sem bolhas fictícias', async () => {
+    const { container } = renderAt('/observatorio')
+    await userEvent.click(screen.getByRole('button', { name: /Outras especialidades/i }))
+    expect(screen.getByRole('heading', { name: /Outras especialidades — em levantamento/i })).toBeInTheDocument()
+    expect(container.querySelectorAll('.map-bubble')).toHaveLength(0)
+    expect(screen.getByRole('complementary')).toHaveTextContent('Em levantamento')
+  })
+
+  it('oferece hover, tooltip e seleção persistente sem navegação automática', async () => {
+    renderAt('/observatorio')
+    const amapa = screen.getByRole('button', { name: /Amapá, AP/i })
+    fireEvent.mouseEnter(amapa)
+    expect(screen.getByRole('tooltip')).toHaveTextContent('AP · Núcleo Digital')
+    expect(screen.getByRole('tooltip')).toHaveTextContent('11')
+    await userEvent.click(amapa)
+    fireEvent.mouseLeave(amapa)
+    expect(screen.getByRole('complementary')).toHaveTextContent('Amapá')
     expect(window.location.pathname).toBe('/observatorio')
   })
 
-  it('não apresenta desconhecido ou NOT_STARTED como zero', () => {
-    const { container } = renderAt('/observatorio')
-    expect(screen.getAllByText('Não iniciado').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('Em levantamento').length).toBeGreaterThan(0)
-    expect(container.textContent).not.toContain('0 profissionais')
-    expect(container.textContent).not.toContain('27 estados analisados')
+  it('seleciona UF por teclado e expõe CTA para a ficha metodológica', async () => {
+    renderAt('/observatorio')
+    const amapa = screen.getByRole('button', { name: /Amapá, AP/i })
+    amapa.focus()
+    await userEvent.keyboard('{Enter}')
+    expect(within(screen.getByRole('complementary')).getByRole('link', { name: /ver metodologia deste estado/i })).toHaveAttribute('href', '/observatorio/estado/ap')
   })
 
-  it('carrega detalhe por UF com status, métricas distintas e limitações', () => {
-    renderAt('/observatorio/estado/rj')
-    expect(screen.getByRole('heading', { level: 1, name: 'Rio de Janeiro' })).toBeInTheDocument()
-    expect(screen.getByText('Registros encontrados')).toBeInTheDocument()
-    expect(screen.getByText('Profissionais únicos identificados')).toBeInTheDocument()
-    expect(screen.getByText(/A presença no cadastro não implica atuação efetiva/i)).toBeInTheDocument()
-    expect(screen.getAllByText('Dados em consolidação').length).toBeGreaterThan(0)
+  it('preserva os quantitativos publicados e seus tipos de contagem', () => {
+    const byUf = Object.fromEntries(stateResearch.map(state => [state.uf, state]))
+    expect(metricFor(byUf.RJ, 'SOURCE_RECORDS')).toMatchObject({ value: 12165, countType: 'ADMINISTRATIVE_COUNT', unit: 'SOURCE_RECORDS' })
+    expect(metricFor(byUf.RJ, 'GENERAL')).toMatchObject({ value: 10804, countType: 'OBSERVED_COUNT', unit: 'UNIQUE_PROFESSIONALS' })
+    expect(metricFor(byUf.RJ, 'DIGITAL')?.value).toBe(187)
+    expect(metricFor(byUf.SE, 'SOURCE_RECORDS')?.value).toBe(1999)
+    expect(metricFor(byUf.SE, 'DIGITAL')?.value).toBe(45)
+    expect(metricFor(byUf.PI, 'RESEARCHED_SUBSET')).toMatchObject({ value: 374, countType: 'SUBSET_COUNT' })
+    expect(metricFor(byUf.PI, 'DIGITAL')?.value).toBe(51)
+    expect(metricFor(byUf.AP, 'GENERAL')?.value).toBe(352)
+    expect(metricFor(byUf.AP, 'DIGITAL')?.value).toBe(11)
+    expect(metricFor(byUf.PA, 'SOURCE_RECORDS')?.value).toBe(918)
+    expect(metricFor(byUf.PA, 'GENERAL')?.value).toBe(577)
+    expect(metricFor(byUf.PA, 'DIGITAL')?.value).toBe(10)
+    expect(metricFor(byUf.TO, 'SOURCE_RECORDS')?.value).toBe(5272)
+    expect(metricFor(byUf.TO, 'DIGITAL')).toMatchObject({ value: 116, countType: 'SUBSET_COUNT', unit: 'CLASSIFIED_RECORDS' })
+    expect(metricFor(byUf.RR, 'DIGITAL')?.value).toBe(13)
+    expect(metricFor(byUf.PR, 'CREDENTIAL_SPECIALTIES')).toMatchObject({ value: 35373, countType: 'ADMINISTRATIVE_COUNT', unit: 'CREDENTIALS_AND_SPECIALTIES' })
+    expect(metricFor(byUf.PR, 'GENERAL')).toBeUndefined()
   })
 
-  it('expõe título, organização e URL original da fonte', () => {
+  it('não apresenta pesquisa parcial como consolidada', () => {
+    renderAt('/observatorio/estado/pi')
+    expect(screen.getAllByText('Parcial').length).toBeGreaterThan(0)
+    expect(screen.queryByText('Consolidado')).not.toBeInTheDocument()
+    expect(screen.getAllByText(/não representa a base integral/i).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/contagem de recorte/i).length).toBeGreaterThan(0)
+  })
+
+  it('não apresenta credenciais administrativas como pessoas únicas', () => {
+    renderAt('/observatorio/estado/pr')
+    expect(screen.getByText('35.373')).toBeInTheDocument()
+    expect(screen.getAllByText(/não equivale a pessoas únicas/i).length).toBeGreaterThan(0)
+    expect(screen.getByText('Dado administrativo')).toBeInTheDocument()
+    expect(screen.queryByText('Cadastro Geral')).not.toBeInTheDocument()
+  })
+
+  it('publica fonte oficial clicável com instituição, data e tipo', () => {
     render(<MemoryRouter><SourceList sources={[cnjResolution233]} /></MemoryRouter>)
     expect(screen.getByText(cnjResolution233.title)).toBeInTheDocument()
-    expect(screen.getByText(/Conselho Nacional de Justiça/)).toBeInTheDocument()
+    expect(screen.getByText(/Conselho Nacional de Justiça · CNJ_ACT · acesso em 05\/09\/2026/)).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /consultar fonte original/i })).toHaveAttribute('href', cnjResolution233.url)
   })
 
-  it('radar associa conteúdo factual à fonte primária', () => {
-    renderAt('/observatorio')
-    const radar = screen.getByRole('heading', { name: 'Radar Regulatório' }).closest('section')!
-    expect(within(radar).getByText(/Resolução CNJ nº 233 estrutura/)).toBeInTheDocument()
-    expect(within(radar).getByRole('link', { name: /consultar fonte original/i })).toHaveAttribute('href', cnjResolution233.url)
-    expect(within(radar).getByText(/não constitui aconselhamento jurídico/i)).toBeInTheDocument()
-  })
-
-  it('calcula per capita somente com numerador e população conhecidos', () => {
-    expect(professionalsPer100k(completed)).toBeCloseTo(63.5529, 4)
-    expect(professionalsPer100k({ ...completed, uniqueProfessionalsCount: undefined })).toBeUndefined()
-    expect(professionalsPer100k({ ...completed, population: undefined })).toBeUndefined()
-  })
-
-  it('ranking exclui estados incompletos mesmo quando possuem números', () => {
-    const partial = { ...completed, uf: 'SP', stateName: 'São Paulo', status: 'PARTIAL' as const, uniqueProfessionalsCount: 99999 }
-    const ranking = comparableRanking([partial, completed], state => state.uniqueProfessionalsCount)
-    expect(ranking.map(item => item.state.uf)).toEqual(['RJ'])
-  })
-
-  it('valida UF, contagens e denominador sem converter inválidos em zero', () => {
-    expect(() => validateStateResearch(completed)).not.toThrow()
-    expect(() => validateStateResearch({ ...completed, uf: 'XX' })).toThrow(/Invalid UF/)
-    expect(() => validateStateResearch({ ...completed, uniqueProfessionalsCount: -1 })).toThrow(/uniqueProfessionalsCount/)
-  })
-
-  it('publica metodologia e limitação central', () => {
+  it('publica página completa de metodologia, glossário e dificuldades observadas', () => {
     renderAt('/observatorio/metodologia')
-    expect(screen.getByRole('heading', { level: 1, name: /como a pesquisa é estruturada/i })).toBeInTheDocument()
-    expect(screen.getByText(/não implica necessariamente atuação efetiva/i)).toBeInTheDocument()
-    expect(screen.getByText(/não é uma pontuação automática de verdade/i)).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /voltar ao observatório/i })).toHaveAttribute('href', '/observatorio')
+    expect(screen.getByRole('heading', { level: 1, name: /como sabemos/i })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Glossário metodológico' })).toBeInTheDocument()
+    expect(screen.getByText('Profissional único identificado')).toBeInTheDocument()
+    expect(screen.getByText(/categoria metodológica da pesquisa Arqen/i)).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /como os dados puderam ser consolidados/i })).toBeInTheDocument()
+    expect(screen.getByText(/não classifica tribunais como melhores ou piores/i)).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Contexto institucional e normativo' })).toBeInTheDocument()
   })
 
-  it('renderiza mapa local com as 27 UFs e foco digital por padrão', () => {
+  it('mantém snapshots estruturados sem inventar revisões', () => {
+    expect(researchSnapshots.length).toBeGreaterThan(0)
+    expect(researchSnapshots.every(snapshot => snapshot.version === 'v1.1')).toBe(true)
+    expect(researchRevisions).toEqual([])
+    renderAt('/observatorio/estado/rj')
+    expect(screen.getByRole('heading', { name: 'Histórico da pesquisa' })).toBeInTheDocument()
+    expect(screen.getByText(/Nenhuma revisão histórica documentada/i)).toBeInTheDocument()
+  })
+
+  it('valida fonte e snapshot obrigatórios para todo quantitativo', () => {
+    const rj = stateResearch.find(state => state.uf === 'RJ')!
+    expect(() => validateStateResearch(rj)).not.toThrow()
+    expect(() => validateStateResearch({ ...rj, uf: 'XX' })).toThrow(/Invalid UF/)
+    expect(() => validateStateResearch({ ...rj, sources: [] })).toThrow(/Metric source is missing/)
+    expect(() => validateStateResearch({ ...rj, snapshots: [] })).toThrow(/Metric snapshot is missing/)
+  })
+
+  it('não cria ranking nacional na página', () => {
     const { container } = renderAt('/observatorio')
-    const map = screen.getByRole('group', { name: /mapa esquemático interativo do brasil/i })
-    expect(within(map).getAllByRole('button')).toHaveLength(27)
-    expect(container.querySelectorAll('.map-state')).toHaveLength(27)
-    expect(screen.getByRole('button', { name: 'Núcleo digital/TI' })).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByText(/lista abaixo é uma alternativa integral ao mapa/i)).toBeInTheDocument()
+    expect(container.querySelector('.observatory-rankings')).toBeNull()
+    expect(screen.queryByRole('heading', { name: /ranking/i })).not.toBeInTheDocument()
   })
 
-  it('importa valores observados sem colapsar registros, pessoas, recortes e credenciais', () => {
-    const byUf = Object.fromEntries(stateResearch.map(state => [state.uf, state]))
-    expect(byUf.RJ).toMatchObject({ sourceRecordsCount: 12165, uniqueProfessionalsCount: 10804, digitalCoreCount: 187, status: 'COMPLETED' })
-    expect(byUf.SE).toMatchObject({ sourceRecordsCount: 1999, digitalCoreCount: 45 })
-    expect(byUf.PI).toMatchObject({ researchedSubsetUniqueCount: 374, digitalCoreCount: 51, coverage: 'TERM_BASED_SUBSET' })
-    expect(byUf.AP.digitalCoreCount).toBe(11)
-    expect(byUf.PA).toMatchObject({ sourceRecordsCount: 918, uniqueProfessionalsCount: 577, digitalCoreCount: 10 })
-    expect(byUf.TO).toMatchObject({ sourceRecordsCount: 5272, digitalCoreCount: 116, status: 'PARTIAL' })
-    expect(byUf.RR).toMatchObject({ researchedSubsetUniqueCount: 13, digitalCoreCount: 13, status: 'PARTIAL' })
-    expect(byUf.PR).toMatchObject({ credentialSpecialtyCount: 35373, coverage: 'CREDENTIALS_ONLY' })
-    expect(byUf.PR.uniqueProfessionalsCount).toBeUndefined()
-  })
-
-  it('troca para cadastro geral sem converter ausência em zero', async () => {
-    renderAt('/observatorio')
-    await userEvent.click(screen.getByRole('button', { name: 'Cadastro geral' }))
-    expect(screen.getByRole('button', { name: 'Cadastro geral' })).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getAllByText('10.804').length).toBeGreaterThan(0)
-    await userEvent.click(screen.getByRole('button', { name: /Acre, AC\. Sem quantitativo consolidado/i }))
-    expect(screen.getByRole('complementary')).toHaveTextContent('Sem quantitativo consolidado')
-    expect(screen.getByRole('complementary')).not.toHaveTextContent(/^0$/)
-  })
-
-  it('seleciona estado por teclado e oferece navegação essencial sem hover', async () => {
-    renderAt('/observatorio')
-    const amapa = screen.getByRole('button', { name: /Amapá, AP\. 11 profissionais do núcleo digital/i })
-    amapa.focus()
-    await userEvent.keyboard('{Enter}')
-    expect(screen.getByRole('complementary')).toHaveTextContent('Amapá')
-    expect(within(screen.getByRole('complementary')).getByRole('link', { name: /ver detalhes/i })).toHaveAttribute('href', '/observatorio/estado/ap')
-  })
-
-  it('detalhes preservam qualificadores parciais e retorno explícito', () => {
-    renderAt('/observatorio/estado/pi')
-    expect(screen.getByText('51')).toBeInTheDocument()
-    expect(screen.getByText('374')).toBeInTheDocument()
-    expect(screen.getByText(/profissionais únicos no recorte pesquisado/i)).toBeInTheDocument()
-    expect(screen.getByText(/não representa o cadastro integral/i)).toBeInTheDocument()
-    expect(screen.queryByText(/total de peritos do estado/i)).not.toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /voltar ao observatório/i })).toHaveAttribute('href', '/observatorio')
-  })
-
-  it('ranking geral exclui credenciais, linhas e subconjuntos', () => {
-    renderAt('/observatorio')
-    const ranking = screen.getByRole('heading', { name: /bases integrais comparáveis/i }).closest('section')!
-    expect(ranking).toHaveTextContent('RJ')
-    expect(ranking).toHaveTextContent('PA')
-    expect(ranking).toHaveTextContent('AP')
-    expect(ranking).not.toHaveTextContent('PR')
-    expect(ranking).not.toHaveTextContent('35.373')
-  })
-
-  it('usa layout responsivo sem URLs presas a largura fixa', () => {
-    render(<MemoryRouter><SourceList sources={[cnjResolution233]} /></MemoryRouter>)
-    const link = screen.getByRole('link', { name: /consultar fonte original/i })
-    expect(link.closest('li')).toBeInTheDocument()
-    expect(link).toHaveAttribute('target', '_blank')
-    expect(link).toHaveAttribute('rel', 'noopener noreferrer')
-  })
-
-  it.each([320, 375, 390, 430, 768, 1024, 1440])('mantém mapa e fallback navegável em %ipx', width => {
+  it.each([320, 375, 390, 430, 768, 1024, 1440, 1920])('mantém mapa e fallback textual em %ipx', width => {
     Object.defineProperty(window, 'innerWidth', { configurable: true, value: width })
     window.dispatchEvent(new Event('resize'))
     renderAt('/observatorio')
-    expect(screen.getByRole('group', { name: /mapa esquemático interativo/i })).toHaveAttribute('viewBox', '0 0 600 600')
-    expect(screen.getByText(/lista abaixo é uma alternativa integral ao mapa/i)).toBeInTheDocument()
+    expect(screen.getByRole('group', { name: /mapa geográfico interativo/i })).toBeInTheDocument()
+    expect(screen.getByText(/navegação textual completa/i)).toBeInTheDocument()
     expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(width)
     cleanup()
   })
