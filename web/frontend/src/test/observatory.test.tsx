@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { App } from '../App'
 import { bubbleRadius } from '../observatory/BrazilResearchMap'
 import { SourceList } from '../observatory/components'
-import { cnjResolution233, researchRevisions, researchSnapshots, stateResearch } from '../observatory/data'
+import { cnjResolution233, observedTotals, researchRevisions, researchSnapshots, specialtyDictionary, stateResearch } from '../observatory/data'
 import { metricFor, validateStateResearch } from '../observatory/models'
 
 function renderAt(path: string) {
@@ -111,6 +111,54 @@ describe('Observatório da Perícia Judicial — pesquisa V1', () => {
     expect(metricFor(byUf.RR, 'DIGITAL')?.value).toBe(13)
     expect(metricFor(byUf.PR, 'CREDENTIAL_SPECIALTIES')).toMatchObject({ value: 35373, countType: 'ADMINISTRATIVE_COUNT', unit: 'CREDENTIALS_AND_SPECIALTIES' })
     expect(metricFor(byUf.PR, 'GENERAL')).toBeUndefined()
+    expect(metricFor(byUf.MG, 'GENERAL')?.value).toBe(13644)
+    expect(metricFor(byUf.MG, 'DIGITAL')?.value).toBe(137)
+    expect(metricFor(byUf.MG, 'ADJACENT')?.value).toBe(4598)
+    expect(metricFor(byUf.MG, 'CORE_ADJACENT')?.value).toBe(4735)
+    expect(metricFor(byUf.DF, 'GENERAL')?.value).toBe(1995)
+    expect(metricFor(byUf.DF, 'DIGITAL')?.value).toBe(91)
+    expect(metricFor(byUf.DF, 'ADJACENT')).toBeUndefined()
+    expect(metricFor(byUf.DF, 'SPECIALTIES_OBSERVED')?.value).toBe(350)
+    expect(metricFor(byUf.DF, 'SPECIALTIES_CATALOG')?.value).toBe(493)
+    expect(metricFor(byUf.SP, 'GENERAL')?.value).toBe(19665)
+    expect(metricFor(byUf.SP, 'SOURCE_RECORDS')?.value).toBe(4400)
+    expect(metricFor(byUf.SP, 'RESEARCHED_SUBSET')?.value).toBe(4397)
+    expect(metricFor(byUf.SP, 'DIGITAL')?.value).toBe(220)
+    expect(metricFor(byUf.SP, 'ADJACENT')?.value).toBe(1215)
+    expect(metricFor(byUf.SP, 'CORE_ADJACENT')?.value).toBe(1435)
+  })
+
+  it('mantém os totais observados e não converte adjacente desconhecido em zero', () => {
+    expect(observedTotals).toMatchObject({ core: 881, adjacentClassified: 6690, coreAndAdjacent: 7571, scope: 'OBSERVED_APPROXIMATION' })
+    const df = stateResearch.find(state => state.uf === 'DF')!
+    expect(metricFor(df, 'ADJACENT')).toBeUndefined()
+  })
+
+  it('publica MG e DF como consolidados e mantém SP explicitamente parcial', () => {
+    renderAt('/observatorio/estado/mg')
+    expect(screen.getByText('13.644')).toBeInTheDocument()
+    expect(screen.getAllByText('Consolidado').length).toBeGreaterThan(0)
+    cleanup()
+
+    renderAt('/observatorio/estado/df')
+    expect(screen.getByText('1.995')).toBeInTheDocument()
+    expect(screen.getAllByText(/mercado adjacente não (foi )?quantificado/i).length).toBeGreaterThan(0)
+    cleanup()
+
+    renderAt('/observatorio/estado/sp')
+    expect(screen.getAllByText('Parcial').length).toBeGreaterThan(0)
+    expect(screen.getByText('19.665')).toBeInTheDocument()
+    expect(screen.getAllByText(/limites inferiores observados/i).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/não houve extrapolação/i).length).toBeGreaterThan(0)
+  })
+
+  it('registra somente as especialidades de SP fornecidas sem completar o arquivo ausente', () => {
+    expect(specialtyDictionary).toHaveLength(12)
+    expect(specialtyDictionary[0]).toMatchObject({ tribunal: 'TJSP', originalSpecialty: 'Análise de Sistemas e Tecnologias da Informação', observedCount: 105 })
+    expect(specialtyDictionary.at(-1)).toMatchObject({ originalSpecialty: 'Redes de Computadores', observedCount: 44 })
+    renderAt('/observatorio/metodologia')
+    expect(screen.getByRole('cell', { name: 'Análise de Sistemas e Tecnologias da Informação' })).toBeInTheDocument()
+    expect(screen.getByRole('cell', { name: '105' })).toBeInTheDocument()
   })
 
   it('não apresenta pesquisa parcial como consolidada', () => {
@@ -149,7 +197,7 @@ describe('Observatório da Perícia Judicial — pesquisa V1', () => {
 
   it('mantém snapshots estruturados sem inventar revisões', () => {
     expect(researchSnapshots.length).toBeGreaterThan(0)
-    expect(researchSnapshots.every(snapshot => snapshot.version === 'v1.1')).toBe(true)
+    expect(researchSnapshots.every(snapshot => snapshot.version === 'v1.2')).toBe(true)
     expect(researchRevisions).toEqual([])
     renderAt('/observatorio/estado/rj')
     expect(screen.getByRole('heading', { name: 'Histórico da pesquisa' })).toBeInTheDocument()

@@ -100,7 +100,12 @@ export function ObservatoryMethodologyPage() {
       <p>A estrutura prevê nomenclatura original, tribunal, categoria normalizada, regra de classificação, status de revisão e fonte. Nenhuma entrada será criada sem evidência documental.</p>
       {specialtyDictionary.length === 0
         ? <p className="observatory-empty">Dicionário público em preparação; nenhuma especialidade fictícia foi adicionada.</p>
-        : null}
+        : <div className="research-table-wrap"><table className="research-table">
+          <thead><tr><th>Especialidade original</th><th>Tribunal</th><th>Categoria normalizada</th><th>Quantidade observada</th></tr></thead>
+          <tbody>{specialtyDictionary.map(entry => <tr key={entry.id}>
+            <td>{entry.originalSpecialty}</td><td>{entry.tribunal}</td><td>{entry.normalizedCategory}</td><td>{entry.observedCount?.toLocaleString('pt-BR') ?? 'Não quantificado'}</td>
+          </tr>)}</tbody>
+        </table></div>}
     </Section>
 
     <Section id="historico" className="surface-section" eyebrow="VERSIONAMENTO" title="Histórico da pesquisa">

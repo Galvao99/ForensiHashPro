@@ -23,9 +23,27 @@ export interface ResearchSource {
   description?: string
 }
 
-export type ResearchMetricId = 'DIGITAL' | 'GENERAL' | 'SOURCE_RECORDS' | 'RESEARCHED_SUBSET' | 'CREDENTIAL_SPECIALTIES'
+export type ResearchMetricId =
+  | 'DIGITAL'
+  | 'ADJACENT'
+  | 'CORE_ADJACENT'
+  | 'GENERAL'
+  | 'SOURCE_RECORDS'
+  | 'RESEARCHED_SUBSET'
+  | 'CREDENTIAL_SPECIALTIES'
+  | 'SPECIALTIES_OBSERVED'
+  | 'SPECIALTIES_CATALOG'
 export type CountType = 'OBSERVED_COUNT' | 'ESTIMATE' | 'ADMINISTRATIVE_COUNT' | 'SUBSET_COUNT'
-export type CountUnit = 'UNIQUE_PROFESSIONALS' | 'IDENTIFIED_PROFESSIONALS' | 'SOURCE_RECORDS' | 'UNIQUE_PROFESSIONALS_IN_SUBSET' | 'CLASSIFIED_RECORDS' | 'CREDENTIALS_AND_SPECIALTIES'
+export type CountUnit =
+  | 'UNIQUE_PROFESSIONALS'
+  | 'IDENTIFIED_PROFESSIONALS'
+  | 'ACTIVE_REGISTRY_ENTRIES'
+  | 'PUBLICLY_VISIBLE_NAMED_EXPERTS_OR_ENTITIES'
+  | 'SOURCE_RECORDS'
+  | 'UNIQUE_PROFESSIONALS_IN_SUBSET'
+  | 'CLASSIFIED_RECORDS'
+  | 'CREDENTIALS_AND_SPECIALTIES'
+  | 'SPECIALTIES'
 export type MethodologyType = 'DIRECT_OBSERVATION' | 'DEDUPLICATED_COUNT' | 'CLASSIFIED_COUNT' | 'CLASSIFIED_DEDUPLICATED_COUNT' | 'TERM_BASED_RESEARCH' | 'EXACT_TYPE_RESEARCH'
 export type MetricComparability = 'DOCUMENTED_SCOPE_ONLY' | 'NOT_COMPARABLE'
 
@@ -39,10 +57,13 @@ export const COUNT_TYPE_LABELS: Record<CountType, string> = {
 export const UNIT_LABELS: Record<CountUnit, string> = {
   UNIQUE_PROFESSIONALS: 'profissionais únicos identificados na base consultada',
   IDENTIFIED_PROFESSIONALS: 'profissionais identificados na classificação adotada',
+  ACTIVE_REGISTRY_ENTRIES: 'cadastros ativos observados na base pública consultada',
+  PUBLICLY_VISIBLE_NAMED_EXPERTS_OR_ENTITIES: 'peritos ou entidades com nome visível na consulta pública',
   SOURCE_RECORDS: 'registros encontrados na fonte',
   UNIQUE_PROFESSIONALS_IN_SUBSET: 'profissionais únicos identificados no recorte pesquisado',
   CLASSIFIED_RECORDS: 'registros identificados nos tipos classificados',
   CREDENTIALS_AND_SPECIALTIES: 'credenciais/especialidades observadas; não equivale a pessoas únicas',
+  SPECIALTIES: 'especialidades distintas',
 }
 
 export const METHODOLOGY_LABELS: Record<MethodologyType, string> = {
@@ -94,6 +115,7 @@ export interface SpecialtyDictionaryEntry {
   classificationRule: string
   reviewStatus: 'REVIEWED' | 'UNDER_REVIEW'
   sourceId: string
+  observedCount?: number
 }
 
 export interface StateResearch {
@@ -178,6 +200,10 @@ export function validateStateResearch(state: StateResearch): void {
     if (metric.countType === 'SUBSET_COUNT' && metric.comparability !== 'NOT_COMPARABLE') throw new Error(`Subset count cannot be marked comparable for ${state.uf}`)
   }
   if (new Set(state.metrics.map(metric => metric.metricId)).size !== state.metrics.length) throw new Error(`Duplicate metric for ${state.uf}`)
+  const digital = metricFor(state, 'DIGITAL')
+  const adjacent = metricFor(state, 'ADJACENT')
+  const combined = metricFor(state, 'CORE_ADJACENT')
+  if (digital && adjacent && combined && combined.value !== digital.value + adjacent.value) throw new Error(`Core and adjacent total mismatch for ${state.uf}`)
   for (const source of state.sources) {
     const url = new URL(source.url)
     if (!['https:', 'http:'].includes(url.protocol)) throw new Error(`Invalid source URL: ${source.id}`)
