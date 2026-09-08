@@ -5,12 +5,13 @@ import type {
 } from './models'
 import { validateStateResearch, validateUniqueIds } from './models'
 
-export const RESEARCH_VERSION = 'v1.1'
-export const LATEST_SOURCE_ACCESS_DATE = '2026-09-05'
+export const RESEARCH_VERSION = 'v1.2'
+export const LATEST_SOURCE_ACCESS_DATE = '2026-09-08'
+const PREVIOUS_SOURCE_ACCESS_DATE = '2026-09-05'
 
-const source = (id: string, title: string, institution: string, url: string): ResearchSource => ({
+const source = (id: string, title: string, institution: string, url: string, accessedAt = PREVIOUS_SOURCE_ACCESS_DATE): ResearchSource => ({
   id, title, institution, url, sourceType: 'COURT_REGISTRY',
-  accessedAt: LATEST_SOURCE_ACCESS_DATE, jurisdiction: 'Brasil',
+  accessedAt, jurisdiction: 'Brasil',
 })
 
 export const cnjResolution233: ResearchSource = {
@@ -20,7 +21,7 @@ export const cnjResolution233: ResearchSource = {
   url: 'https://atos.cnj.jus.br/atos/detalhar/2310',
   sourceType: 'CNJ_ACT',
   publishedAt: '2016-07-13',
-  accessedAt: LATEST_SOURCE_ACCESS_DATE,
+  accessedAt: PREVIOUS_SOURCE_ACCESS_DATE,
   jurisdiction: 'Brasil',
   description: 'Dispõe sobre o cadastro de profissionais e órgãos técnicos ou científicos na Justiça de primeiro e segundo graus.',
 }
@@ -34,6 +35,9 @@ const courtSources = {
   TO: source('tjto-public-experts', 'Relação de profissionais credenciados e peritos cadastrados', 'Corregedoria-Geral da Justiça do Tocantins', 'https://corregedoria.tjto.jus.br/component/content/article/corregedoria-geral-da-justica-disponibiliza-relacao-de-profissionais-credenciados-e-peritos-cadastrados-em-seu-portal?catid=8&layout=blog'),
   RR: source('tjrr-public-experts', 'Credenciamentos — Cadastro Eletrônico de Peritos', 'Tribunal de Justiça do Estado de Roraima', 'https://www.tjrr.jus.br/index.php/credenciamentos-subalc'),
   PR: source('tjpr-caju', 'Cadastro de Auxiliares da Justiça', 'Tribunal de Justiça do Estado do Paraná', 'https://portal.tjpr.jus.br/caju/publico/credencial/perito.do?tjpr.url.crypto=8a6c53f8698c7ff7d88bd1d17bac0727d751336abc0458fc1ba0bb4c6e9b4853'),
+  MG: source('tjmg-aj-public-experts', 'Sistema Eletrônico Auxiliares da Justiça — módulo de peritos', 'Tribunal de Justiça do Estado de Minas Gerais', 'https://aj.tjmg.jus.br/aj/internet/loginInternet.jsf', '2026-08-07'),
+  DF: source('tjdft-active-public-experts', 'Consulta pública aos peritos com cadastro ativo', 'Tribunal de Justiça do Distrito Federal e dos Territórios', 'https://auxiliares-justica.tjdft.jus.br/#/consultaPublicaAuxiliarJustica', '2026-09-08'),
+  SP: source('tjsp-public-court-assistants', 'Consulta pública de Auxiliares da Justiça', 'Tribunal de Justiça do Estado de São Paulo', 'https://www.tjsp.jus.br/auxiliaresjustica/auxiliarjustica/consultapublica', '2026-09-08'),
 }
 
 const snapshotId = (uf: string) => `snapshot-${uf.toLowerCase()}-${RESEARCH_VERSION}`
@@ -42,9 +46,9 @@ const metric = (
   unit: CountUnit, countType: CountType, methodologyType: MethodologyType,
   comparability: ResearchMetric['comparability'] = 'NOT_COMPARABLE',
 ): ResearchMetric => ({ metricId, label, value, unit, countType, methodologyType, comparability, sourceId, snapshotId: snapshotId(uf) })
-const snapshot = (uf: string, sourceId: string, notes?: string): ResearchSnapshot => ({
+const snapshot = (uf: string, sourceId: string, notes?: string, collectedAt?: string): ResearchSnapshot => ({
   id: snapshotId(uf), version: RESEARCH_VERSION, sourceIds: [sourceId],
-  methodologyVersion: RESEARCH_VERSION, notes,
+  methodologyVersion: RESEARCH_VERSION, notes, collectedAt,
 })
 
 const names: Record<string, string> = {
@@ -131,6 +135,45 @@ const researched: Record<string, StateSeed> = {
       metric('RR', courtSources.RR.id, 'DIGITAL', 'Núcleo Digital', 13, 'UNIQUE_PROFESSIONALS_IN_SUBSET', 'SUBSET_COUNT', 'CLASSIFIED_COUNT'),
     ],
   },
+  MG: {
+    tribunal: 'TJMG', status: 'CONSOLIDATED', coverage: 'INTEGRAL_DEDUPLICATED', updatedAt: '2026-08-07',
+    notes: 'Levantamento integral e deduplicado. A classificação preserva a prioridade Core FH > Adjacente dentro do tribunal.',
+    sources: [courtSources.MG], snapshots: [snapshot('MG', courtSources.MG.id, 'Referência do agregado: 07/08/2026.', '2026-08-07')],
+    metrics: [
+      metric('MG', courtSources.MG.id, 'GENERAL', 'Cadastro Geral', 13644, 'UNIQUE_PROFESSIONALS', 'OBSERVED_COUNT', 'DEDUPLICATED_COUNT', 'DOCUMENTED_SCOPE_ONLY'),
+      metric('MG', courtSources.MG.id, 'DIGITAL', 'Core FH', 137, 'IDENTIFIED_PROFESSIONALS', 'OBSERVED_COUNT', 'CLASSIFIED_DEDUPLICATED_COUNT', 'DOCUMENTED_SCOPE_ONLY'),
+      metric('MG', courtSources.MG.id, 'ADJACENT', 'Mercado adjacente classificado', 4598, 'IDENTIFIED_PROFESSIONALS', 'OBSERVED_COUNT', 'CLASSIFIED_DEDUPLICATED_COUNT', 'DOCUMENTED_SCOPE_ONLY'),
+      metric('MG', courtSources.MG.id, 'CORE_ADJACENT', 'Core + adjacente', 4735, 'IDENTIFIED_PROFESSIONALS', 'OBSERVED_COUNT', 'CLASSIFIED_DEDUPLICATED_COUNT', 'DOCUMENTED_SCOPE_ONLY'),
+    ],
+  },
+  DF: {
+    tribunal: 'TJDFT', status: 'CONSOLIDATED', coverage: 'INTEGRAL', updatedAt: '2026-09-08',
+    notes: 'Levantamento integral da base ativa consultada. A base pública é dinâmica. Mercado adjacente não quantificado.',
+    observedDifficulties: ['A base pública consultada é dinâmica; o resultado representa o estado observado na data de referência.', 'O mercado adjacente não foi quantificado.'],
+    sources: [courtSources.DF], snapshots: [snapshot('DF', courtSources.DF.id, 'Referência do levantamento: 08/09/2026.', '2026-09-08')],
+    metrics: [
+      metric('DF', courtSources.DF.id, 'GENERAL', 'Cadastro geral ativo observado', 1995, 'ACTIVE_REGISTRY_ENTRIES', 'OBSERVED_COUNT', 'DIRECT_OBSERVATION', 'DOCUMENTED_SCOPE_ONLY'),
+      metric('DF', courtSources.DF.id, 'DIGITAL', 'Core FH', 91, 'IDENTIFIED_PROFESSIONALS', 'OBSERVED_COUNT', 'CLASSIFIED_COUNT', 'DOCUMENTED_SCOPE_ONLY'),
+      metric('DF', courtSources.DF.id, 'SPECIALTIES_OBSERVED', 'Especialidades ativas observadas', 350, 'SPECIALTIES', 'OBSERVED_COUNT', 'DIRECT_OBSERVATION', 'DOCUMENTED_SCOPE_ONLY'),
+      metric('DF', courtSources.DF.id, 'SPECIALTIES_CATALOG', 'Especialidades existentes no catálogo', 493, 'SPECIALTIES', 'OBSERVED_COUNT', 'DIRECT_OBSERVATION', 'DOCUMENTED_SCOPE_ONLY'),
+    ],
+  },
+  SP: {
+    tribunal: 'TJSP', status: 'PARTIAL', coverage: 'SUBSET', updatedAt: '2026-09-08',
+    notes: 'A consulta pública exibe auxiliares com pelo menos uma nomeação. Core FH e adjacentes são limites inferiores observados na extração parcial (22,36%); não houve extrapolação para o estado.',
+    observedDifficulties: ['A extração analisou 4.400 linhas, cerca de 22,36% dos 19.665 peritos ou entidades com nome visível na consulta pública.', 'A consulta pública não representa todos os profissionais cadastrados no estado.', 'Os códigos de tipo 70 e 74 foram preservados como dados brutos no levantamento de origem, sem equivalência presumida entre pessoa física e pessoa jurídica.'],
+    sources: [courtSources.SP], snapshots: [snapshot('SP', courtSources.SP.id, 'Extração parcial de 4.400 linhas; 4.397 entidades únicas.', '2026-09-08')],
+    metrics: [
+      metric('SP', courtSources.SP.id, 'GENERAL', 'Total público visível', 19665, 'PUBLICLY_VISIBLE_NAMED_EXPERTS_OR_ENTITIES', 'OBSERVED_COUNT', 'DIRECT_OBSERVATION'),
+      metric('SP', courtSources.SP.id, 'SOURCE_RECORDS', 'Linhas extraídas na análise parcial', 4400, 'SOURCE_RECORDS', 'SUBSET_COUNT', 'DIRECT_OBSERVATION'),
+      metric('SP', courtSources.SP.id, 'RESEARCHED_SUBSET', 'Entidades únicas na extração', 4397, 'UNIQUE_PROFESSIONALS_IN_SUBSET', 'SUBSET_COUNT', 'DEDUPLICATED_COUNT'),
+      metric('SP', courtSources.SP.id, 'DIGITAL', 'Core FH observado na extração', 220, 'UNIQUE_PROFESSIONALS_IN_SUBSET', 'SUBSET_COUNT', 'CLASSIFIED_DEDUPLICATED_COUNT'),
+      metric('SP', courtSources.SP.id, 'ADJACENT', 'Mercado adjacente observado na extração', 1215, 'UNIQUE_PROFESSIONALS_IN_SUBSET', 'SUBSET_COUNT', 'CLASSIFIED_DEDUPLICATED_COUNT'),
+      metric('SP', courtSources.SP.id, 'CORE_ADJACENT', 'Core + adjacente observado', 1435, 'UNIQUE_PROFESSIONALS_IN_SUBSET', 'SUBSET_COUNT', 'CLASSIFIED_DEDUPLICATED_COUNT'),
+      metric('SP', courtSources.SP.id, 'SPECIALTIES_OBSERVED', 'Especialidades observadas', 791, 'SPECIALTIES', 'SUBSET_COUNT', 'DIRECT_OBSERVATION'),
+      metric('SP', courtSources.SP.id, 'SPECIALTIES_CATALOG', 'Especialidades existentes no catálogo consultado', 892, 'SPECIALTIES', 'OBSERVED_COUNT', 'DIRECT_OBSERVATION'),
+    ],
+  },
   AL: { tribunal: 'TJAL', status: 'PARTIAL', coverage: 'COLLECTION_INTERRUPTED', notes: 'Portal oficial confirmado; extração interrompida na rodada anterior.', observedDifficulties: ['A extração foi interrompida na rodada documentada.'] },
   BA: { tribunal: 'TJBA', status: 'IN_PROGRESS', coverage: 'SOURCE_CONFIRMED', notes: 'Fonte pública oficial confirmada; sem quantitativo consolidado.' },
   CE: { tribunal: 'TJCE', status: 'IN_PROGRESS', coverage: 'SOURCE_CONFIRMED', notes: 'Sistema CPTEC confirmado; lista pública agregada exportável não localizada.', observedDifficulties: ['Lista pública agregada exportável não localizada.'] },
@@ -166,7 +209,39 @@ export const stateResearch: StateResearch[] = Object.entries(names).map(([uf, st
 
 export const researchSnapshots = stateResearch.flatMap(state => state.snapshots)
 export const researchRevisions = stateResearch.flatMap(state => state.revisions)
-export const specialtyDictionary: SpecialtyDictionaryEntry[] = []
+const spDigitalSpecialties: Array<[string, number]> = [
+  ['Análise de Sistemas e Tecnologias da Informação', 105],
+  ['Computação e Informática', 101],
+  ['Segurança da Informação', 76],
+  ['Análise de Sistemas', 70],
+  ['Ciências da Computação', 69],
+  ['Tecnologia da Informação', 68],
+  ['Computação', 60],
+  ['Análise e Desenvolvimento de Sistemas', 55],
+  ['Banco de Dados', 54],
+  ['Gestão da Tecnologia da Informação', 52],
+  ['Desenvolvimento de Sistemas de Informação', 51],
+  ['Redes de Computadores', 44],
+]
+export const specialtyDictionary: SpecialtyDictionaryEntry[] = spDigitalSpecialties.map(([originalSpecialty, observedCount], index) => ({
+  id: `tjsp-digital-specialty-${index + 1}`,
+  originalSpecialty,
+  tribunal: 'TJSP',
+  normalizedCategory: 'Core FH',
+  classificationRule: 'Especialidade digital explicitamente observada na extração parcial fornecida.',
+  reviewStatus: 'REVIEWED',
+  sourceId: courtSources.SP.id,
+  observedCount,
+}))
+
+const observedCore = stateResearch.reduce((total, state) => total + (state.metrics.find(item => item.metricId === 'DIGITAL')?.value ?? 0), 0)
+export const observedTotals = {
+  core: observedCore,
+  // Agregado consolidado fornecido para os tribunais em que houve classificação adjacente.
+  adjacentClassified: 6690,
+  coreAndAdjacent: observedCore + 6690,
+  scope: 'OBSERVED_APPROXIMATION',
+} as const
 
 export const regulatoryItems: RegulatoryItem[] = [{
   id: 'cnj-resolution-233',
@@ -186,4 +261,5 @@ export const observatoryArticles: ObservatoryArticle[] = []
 
 stateResearch.forEach(validateStateResearch)
 validateUniqueIds([...Object.values(courtSources), cnjResolution233])
+validateUniqueIds(specialtyDictionary)
 validateUniqueIds(regulatoryItems)
