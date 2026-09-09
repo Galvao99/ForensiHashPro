@@ -2,6 +2,7 @@ import hashlib
 from pathlib import Path
 
 from app.models import HashResult
+from app.observability.profiling import record_bytes_read
 
 
 class HashEngine: #Colocar mais hashes se necessário
@@ -41,10 +42,15 @@ class HashEngine: #Colocar mais hashes se necessário
             name: hashlib.new(algorithm)
             for name, algorithm in self._algorithms.items()
         }
-        with Path(file_path).open("rb") as file:
-            for chunk in iter(lambda: file.read(1024 * 1024), b""):
-                for hash_object in hash_objects.values():
-                    hash_object.update(chunk)
+        bytes_read = 0
+        try:
+            with Path(file_path).open("rb") as file:
+                for chunk in iter(lambda: file.read(1024 * 1024), b""):
+                    bytes_read += len(chunk)
+                    for hash_object in hash_objects.values():
+                        hash_object.update(chunk)
+        finally:
+            record_bytes_read(bytes_read)
         return HashResult(**{
             name: hash_object.hexdigest()
             for name, hash_object in hash_objects.items()

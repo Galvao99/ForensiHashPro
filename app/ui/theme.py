@@ -382,6 +382,37 @@ QFrame#DiagnosticsMetricCard, QFrame#DiagnosticsFact, QFrame#DiagnosticsChart {
 QLabel#DiagnosticsCardTitle, QLabel#DiagnosticsFactTitle { color: {text_secondary}; }
 QLabel#DiagnosticsCardValue, QLabel#DiagnosticsFactValue { color: {text_primary}; }
 QLabel#DiagnosticsDetails { color: {text_secondary}; background: {surface_secondary}; border: 1px solid {border}; border-radius: {radius_small}px; }
+QLabel#DiagnosticsTitle { color: {text_primary}; font-size: 22px; font-weight: 700; }
+QLabel#DiagnosticsSubtitle, QLabel#DiagnosticsCoverageLabel, QLabel#DiagnosticsEmptyState { color: {text_secondary}; }
+QWidget#DiagnosticsPage QGroupBox { background: {surface_elevated}; color: {text_primary}; border: 1px solid {border}; border-radius: {radius_panel}px; }
+QWidget#DiagnosticsPage QTabWidget::pane { border: 1px solid {border}; background: {surface}; }
+QWidget#DiagnosticsPage QTabBar::tab { background: {surface_secondary}; color: {text_secondary}; border: 1px solid {border}; padding: 7px 12px; }
+QWidget#DiagnosticsPage QTabBar::tab:selected { background: {selected}; color: {text_primary}; border-bottom: 2px solid {accent}; }
+QWidget#DiagnosticsPage QTableWidget { background: {surface_elevated}; color: {text_primary}; alternate-background-color: {surface_secondary}; gridline-color: {border}; selection-background-color: {selected}; selection-color: {text_primary}; }
+QWidget#DiagnosticsPage QProgressBar#DiagnosticsTimeBar, QWidget#DiagnosticsPage QProgressBar#DiagnosticsStatusBar { background: {surface_secondary}; border: 1px solid {border}; border-radius: {radius_small}px; }
+QWidget#DiagnosticsPage QProgressBar#DiagnosticsTimeBar::chunk { background: {text_muted}; }
+QWidget#DiagnosticsPage QLabel#DiagnosticsStatusBadge[statusKind="ok"] { color: {success}; background: {surface_secondary}; }
+QWidget#DiagnosticsPage QLabel#DiagnosticsStatusBadge[statusKind="degraded"] { color: {warning}; background: {surface_secondary}; }
+QWidget#DiagnosticsPage QLabel#DiagnosticsStatusBadge[statusKind="unavailable"] { color: {text_muted}; background: {surface_secondary}; }
+QWidget#DiagnosticsPage QLabel#DiagnosticsStatusBadge[statusKind="error"] { color: {error}; background: {surface_secondary}; }
+QWidget#DiagnosticsPage { background: {surface_secondary}; color: {text_primary}; }
+QWidget#DiagnosticsPage QScrollArea, QWidget#DiagnosticsPage QScrollArea > QWidget > QWidget { background: {surface_secondary}; }
+QWidget#DiagnosticsPage QLabel { background: transparent; }
+QWidget#DiagnosticsPage QFrame#DiagnosticsMetricCard { background: {surface_elevated}; border: 1px solid {border}; border-radius: 4px; }
+QWidget#DiagnosticsPage QLabel#DiagnosticsCardTitle, QWidget#DiagnosticsPage QLabel#DiagnosticsFactTitle,
+QWidget#DiagnosticsPage QLabel#DiagnosticsCardDetail { color: {text_secondary}; }
+QWidget#DiagnosticsPage QLabel#DiagnosticsCardValue { color: {text_primary}; font-size: 20px; }
+QWidget#DiagnosticsPage QHeaderView::section { background: {surface_secondary}; color: {text_secondary}; border: 0; border-bottom: 1px solid {border}; padding: 6px; }
+QWidget#DiagnosticsPage QTableWidget::item { padding: 4px; }
+QWidget#DiagnosticsPage QTableWidget::item:hover { background: {hover}; }
+QWidget#DiagnosticsPage QTableWidget::item:selected { background: {selected}; color: {text_primary}; }
+QWidget#DiagnosticsPage QPushButton:focus, QWidget#DiagnosticsPage QComboBox:focus, QWidget#DiagnosticsPage QTableWidget:focus { border: 1px solid {accent}; }
+QWidget#DiagnosticsPage QTabBar::tab:hover { background: {hover}; }
+QWidget#DiagnosticsPage QProgressBar#DiagnosticsStatusBar[statusKind="ok"]::chunk { background: {success}; }
+QWidget#DiagnosticsPage QProgressBar#DiagnosticsStatusBar[statusKind="degraded"]::chunk { background: {warning}; }
+QWidget#DiagnosticsPage QProgressBar#DiagnosticsStatusBar[statusKind="error"]::chunk { background: {error}; }
+QWidget#DiagnosticsPage QProgressBar#DiagnosticsStatusBar[statusKind="running"]::chunk,
+QWidget#DiagnosticsPage QProgressBar#DiagnosticsStatusBar[statusKind="unavailable"]::chunk { background: {text_muted}; }
 QFrame#MagicCompactHeader, QFrame#SelectionBar, QFrame#BinaryStatusBar {
     background: {surface_elevated}; border: 0; border-bottom: 1px solid {border};
 }

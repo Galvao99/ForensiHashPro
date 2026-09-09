@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Sequence
 import logging
 from uuid import uuid4
+from app.observability.profiling import profile_call
 
 from app.engines.file_analyzer import FileAnalyzer
 from app.investigation.correlation_result import CorrelationResult
@@ -113,7 +114,7 @@ class AnalysisService:
                 ))
                 result.extracted_text = ""
             elif callable(extract_step):
-                text_step = extract_step(working_path)
+                text_step = profile_call("text_extraction", "text_extraction", extract_step, working_path)
                 result.processing_steps.append(text_step)
                 result.extracted_text = (
                     text_step.value.text if text_step.value is not None else ""
@@ -121,7 +122,7 @@ class AnalysisService:
             else:
                 try:
                     result.extracted_text = (
-                        self.text_extraction_service.extract_text(working_path)
+                        profile_call("text_extraction", "text_extraction", self.text_extraction_service.extract_text, working_path)
                     )
                     text_step = StepResult(
                         code="text_extraction",
@@ -160,7 +161,7 @@ class AnalysisService:
                 getattr(result.magic_numbers, "detected_format", None)
             )
             lease.source = evidence
-            evidence = lease.verify()
+            evidence = profile_call("evidence_verification", "evidence_verification", lease.verify)
 
             if result.hashes.sha256 != evidence.initial_sha256:
                 evidence = evidence.compromised(
@@ -236,7 +237,7 @@ class AnalysisService:
                         if isinstance(text_step.value, TextExtractionResult)
                         else None
                     )
-                    resolution = self.entity_extraction_service.resolve_analysis(  # type: ignore[union-attr]
+                    resolution = profile_call("entity_extraction", "entity_resolution", self.entity_extraction_service.resolve_analysis,  # type: ignore[union-attr]
                         result,
                         text_result=text_result,
                     )
@@ -301,7 +302,7 @@ class AnalysisService:
                 ))
             else:
               try:
-                timeline = self.timeline_service.build(result)  # type: ignore[union-attr]
+                timeline = profile_call("timeline", "timeline", self.timeline_service.build, result)  # type: ignore[union-attr]
                 result.timeline_events = timeline.events
                 result.timeline_warnings = timeline.warnings
                 result.timeline_limitations = timeline.limitations

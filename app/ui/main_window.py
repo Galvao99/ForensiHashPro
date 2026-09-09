@@ -867,14 +867,18 @@ class MainWindow(QWidget):
         self._refresh_case_overview()
 
         observability = getattr(self.analysis_service, "observability", None)
-        case_ref = (
-            observability.begin_case(
-                case_identity,
-                [(str(path), path.stat().st_size) for path in files],
-                getattr(self, "_last_ingestion_ms", 0.0),
-            )
-            if observability is not None else None
-        )
+        case_ref = None
+        if observability is not None:
+            try:
+                case_ref = observability.begin_case(
+                    case_identity,
+                    [(str(path), path.stat().st_size) for path in files],
+                    getattr(self, "_last_ingestion_ms", 0.0),
+                    cache_entries=len(cached_results),
+                )
+            except Exception as error:
+                print(f"Observabilidade indisponível em begin_case ({type(error).__name__}).")
+                observability = None
 
         # Limpa IPs e dados investigativos da análise anterior.
         self.workspace.update_investigation_context(

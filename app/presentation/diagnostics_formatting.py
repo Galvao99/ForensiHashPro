@@ -20,11 +20,14 @@ def format_duration(value_ms: float | None) -> str:
     if value_ms is None:
         return "—"
     value = max(0.0, value_ms)
+    if 0 < value < 1:
+        return "<1 ms"
     if value < 1000:
         return f"{value:.0f} ms"
     if value < 60_000:
-        return f"{value / 1000:.2f} s".replace(".", ",")
-    return f"{value / 60_000:.2f} min".replace(".", ",")
+        return f"{value / 1000:.1f} s".replace(".", ",")
+    seconds = round(value / 1000)
+    return f"{seconds // 60}m {seconds % 60:02d}s"
 
 
 def format_count(value: int, singular: str, plural: str | None = None) -> str:
