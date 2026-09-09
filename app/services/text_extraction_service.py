@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import fitz
+from app.observability.profiling import profile_call
 
 from app.processing import (
     ProcessingImpact,
@@ -280,7 +281,7 @@ class TextExtractionService:
             pytesseract.pytesseract.tesseract_cmd = str(self.tesseract_status.path)
         effective_timeout = timeout or self.limits.ocr_timeout_seconds
         return str(
-            pytesseract.image_to_string(
+            profile_call("ocr", "ocr_image", pytesseract.image_to_string,
                 image, lang="por", timeout=effective_timeout
             )
         )

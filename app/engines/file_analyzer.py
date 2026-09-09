@@ -1,4 +1,5 @@
 from pathlib import Path
+from app.observability.profiling import profile_call
 
 from app.engines.digital_signature_engine import DigitalSignatureEngine
 from app.engines.finding_engine import FindingsEngine
@@ -137,7 +138,7 @@ class FileAnalyzer:
             accessed_at=timestamp_results[2].value,
         )
 
-        hashes = self.hash_engine.calculate_all(
+        hashes = profile_call("hash", "hash", self.hash_engine.calculate_all,
             file_path
         )
 
@@ -176,7 +177,7 @@ class FileAnalyzer:
         extract_step = getattr(self.metadata_engine, "extract_step", None)
         if callable(extract_step):
             try:
-                metadata_step = extract_step(file_path)
+                metadata_step = profile_call("metadata", "metadata_extraction", extract_step, file_path)
             except Exception as error:
                 issue = self._processing_issue(
                     "metadata_failed", "metadata", ProcessingStatus.FAILED,
@@ -189,10 +190,10 @@ class FileAnalyzer:
             processing_steps.append(metadata_step)
             metadata = metadata_step.value or MetadataResult(raw={})
         else:
-            metadata = self.metadata_engine.extract(file_path)
+            metadata = profile_call("metadata", "metadata_extraction", self.metadata_engine.extract, file_path)
 
         try:
-            magic_numbers = self.magic_number_engine.analyze(file_path)
+            magic_numbers = profile_call("magic_number", "magic_number", self.magic_number_engine.analyze, file_path)
         except Exception as error:
             issue = self._processing_issue(
                 "magic_number_failed", "magic_number", ProcessingStatus.FAILED,
@@ -207,7 +208,7 @@ class FileAnalyzer:
             )
 
         try:
-            digital_signature = self.digital_signature_engine.analyze(file_path)
+            digital_signature = profile_call("digital_signature", "digital_signature", self.digital_signature_engine.analyze, file_path)
         except Exception as error:
             issue = self._processing_issue(
                 "digital_signature_failed", "digital_signature",
@@ -229,7 +230,7 @@ class FileAnalyzer:
         parsed_artifact: ParsedArtifact | None = None
         identification = identify_artifact(file_path, magic_numbers)
         try:
-            parsed_artifact = self.parser_registry.parse(file_path, identification)
+            parsed_artifact = profile_call("parser_registry", "artifact_parsing", self.parser_registry.parse, file_path, identification)
             parser_status = (
                 ProcessingStatus.PARTIAL
                 if parsed_artifact.state == "partial" or parsed_artifact.warnings
@@ -254,7 +255,7 @@ class FileAnalyzer:
 
         if magic_numbers.detected_format == "PDF":
             try:
-                pdf_structure = self.pdf_structure_engine.analyze(file_path)
+                pdf_structure = profile_call("pdf_structure", "pdf_structure", self.pdf_structure_engine.analyze, file_path)
                 processing_steps.append(
                     self._processing_step(
                         "pdf_structure",
@@ -299,7 +300,7 @@ class FileAnalyzer:
         )
 
         json_step = (
-            self._analyze_json(file_path)
+            profile_call("json", "json_analysis", self._analyze_json, file_path)
             if self.profile.allows(AnalysisCapability.SPECIALIZED_PARSERS)
             else self._capability_skipped(
                 "json_analysis", "json", AnalysisCapability.SPECIALIZED_PARSERS
@@ -309,7 +310,7 @@ class FileAnalyzer:
         json_analysis = json_step.value
 
         biometric_step = (
-            self._analyze_biometric_report(file_path)
+            profile_call("biometric", "biometric_analysis", self._analyze_biometric_report, file_path)
             if self.profile.allows(AnalysisCapability.BIOMETRIC_ANALYSIS)
             else self._capability_skipped(
                 "biometric_analysis", "biometric",
@@ -320,7 +321,7 @@ class FileAnalyzer:
         biometric_report = biometric_step.value
 
         try:
-            findings = self.findings_engine.analyze(
+            findings = profile_call("findings", "artifact_findings", self.findings_engine.analyze,
                 metadata=metadata,
                 integrity=integrity,
                 biometric_report=biometric_report,
@@ -339,7 +340,7 @@ class FileAnalyzer:
         binary_analysis = None
         if self.binary_structure_engine is not None:
             try:
-                binary_analysis = self.binary_structure_engine.analyze(file_path)
+                binary_analysis = profile_call("binary", "binary_analysis", self.binary_structure_engine.analyze, file_path)
                 if binary_analysis is not None:
                     processing_steps.extend(binary_analysis.processing_steps)
             except Exception as error:

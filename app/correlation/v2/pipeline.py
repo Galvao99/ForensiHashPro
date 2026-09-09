@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from time import perf_counter
 from typing import Protocol, Sequence
 
 from app.correlation.case_result import (
@@ -400,6 +401,23 @@ class CanonicalCasePipelineResult:
     graph: CorrelationReport
     index: CaseEvidenceIndex
     case_result: CaseResult
+    performance: "CanonicalPipelinePerformance | None" = None
+
+
+@dataclass(frozen=True, slots=True)
+class CanonicalRulePerformance:
+    rule_id: str
+    duration_ms: float
+    findings: int
+    failed: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class CanonicalPipelinePerformance:
+    duration_ms: float
+    index_build_duration_ms: float
+    rule_evaluation_duration_ms: float
+    rules: tuple[CanonicalRulePerformance, ...]
 
 
 class CanonicalCasePipeline:
@@ -421,23 +439,34 @@ class CanonicalCasePipeline:
         )
 
     def analyze(self, case_id: str, results: Sequence[AnalysisResult]) -> CanonicalCasePipelineResult:
+        pipeline_started = perf_counter()
         batch = self.provider.provide_case(results)
         graph = self.graph_engine.correlate(
             batch.candidates, declared_hash_targets=batch.declared_hash_targets,
             signature_temporal_bindings=batch.signature_temporal_bindings,
         )
+        index_started = perf_counter()
         index = CaseEvidenceIndex(graph)
+        index_ms = (perf_counter() - index_started) * 1000
         findings: list[CaseFinding] = []
         limitations: list[RuleExecutionLimitation] = []
+        rule_profiles: list[CanonicalRulePerformance] = []
+        rules_started = perf_counter()
         for rule in self.rules:
+            rule_started = perf_counter()
+            finding_count = 0
+            failed = False
             try:
                 evaluated = rule.evaluate(index)
                 if isinstance(evaluated, DeterministicRuleResult):
                     findings.extend(evaluated.findings)
                     limitations.extend(evaluated.limitations)
+                    finding_count = len(evaluated.findings)
                 else:
                     findings.extend(evaluated)
+                    finding_count = len(evaluated)
             except Exception as error:
+                failed = True
                 limitations.append(RuleExecutionLimitation(
                     rule_id=rule.rule_id,
                     rule_version=rule.rule_version,
@@ -446,9 +475,16 @@ class CanonicalCasePipeline:
                     message="A regra não pôde ser concluída; fatos válidos foram preservados.",
                     metadata={"error_type": type(error).__name__},
                 ))
+            rule_profiles.append(CanonicalRulePerformance(
+                rule.rule_id, (perf_counter() - rule_started) * 1000,
+                finding_count, failed,
+            ))
+        rules_ms = (perf_counter() - rules_started) * 1000
+        total_ms = (perf_counter() - pipeline_started) * 1000
         return CanonicalCasePipelineResult(
             graph, index,
             CaseResult(case_id, findings=tuple(findings), limitations=tuple(limitations)),
+            CanonicalPipelinePerformance(total_ms, index_ms, rules_ms, tuple(rule_profiles)),
         )
 
 
