@@ -110,6 +110,8 @@ class DiagnosticsPage(QWidget):
                 self.export_button,
             )
         ):
+            widget.setMinimumWidth(0)
+            widget.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
             actions.addWidget(widget, index // 3, index % 3)
         actions.setColumnStretch(1, 1)
         root.addLayout(actions)
@@ -228,6 +230,9 @@ class DiagnosticsPage(QWidget):
         layout.addWidget(self.engine_details)
         title = QLabel("Engines mais demoradas nesta execução · top 5")
         title.setObjectName("CardTitle")
+        title.setWordWrap(True)
+        title.setMinimumWidth(0)
+        title.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         layout.addWidget(title)
         self.engine_chart = EngineTimeChart()
         layout.addWidget(self.engine_chart)
@@ -272,6 +277,9 @@ class DiagnosticsPage(QWidget):
         layout.addWidget(self.correlation_summary)
         artifact_title = QLabel("Artefatos mais demorados nesta execução")
         artifact_title.setObjectName("CardTitle")
+        artifact_title.setWordWrap(True)
+        artifact_title.setMinimumWidth(0)
+        artifact_title.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         layout.addWidget(artifact_title)
         self.artifacts = self._table(
             ("Artefato/ref", "Total wall", "Etapa mais demorada", "Bytes", "Engines", "Status"), 260
