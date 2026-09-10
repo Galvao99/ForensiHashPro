@@ -389,6 +389,34 @@ def test_worker_marks_ttfr_before_legacy_correlation_and_sending_result(tmp_path
     assert names.index("correlation_started") < names.index("correlation_completed")
 
 
+def test_40_artifact_case_records_one_final_legacy_recomputation(tmp_path):
+    paths = [tmp_path / f"artifact-{index:02d}.bin" for index in range(40)]
+    for path in paths:
+        path.write_bytes(b"data")
+
+    class Service:
+        def analyze(self, path, **_):
+            return result_for(path)
+
+        def correlate_case(self, _, results):
+            return tuple(result.analysis_id for result in results)
+
+    service = ObservabilityService()
+    ref = service.begin_case("case", [(str(path), 4) for path in paths], 0)
+    worker = AnalysisWorker(
+        analysis_service=Service(), files=paths, case_id="case", observability=service
+    )
+    worker.case_ref = ref
+    worker.run()
+
+    snapshot = service.snapshot()
+    legacy = next(item for item in snapshot.engine_metrics if item.engine_id == "legacy_correlation")
+    assert legacy.executions == 1
+    assert legacy.total_duration_ms is not None and legacy.total_duration_ms >= 0
+    assert snapshot.case_performance.first_result_ms is not None
+    assert snapshot.case_performance.total_analysis_ms is not None
+
+
 def test_cached_worker_consumes_queue_without_fake_engine_calls(tmp_path):
     path = tmp_path / "cached.txt"
     cached = result_for(path)

@@ -113,7 +113,8 @@ class DiagnosticsPage(QWidget):
             widget.setMinimumWidth(0)
             widget.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
             actions.addWidget(widget, index // 3, index % 3)
-        actions.setColumnStretch(1, 1)
+        for column in range(3):
+            actions.setColumnStretch(column, 1)
         root.addLayout(actions)
         self.tabs = QTabWidget()
         self.tabs.setObjectName("DiagnosticsSections")
@@ -996,13 +997,22 @@ class DiagnosticsPage(QWidget):
         filename, _ = QFileDialog.getSaveFileName(
             self, "Exportar diagnóstico", default, "JSON (*.json)"
         )
-        if filename:
-            try:
-                export_diagnostic(self.observability.snapshot(), Path(filename))
-            except OSError as error:
-                QMessageBox.warning(
-                    self, "Exportação", f"Não foi possível exportar: {type(error).__name__}"
-                )
+        if not filename:
+            return
+        try:
+            export_diagnostic(self.observability.snapshot(), Path(filename))
+        except Exception as error:
+            self.observability.record_error(
+                component_id="diagnostics",
+                operation="export_json",
+                error_code="diagnostic_export_failed",
+                error=error,
+            )
+            QMessageBox.warning(
+                self,
+                "Exportação",
+                f"Não foi possível exportar o diagnóstico ({type(error).__name__}).",
+            )
 
     @staticmethod
     def _sync_combo(combo, values, label) -> None:

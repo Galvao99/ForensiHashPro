@@ -362,8 +362,90 @@ def test_folder_batch_schedules_all_files_without_selection(tmp_path: Path) -> N
 
     assert service.analyzed_paths == paths
     assert len(emitted) == 10
-    assert service.correlation_sizes == list(range(0, 11))
+    assert service.correlation_sizes == [10]
     assert service.canonical_sizes == [10]
+
+
+def test_folder_batch_coalesces_40_legacy_correlations_into_one_final_run(
+    tmp_path: Path,
+) -> None:
+    paths = [tmp_path / f"evidence-{index:02d}.bin" for index in range(40)]
+    for path in paths:
+        path.write_bytes(b"evidence")
+    service = _FakeCaseService()
+    worker = AnalysisWorker(analysis_service=service, files=paths, case_id="case-40")
+    emitted_results = []
+    emitted_correlations = []
+    events = []
+    worker.file_analyzed.connect(
+        lambda result: (emitted_results.append(result), events.append("artifact"))
+    )
+    worker.investigation_completed.connect(
+        lambda result: (emitted_correlations.append(result), events.append("legacy"))
+    )
+    worker.completed.connect(lambda _: events.append("completed"))
+
+    worker.run()
+
+    assert service.analyzed_paths == paths
+    assert len(emitted_results) == 40
+    assert [result.file_info.path for result in emitted_results] == paths
+    assert service.correlation_sizes == [40]
+    assert service.canonical_sizes == [40]
+    assert len(emitted_correlations) == 1
+    assert events[-2:] == ["legacy", "completed"]
+
+
+def test_deferred_legacy_result_matches_direct_final_correlation(tmp_path: Path) -> None:
+    paths = [tmp_path / "first.bin", tmp_path / "second.bin"]
+    for path in paths:
+        path.write_bytes(path.name.encode("ascii"))
+
+    class CharacterizingService(_FakeCaseService):
+        def correlate_case(self, _case_id: str, results):
+            self.correlation_sizes.append(len(results))
+            return tuple(result.analysis_id for result in results)
+
+    service = CharacterizingService()
+    worker = AnalysisWorker(analysis_service=service, files=paths, case_id="case")
+    correlations = []
+    analyzed = []
+    worker.investigation_completed.connect(correlations.append)
+    worker.file_analyzed.connect(analyzed.append)
+    worker.run()
+
+    assert correlations == [tuple(result.analysis_id for result in analyzed)]
+
+
+def test_repeated_case_run_replaces_stale_legacy_members(tmp_path: Path) -> None:
+    first_paths = [tmp_path / "old-a.bin", tmp_path / "old-b.bin"]
+    current_path = tmp_path / "current.bin"
+    for path in (*first_paths, current_path):
+        path.write_bytes(path.name.encode("ascii"))
+
+    class CharacterizingService(_FakeCaseService):
+        def correlate_case(self, _case_id: str, results):
+            self.correlation_sizes.append(len(results))
+            return tuple(result.file_info.path for result in results)
+
+    service = CharacterizingService()
+    first = []
+    first_worker = AnalysisWorker(
+        analysis_service=service, files=first_paths, case_id="same-case"
+    )
+    first_worker.investigation_completed.connect(first.append)
+    first_worker.run()
+
+    current = []
+    current_worker = AnalysisWorker(
+        analysis_service=service, files=[current_path], case_id="same-case"
+    )
+    current_worker.investigation_completed.connect(current.append)
+    current_worker.run()
+
+    assert first == [tuple(first_paths)]
+    assert current == [(current_path,)]
+    assert service.correlation_sizes == [2, 1]
 
 
 def test_worker_isolates_canonical_projection_failure(tmp_path: Path) -> None:
@@ -389,6 +471,7 @@ def test_worker_isolates_canonical_projection_failure(tmp_path: Path) -> None:
     assert len(completed) == 1
     assert failures == [("case-1", "Correlação canônica indisponível (RuntimeError).")]
     assert "sensitive" not in failures[0][1]
+    assert worker.analysis_service.correlation_sizes == [1]
 
 
 def test_folder_batch_reuses_valid_results_and_reports_progress(tmp_path: Path) -> None:
@@ -418,6 +501,7 @@ def test_folder_batch_reuses_valid_results_and_reports_progress(tmp_path: Path) 
         "pending": 0,
         "current_file": "",
     }
+    assert service.correlation_sizes == [2]
 
 
 def test_folder_batch_progress_counts_failures(tmp_path: Path) -> None:
@@ -432,9 +516,8 @@ def test_folder_batch_progress_counts_failures(tmp_path: Path) -> None:
                 raise RuntimeError("technical failure")
             return super().analyze(path, analysis_id=analysis_id)
 
-    worker = AnalysisWorker(
-        analysis_service=FailingService(), files=[good, bad], case_id="case-1"
-    )
+    service = FailingService()
+    worker = AnalysisWorker(analysis_service=service, files=[good, bad], case_id="case-1")
     progress = []
     states = []
     worker.case_progress_changed.connect(progress.append)
@@ -447,6 +530,7 @@ def test_folder_batch_progress_counts_failures(tmp_path: Path) -> None:
     assert progress[-1]["pending"] == 0
     assert progress[-1]["failed"] == 1
     assert states[-1] == (str(bad.resolve()), "failed")
+    assert service.correlation_sizes == [1]
 
 
 def test_observability_start_failure_does_not_mask_valid_analysis(tmp_path: Path) -> None:
@@ -504,6 +588,7 @@ def test_cached_partial_result_remains_partial_in_case_observability(tmp_path: P
     assert performance.completed == 0
     assert performance.partial == 1
     assert performance.cache_hits == 1
+    assert worker.analysis_service.correlation_sizes == [1]
 
 
 def test_user_cancellation_is_not_emitted_as_file_failure(tmp_path: Path) -> None:
@@ -519,7 +604,9 @@ def test_user_cancellation_is_not_emitted_as_file_failure(tmp_path: Path) -> Non
             return result
 
     service = CancellingService()
-    worker = AnalysisWorker(analysis_service=service, files=[evidence])
+    worker = AnalysisWorker(
+        analysis_service=service, files=[evidence], case_id="cancelled-case"
+    )
     service.worker = worker
     file_failures = []
     worker_failures = []
@@ -533,6 +620,7 @@ def test_user_cancellation_is_not_emitted_as_file_failure(tmp_path: Path) -> Non
     assert file_failures == []
     assert worker_failures == []
     assert completed == [[]]
+    assert service.correlation_sizes == []
 
 
 def test_export_service_writes_utf8_versioned_contract(tmp_path: Path) -> None:
