@@ -10,6 +10,7 @@ from app.observability.models import (
     ComponentHealth,
     ExecutionMetric,
     ExecutionStatus,
+    ObservabilitySnapshot,
     OperationalStatus,
 )
 from app.observability.service import ObservabilityService
@@ -50,6 +51,13 @@ def page_for(qt_app, components=()):
     page = DiagnosticsPage(service, checks)
     page.timer.stop()
     return page, service, checks
+
+
+def assert_snapshot_state_equal(
+    actual: ObservabilitySnapshot, expected: ObservabilitySnapshot
+) -> None:
+    """Compare all observable snapshot state except its generation timestamp."""
+    assert replace(actual, generated_at=expected.generated_at) == expected
 
 
 @pytest.mark.parametrize(
@@ -424,10 +432,18 @@ def test_export_action_uses_current_snapshot_and_versioned_filename(
     destination = tmp_path / "diagnostic.json"
     dialog_calls = []
     exports = []
+    snapshot_calls = []
+    expected_state = service.snapshot()
+    original_snapshot = service.snapshot
 
     def choose_file(parent, title, suggested, file_filter):
         dialog_calls.append((parent, title, suggested, file_filter))
         return str(destination), "JSON"
+
+    def capture_snapshot():
+        snapshot = original_snapshot()
+        snapshot_calls.append(snapshot)
+        return snapshot
 
     monkeypatch.setattr(
         "app.pages.diagnostics_page.QFileDialog.getSaveFileName", choose_file
@@ -436,6 +452,7 @@ def test_export_action_uses_current_snapshot_and_versioned_filename(
         "app.pages.diagnostics_page.export_diagnostic",
         lambda snapshot, path: exports.append((snapshot, path)),
     )
+    monkeypatch.setattr(service, "snapshot", capture_snapshot)
 
     page.export_button.click()
 
@@ -443,7 +460,12 @@ def test_export_action_uses_current_snapshot_and_versioned_filename(
     assert re.fullmatch(
         r"forensihash-diagnostic-\d{8}-\d{6}\.json", dialog_calls[0][2]
     )
-    assert exports == [(service.snapshot(), destination)]
+    assert len(snapshot_calls) == 1
+    assert len(exports) == 1
+    exported_snapshot, exported_path = exports[0]
+    assert exported_snapshot is snapshot_calls[0]
+    assert exported_path == destination
+    assert_snapshot_state_equal(exported_snapshot, expected_state)
 
 
 def test_cancelled_export_has_no_side_effect_or_warning(qt_app, monkeypatch):
@@ -468,7 +490,7 @@ def test_cancelled_export_has_no_side_effect_or_warning(qt_app, monkeypatch):
 
     assert exports == []
     assert warnings == []
-    assert service.snapshot() == before
+    assert_snapshot_state_equal(service.snapshot(), before)
 
 
 def test_export_failure_is_sanitized_recorded_and_shown(qt_app, tmp_path, monkeypatch):
