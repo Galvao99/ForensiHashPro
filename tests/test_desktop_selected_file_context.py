@@ -127,6 +127,10 @@ def test_pending_clears_stale_result_and_completion_updates_if_still_selected(
     window._on_file_analyzed(c)
     assert window.current_result is c
     assert window.workspace.deep_file_explorer_page._result is c
+    cached = window._case_result_cache[str(tmp_path.resolve())][str(paths[2].resolve())]
+    assert cached is not c
+    c.metadata.raw["consumer_mutation"] = True
+    assert "consumer_mutation" not in cached.metadata.raw
     window.close()
 
 

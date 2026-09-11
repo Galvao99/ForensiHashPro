@@ -10,6 +10,7 @@ from app.observability.models import (
     ComponentHealth,
     ExecutionMetric,
     ExecutionStatus,
+    ObservabilitySnapshot,
     OperationalStatus,
 )
 from app.observability.service import ObservabilityService
@@ -50,6 +51,13 @@ def page_for(qt_app, components=()):
     page = DiagnosticsPage(service, checks)
     page.timer.stop()
     return page, service, checks
+
+
+def assert_snapshot_state_equal(
+    actual: ObservabilitySnapshot, expected: ObservabilitySnapshot
+) -> None:
+    """Compare all observable snapshot state except its generation timestamp."""
+    assert replace(actual, generated_at=expected.generated_at) == expected
 
 
 @pytest.mark.parametrize(
@@ -375,6 +383,10 @@ def test_themed_views_keep_tables_inside_viewport(qt_app, theme, width):
             assert page.width() == width
             assert scroll.horizontalScrollBar().maximum() == 0
             assert scroll.widget().width() <= scroll.viewport().width()
+        for button in (page.copy_summary_button, page.export_button):
+            assert button.isVisible()
+            assert button.width() > 0
+            assert button.geometry().right() < page.width()
         page.tabs.setCurrentIndex(1)
         qt_app.processEvents()
         assert all(
@@ -409,6 +421,103 @@ def test_ui_exports_sanitized_session_json(qt_app, tmp_path, monkeypatch):
     content = destination.read_text(encoding="utf-8")
     assert all(term not in content for term in ("Maria", "private", "123.456.789"))
     assert json.loads(content)["performance_schema_version"] == "1.0.0"
+
+
+def test_export_action_uses_current_snapshot_and_versioned_filename(
+    qt_app, tmp_path, monkeypatch
+):
+    import re
+
+    page, service, _ = page_for(qt_app)
+    destination = tmp_path / "diagnostic.json"
+    dialog_calls = []
+    exports = []
+    snapshot_calls = []
+    expected_state = service.snapshot()
+    original_snapshot = service.snapshot
+
+    def choose_file(parent, title, suggested, file_filter):
+        dialog_calls.append((parent, title, suggested, file_filter))
+        return str(destination), "JSON"
+
+    def capture_snapshot():
+        snapshot = original_snapshot()
+        snapshot_calls.append(snapshot)
+        return snapshot
+
+    monkeypatch.setattr(
+        "app.pages.diagnostics_page.QFileDialog.getSaveFileName", choose_file
+    )
+    monkeypatch.setattr(
+        "app.pages.diagnostics_page.export_diagnostic",
+        lambda snapshot, path: exports.append((snapshot, path)),
+    )
+    monkeypatch.setattr(service, "snapshot", capture_snapshot)
+
+    page.export_button.click()
+
+    assert len(dialog_calls) == 1
+    assert re.fullmatch(
+        r"forensihash-diagnostic-\d{8}-\d{6}\.json", dialog_calls[0][2]
+    )
+    assert len(snapshot_calls) == 1
+    assert len(exports) == 1
+    exported_snapshot, exported_path = exports[0]
+    assert exported_snapshot is snapshot_calls[0]
+    assert exported_path == destination
+    assert_snapshot_state_equal(exported_snapshot, expected_state)
+
+
+def test_cancelled_export_has_no_side_effect_or_warning(qt_app, monkeypatch):
+    page, service, _ = page_for(qt_app)
+    exports = []
+    warnings = []
+    monkeypatch.setattr(
+        "app.pages.diagnostics_page.QFileDialog.getSaveFileName",
+        lambda *_: ("", ""),
+    )
+    monkeypatch.setattr(
+        "app.pages.diagnostics_page.export_diagnostic",
+        lambda *args: exports.append(args),
+    )
+    monkeypatch.setattr(
+        "app.pages.diagnostics_page.QMessageBox.warning",
+        lambda *args: warnings.append(args),
+    )
+
+    before = service.snapshot()
+    page.export_json()
+
+    assert exports == []
+    assert warnings == []
+    assert_snapshot_state_equal(service.snapshot(), before)
+
+
+def test_export_failure_is_sanitized_recorded_and_shown(qt_app, tmp_path, monkeypatch):
+    page, service, _ = page_for(qt_app)
+    warnings = []
+    monkeypatch.setattr(
+        "app.pages.diagnostics_page.QFileDialog.getSaveFileName",
+        lambda *_: (str(tmp_path / "diagnostic.json"), "JSON"),
+    )
+    monkeypatch.setattr(
+        "app.pages.diagnostics_page.export_diagnostic",
+        lambda *_: (_ for _ in ()).throw(RuntimeError("Maria 123.456.789-00")),
+    )
+    monkeypatch.setattr(
+        "app.pages.diagnostics_page.QMessageBox.warning",
+        lambda *args: warnings.append(args),
+    )
+
+    page.export_json()
+
+    error = service.snapshot().recent_errors[-1]
+    assert error.component_id == "diagnostics"
+    assert error.error_code == "diagnostic_export_failed"
+    assert "Maria" not in error.message and "123.456.789-00" not in error.message
+    assert len(warnings) == 1
+    assert "RuntimeError" in warnings[0][2]
+    assert "Maria" not in warnings[0][2]
 
 
 def test_numeric_columns_sort_by_value_and_align_right(qt_app):

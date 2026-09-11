@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import FrozenInstanceError
 from datetime import datetime, timezone
+from hashlib import sha256
 import json
 from types import SimpleNamespace
 
@@ -28,12 +29,13 @@ from app.observability.models import CorrelationRuleMetric, MeasurementState, Pe
 from app.observability.profiling import ProfilingBinding, profile_call, profiling_scope
 from app.processing import ProcessingStatus, StepResult
 from app.workers.analysis_worker import AnalysisWorker
+from app.evidence import CaptureState, EvidenceSource, FileIdentity
 
 NOW = datetime.now(timezone.utc)
 
 
 def result_for(path, *, useful=True):
-    return AnalysisResult(
+    result = AnalysisResult(
         file_info=FileInfo(path.name, path, path.suffix, 4),
         hashes=HashResult("", "", "", "a" * 64 if useful else "", "", ""),
         metadata=MetadataResult({}),
@@ -43,6 +45,27 @@ def result_for(path, *, useful=True):
         integrity=IntegrityResult(None, "Technical fixture", None, useful, False, False),
         analysis_id="fixture",
     )
+    if useful and path.exists():
+        stat = path.stat()
+        digest = sha256(path.read_bytes()).hexdigest()
+        result.hashes = HashResult("", "", "", digest, "", "")
+        result.evidence_source = EvidenceSource(
+            evidence_id=f"fixture-{digest[:12]}",
+            original_name=path.name,
+            original_path=path.resolve(),
+            working_path=path.resolve(),
+            size_bytes=stat.st_size,
+            initial_sha256=digest,
+            acquired_at_utc=NOW,
+            declared_type=path.suffix or "sem_extensao",
+            detected_type=None,
+            capture_state=CaptureState.VERIFIED,
+            read_only=True,
+            acquisition_errors=(),
+            original_identity=FileIdentity.from_stat(stat),
+            final_sha256=digest,
+        )
+    return result
 
 
 def finish(service, **extra):
@@ -389,8 +412,37 @@ def test_worker_marks_ttfr_before_legacy_correlation_and_sending_result(tmp_path
     assert names.index("correlation_started") < names.index("correlation_completed")
 
 
+def test_40_artifact_case_records_one_final_legacy_recomputation(tmp_path):
+    paths = [tmp_path / f"artifact-{index:02d}.bin" for index in range(40)]
+    for path in paths:
+        path.write_bytes(b"data")
+
+    class Service:
+        def analyze(self, path, **_):
+            return result_for(path)
+
+        def correlate_case(self, _, results):
+            return tuple(result.analysis_id for result in results)
+
+    service = ObservabilityService()
+    ref = service.begin_case("case", [(str(path), 4) for path in paths], 0)
+    worker = AnalysisWorker(
+        analysis_service=Service(), files=paths, case_id="case", observability=service
+    )
+    worker.case_ref = ref
+    worker.run()
+
+    snapshot = service.snapshot()
+    legacy = next(item for item in snapshot.engine_metrics if item.engine_id == "legacy_correlation")
+    assert legacy.executions == 1
+    assert legacy.total_duration_ms is not None and legacy.total_duration_ms >= 0
+    assert snapshot.case_performance.first_result_ms is not None
+    assert snapshot.case_performance.total_analysis_ms is not None
+
+
 def test_cached_worker_consumes_queue_without_fake_engine_calls(tmp_path):
     path = tmp_path / "cached.txt"
+    path.write_bytes(b"test")
     cached = result_for(path)
     service = ObservabilityService()
     ref = service.begin_case("case", [(str(path), 4)], 0, cache_entries=1)

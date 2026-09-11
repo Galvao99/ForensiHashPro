@@ -14,6 +14,9 @@ from app.observability.sanitization import safe_ref
 from app.observability.profiling import ProfilingBinding, profile_call, profiling_scope
 from datetime import datetime, timezone
 from time import perf_counter
+from copy import deepcopy
+
+from app.evidence import EvidenceContentIdentity
 
 
 class AnalysisWorker(QObject):
@@ -83,9 +86,6 @@ class AnalysisWorker(QObject):
                 self.completed.emit([])
                 return
 
-            if self.case_id:
-                self._emit_case_correlations(results)
-
             for index, file_path in enumerate(
                 self.files,
                 start=1,
@@ -96,7 +96,9 @@ class AnalysisWorker(QObject):
                 resolved_path = str(file_path.resolve())
                 job_id = self._start_observability_job(file_path)
                 lookup_started = perf_counter()
-                cached = self.cached_results.get(resolved_path)
+                cached = self._validated_cached_result(
+                    file_path, self.cached_results.get(resolved_path)
+                )
                 lookup_ms = (perf_counter() - lookup_started) * 1000
                 if cached is not None:
                     cache_hits += 1
@@ -129,8 +131,6 @@ class AnalysisWorker(QObject):
                     self._update_observability(len(results), partial_files, failed_files,
                                                total_files, cache_hits, cache_misses,
                                                first_result=self._is_useful_result(cached))
-                    if self.case_id:
-                        self._emit_case_correlations(results)
                     continue
 
                 start_percentage = int(
@@ -225,8 +225,6 @@ class AnalysisWorker(QObject):
                 self.file_analyzed.emit(result)
                 self.contract_analyzed.emit(execution.contract)
                 self.file_state_changed.emit(resolved_path, "analyzed")
-                if self.case_id:
-                    self._emit_case_correlations(results)
                 self._emit_case_progress(
                     total_files, len(results), failed_files, ""
                 )
@@ -252,8 +250,14 @@ class AnalysisWorker(QObject):
 
             correlation_result = None
 
-            if results and self.case_id:
-                self._emit_canonical_correlations(self.case_id, results)
+            if self.case_id:
+                self.progress_changed.emit(
+                    92,
+                    "Correlacionando vestígios entre os arquivos...",
+                )
+                self._emit_case_correlations(results)
+                if results:
+                    self._emit_canonical_correlations(self.case_id, results)
             elif results:
                 self.progress_changed.emit(
                     92,
@@ -316,6 +320,28 @@ class AnalysisWorker(QObject):
             return file_path.stat().st_size
         except OSError:
             return None
+
+    @staticmethod
+    def _validated_cached_result(
+        file_path: Path, cached: AnalysisResult | None,
+    ) -> AnalysisResult | None:
+        if cached is None:
+            return None
+        try:
+            cached_path = Path(cached.file_info.path).resolve()
+            source_path = cached.evidence_source.original_path.resolve()
+            current_path = file_path.resolve()
+        except (AttributeError, OSError):
+            return None
+        if cached_path != current_path or source_path != current_path:
+            return None
+        cached_identity = EvidenceContentIdentity.from_cached_result(cached)
+        if cached_identity is None:
+            return None
+        current_identity = EvidenceContentIdentity.calculate(file_path)
+        if not cached_identity.matches(current_identity):
+            return None
+        return deepcopy(cached)
 
     def _case_profiling_scope(self):
         return profiling_scope(ProfilingBinding(self.observability, self.case_ref, None)

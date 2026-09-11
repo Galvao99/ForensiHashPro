@@ -1,3 +1,4 @@
+from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
 from time import perf_counter
@@ -25,6 +26,7 @@ from PySide6.QtWidgets import (
 )
 
 from app.models import AnalysisResult
+from app.evidence import EvidenceContentIdentity
 from app.observability.sanitization import sanitize_message
 from app.services.analysis_service import AnalysisService
 from app.services.case_deletion_service import CaseDeletionService
@@ -825,29 +827,26 @@ class MainWindow(QWidget):
             if self.current_folder_path is not None
             else ""
         )
-        cached_results = self._case_result_cache.get(case_id, {})
+        cache_candidates = self._case_result_cache.get(case_id, {})
         current_keys = {str(path.resolve()) for path in files}
-        cached_results = {
-            key: value for key, value in cached_results.items()
-            if key in current_keys and self._is_cached_result_valid(value)
+        cache_candidates = {
+            key: value for key, value in cache_candidates.items()
+            if key in current_keys and self._is_cache_candidate_eligible(value)
         }
         if case_id:
-            self._case_result_cache[case_id] = cached_results
+            self._case_result_cache[case_id] = cache_candidates
         case_identity = case_id or str(files[0].resolve())
         self._analysis_case_identity = case_identity
         self._case_file_states = {
-            str(path.resolve()): (
-                "analyzed" if str(path.resolve()) in cached_results else "pending"
-            )
-            for path in files
+            str(path.resolve()): "pending" for path in files
         }
         selected_path = self.file_strip.selected_path()
         self.current_selection = (
             CurrentCaseSelection(
                 case_id=case_id,
                 file_path=selected_path,
-                status=self._case_file_states.get(str(selected_path.resolve()), "pending"),
-                result=cached_results.get(str(selected_path.resolve())),
+                status="pending",
+                result=None,
             )
             if selected_path is not None else None
         )
@@ -857,9 +856,9 @@ class MainWindow(QWidget):
             "case_name": self.current_case_name or (self.current_folder_path.name if self.current_folder_path else files[0].name),
             "is_case": self.current_folder_path is not None,
             "total": len(files),
-            "analyzed": len(cached_results),
+            "analyzed": 0,
             "analyzing": 0,
-            "pending": len(files) - len(cached_results),
+            "pending": len(files),
             "failed": 0,
             "current_file": "",
             "file_paths": [str(path) for path in files],
@@ -874,7 +873,7 @@ class MainWindow(QWidget):
                     case_identity,
                     [(str(path), path.stat().st_size) for path in files],
                     getattr(self, "_last_ingestion_ms", 0.0),
-                    cache_entries=len(cached_results),
+                    cache_entries=len(cache_candidates),
                 )
             except Exception as error:
                 print(f"Observabilidade indisponível em begin_case ({type(error).__name__}).")
@@ -902,7 +901,7 @@ class MainWindow(QWidget):
             analysis_service=self.analysis_service,
             files=files,
             case_id=case_id or None,
-            cached_results=cached_results,
+            cached_results=cache_candidates,
             observability=observability,
         )
         self.analysis_worker.case_ref = case_ref
@@ -985,7 +984,18 @@ class MainWindow(QWidget):
             self.analysis_results.append(result)
         if self.current_folder_path is not None:
             case_id = str(self.current_folder_path.resolve())
-            self._case_result_cache.setdefault(case_id, {})[result_key] = result
+            case_cache = self._case_result_cache.setdefault(case_id, {})
+            existing = case_cache.get(result_key)
+            existing_identity = (
+                EvidenceContentIdentity.from_cached_result(existing)
+                if existing is not None else None
+            )
+            result_identity = EvidenceContentIdentity.from_cached_result(result)
+            if (
+                existing_identity is None
+                or not existing_identity.matches(result_identity)
+            ):
+                case_cache[result_key] = deepcopy(result)
 
         if self.current_selection is not None and self.current_selection.key == result_key:
             self.current_selection.status = "analyzed"
@@ -1332,18 +1342,10 @@ class MainWindow(QWidget):
         return f"{base} · {failed} falha(s)" if failed else base
 
     @staticmethod
-    def _is_cached_result_valid(result: AnalysisResult) -> bool:
-        path = Path(result.file_info.path)
-        try:
-            stat = path.stat()
-        except OSError:
-            return False
-        if stat.st_size != result.file_info.size_bytes:
-            return False
-        modified_at = result.file_info.modified_at
-        if modified_at is None:
-            return True
-        return abs(stat.st_mtime - modified_at.timestamp()) < 0.001
+    def _is_cache_candidate_eligible(result: AnalysisResult) -> bool:
+        # This UI prefilter only admits entries carrying a verified, internally
+        # consistent identity. The worker hashes the current bytes before HIT.
+        return EvidenceContentIdentity.from_cached_result(result) is not None
 
     # ==========================================================
     # PROGRESSO
