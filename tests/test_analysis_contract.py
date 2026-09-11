@@ -1,5 +1,6 @@
 from dataclasses import replace
 from datetime import datetime, timezone
+from hashlib import sha256
 import inspect
 import json
 from pathlib import Path, PurePosixPath, PureWindowsPath
@@ -40,6 +41,7 @@ from app.workers.analysis_worker import AnalysisWorker
 from app.entities import EntitySource, EntitySourceType, EntityType, NormalizedEntity
 from app.investigation.correlation_result import CorrelationResult
 from app.observability import ObservabilityService
+from app.evidence import CaptureState, EvidenceSource, FileIdentity
 
 
 UTC_NOW = datetime(2026, 8, 5, 12, 0, tzinfo=timezone.utc)
@@ -336,6 +338,24 @@ class _FakeCaseService(_FakeService):
             size_bytes=stat.st_size,
             modified_at=datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc),
         )
+        digest = sha256(path.read_bytes()).hexdigest()
+        value.hashes = replace(value.hashes, sha256=digest)
+        value.evidence_source = EvidenceSource(
+            evidence_id=f"fixture-{digest[:12]}",
+            original_name=path.name,
+            original_path=path.resolve(),
+            working_path=path.resolve(),
+            size_bytes=stat.st_size,
+            initial_sha256=digest,
+            acquired_at_utc=UTC_NOW,
+            declared_type=path.suffix or "sem_extensao",
+            detected_type=None,
+            capture_state=CaptureState.VERIFIED,
+            read_only=True,
+            acquisition_errors=(),
+            original_identity=FileIdentity.from_stat(stat),
+            final_sha256=digest,
+        )
         return value
 
     def correlate_case(self, _case_id: str, results) -> CorrelationResult:
@@ -567,6 +587,25 @@ def test_cached_partial_result_remains_partial_in_case_observability(tmp_path: P
         name=evidence.name,
         path=evidence,
         size_bytes=evidence.stat().st_size,
+    )
+    digest = sha256(evidence.read_bytes()).hexdigest()
+    stat = evidence.stat()
+    cached.hashes = replace(cached.hashes, sha256=digest)
+    cached.evidence_source = EvidenceSource(
+        evidence_id=f"fixture-{digest[:12]}",
+        original_name=evidence.name,
+        original_path=evidence.resolve(),
+        working_path=evidence.resolve(),
+        size_bytes=stat.st_size,
+        initial_sha256=digest,
+        acquired_at_utc=UTC_NOW,
+        declared_type=evidence.suffix or "sem_extensao",
+        detected_type=None,
+        capture_state=CaptureState.VERIFIED,
+        read_only=True,
+        acquisition_errors=(),
+        original_identity=FileIdentity.from_stat(stat),
+        final_sha256=digest,
     )
     observability = ObservabilityService()
     case_ref = observability.begin_case(

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import FrozenInstanceError
 from datetime import datetime, timezone
+from hashlib import sha256
 import json
 from types import SimpleNamespace
 
@@ -28,12 +29,13 @@ from app.observability.models import CorrelationRuleMetric, MeasurementState, Pe
 from app.observability.profiling import ProfilingBinding, profile_call, profiling_scope
 from app.processing import ProcessingStatus, StepResult
 from app.workers.analysis_worker import AnalysisWorker
+from app.evidence import CaptureState, EvidenceSource, FileIdentity
 
 NOW = datetime.now(timezone.utc)
 
 
 def result_for(path, *, useful=True):
-    return AnalysisResult(
+    result = AnalysisResult(
         file_info=FileInfo(path.name, path, path.suffix, 4),
         hashes=HashResult("", "", "", "a" * 64 if useful else "", "", ""),
         metadata=MetadataResult({}),
@@ -43,6 +45,27 @@ def result_for(path, *, useful=True):
         integrity=IntegrityResult(None, "Technical fixture", None, useful, False, False),
         analysis_id="fixture",
     )
+    if useful and path.exists():
+        stat = path.stat()
+        digest = sha256(path.read_bytes()).hexdigest()
+        result.hashes = HashResult("", "", "", digest, "", "")
+        result.evidence_source = EvidenceSource(
+            evidence_id=f"fixture-{digest[:12]}",
+            original_name=path.name,
+            original_path=path.resolve(),
+            working_path=path.resolve(),
+            size_bytes=stat.st_size,
+            initial_sha256=digest,
+            acquired_at_utc=NOW,
+            declared_type=path.suffix or "sem_extensao",
+            detected_type=None,
+            capture_state=CaptureState.VERIFIED,
+            read_only=True,
+            acquisition_errors=(),
+            original_identity=FileIdentity.from_stat(stat),
+            final_sha256=digest,
+        )
+    return result
 
 
 def finish(service, **extra):
@@ -419,6 +442,7 @@ def test_40_artifact_case_records_one_final_legacy_recomputation(tmp_path):
 
 def test_cached_worker_consumes_queue_without_fake_engine_calls(tmp_path):
     path = tmp_path / "cached.txt"
+    path.write_bytes(b"test")
     cached = result_for(path)
     service = ObservabilityService()
     ref = service.begin_case("case", [(str(path), 4)], 0, cache_entries=1)

@@ -6,9 +6,11 @@ from app.evidence.acquisition import (
     EvidenceManager,
 )
 from app.evidence.models import CaptureState, EvidenceSource, FileIdentity
+from app.evidence.content_identity import EvidenceContentIdentity
 
 __all__ = [
     "CaptureState",
+    "EvidenceContentIdentity",
     "EvidenceAcquisitionError",
     "EvidenceIntegrityError",
     "EvidenceLease",
